@@ -1,0 +1,18 @@
+{
+  "name": "calo-bot",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "install:all": "npm --prefix frontend install && python -m pip install -r backend/requirements.txt",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test": "python -m pytest backend/tests && npm --prefix frontend test -- --run",
+    "test:backend": "python -m pytest backend/tests",
+    "test:frontend": "npm --prefix frontend test -- --run",
+    "lint": "python -m compileall backend/app && npm --prefix frontend run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}

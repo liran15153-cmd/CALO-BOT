@@ -1,0 +1,28 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from backend.app.db import get_db
+from backend.app.services.profile_service import ProfileService
+from backend.app.services.summary_service import SummaryService
+
+router = APIRouter(prefix="/api/summaries", tags=["summaries"])
+
+
+@router.get("/daily")
+def daily_summary(db: Session = Depends(get_db)) -> dict:
+    user = ProfileService(db).get_default_user()
+    return SummaryService(db).daily_summary(user_id=user.id)
+
+
+@router.get("/weekly")
+def weekly_summary(db: Session = Depends(get_db)) -> dict:
+    user = ProfileService(db).get_default_user()
+    summary = SummaryService(db).weekly_summary(user_id=user.id)
+    return {
+        "summary": summary.summary_text,
+        "metrics": summary.metrics_json,
+        "next_action": summary.next_action,
+        "week_start": summary.week_start.isoformat(),
+        "week_end": summary.week_end.isoformat(),
+    }
+
