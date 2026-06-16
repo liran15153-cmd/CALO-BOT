@@ -23,3 +23,14 @@ Unsafe cases should:
 - Save a `safety_event`
 - Keep tone calm and non-alarming
 
+## Upload Safety
+
+Meal uploads are local-only in v1. The backend accepts JPEG, PNG, and WEBP, checks file signatures against the declared content type, stores randomized filenames, and rejects files over 5 MB.
+
+Remaining production gaps:
+
+- Re-encode images before storage
+- Strip EXIF and metadata
+- Add malware scanning if uploads become public
+- Add retention and cleanup policies
+- Avoid returning absolute local paths in public APIs

@@ -33,6 +33,16 @@ def test_anthropic_provider_calls_messages_api_with_model_and_input():
     assert result.estimated_tokens_out == 3
 
 
+def test_anthropic_provider_reports_provider_error_when_request_fails():
+    provider = AnthropicProvider(api_key="redacted", model="claude-haiku-4-5", client=FailingAnthropicClient())
+
+    result = provider.chat(AIRequest(instructions="coach", input_text="hello"))
+
+    assert result.provider_status == "provider_error"
+    assert result.used_model == "claude-haiku-4-5"
+    assert "request failed" in result.text.lower()
+
+
 class FakeUsage:
     input_tokens = 7
     output_tokens = 3
@@ -60,3 +70,13 @@ class FakeMessages:
 class FakeAnthropicClient:
     def __init__(self):
         self.messages = FakeMessages()
+
+
+class FailingMessages:
+    def create(self, **_kwargs):
+        raise RuntimeError("boom")
+
+
+class FailingAnthropicClient:
+    def __init__(self):
+        self.messages = FailingMessages()

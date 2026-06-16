@@ -40,9 +40,39 @@ describe('Dashboard UI', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText(/Complete the next planned workout/i)).toBeInTheDocument();
   });
+
+  it('does not render a fake nutrition range when the API has no estimate', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/dashboard')) {
+          return jsonResponse({
+            current_goal: null,
+            current_workout_plan: null,
+            completed_workouts_this_week: 0,
+            meals_logged_this_week: 0,
+            estimated_nutrition_range: [null, null],
+            recent_coach_notes: [],
+            current_streak: 0,
+            missed_workouts: 0,
+            next_recommended_action: 'Finish onboarding.'
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText(/No meal estimates yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/null-null/i)).not.toBeInTheDocument();
+  });
 });
 
 function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
-

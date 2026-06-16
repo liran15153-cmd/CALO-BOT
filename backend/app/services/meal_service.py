@@ -2,6 +2,7 @@ from datetime import date
 import json
 from pathlib import Path
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
@@ -54,8 +55,17 @@ class MealService:
                 "macro_ranges": {},
                 "confidence": "unavailable",
             }
+        elif result.provider_status == "provider_error":
+            payload = {
+                "message": result.text,
+                "detected_items": [],
+                "calorie_range": [None, None],
+                "macro_ranges": {},
+                "confidence": "unavailable",
+            }
         else:
             payload = self._parse_analysis_json(result.text)
+            self._apply_image_estimate(meal, payload)
 
         analysis = MealImageAnalysis(
             meal_id=meal.id,
@@ -150,6 +160,84 @@ class MealService:
             "follow_up_questions": ["Tell me approximate portion sizes to improve accuracy."],
             "confidence": "low",
         }
+
+    def _apply_image_estimate(self, meal: Meal, payload: dict) -> None:
+        calories = self._range_from_payload(payload, "calorie_range", "calories_range")
+        protein = self._macro_range(payload, "protein")
+        carbs = self._macro_range(payload, "carbs")
+        fat = self._macro_range(payload, "fat")
+
+        meal.calories_min, meal.calories_max = calories
+        meal.protein_min, meal.protein_max = protein
+        meal.carbs_min, meal.carbs_max = carbs
+        meal.fat_min, meal.fat_max = fat
+        meal.confidence = self._confidence(payload.get("confidence"))
+
+        detected_items = [item for item in payload.get("detected_items", []) if isinstance(item, dict)]
+        self.db.execute(delete(MealItem).where(MealItem.meal_id == meal.id))
+        for item in detected_items:
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            item_calories = self._range_from_item(item, "calories")
+            item_protein = self._range_from_item(item, "protein")
+            self.db.add(
+                MealItem(
+                    meal_id=meal.id,
+                    name=name[:160],
+                    quantity=str(item.get("quantity") or "").strip()[:120] or None,
+                    calories_min=item_calories[0],
+                    calories_max=item_calories[1],
+                    protein_min=item_protein[0],
+                    protein_max=item_protein[1],
+                    confidence=meal.confidence,
+                )
+            )
+
+    @classmethod
+    def _range_from_payload(cls, payload: dict, *keys: str) -> tuple[int | None, int | None]:
+        for key in keys:
+            value = payload.get(key)
+            parsed = cls._number_range(value)
+            if parsed != (None, None):
+                return parsed
+        return None, None
+
+    @classmethod
+    def _macro_range(cls, payload: dict, macro_name: str) -> tuple[int | None, int | None]:
+        macro_ranges = payload.get("macro_ranges")
+        if not isinstance(macro_ranges, dict):
+            return None, None
+        return cls._number_range(macro_ranges.get(macro_name))
+
+    @classmethod
+    def _range_from_item(cls, item: dict, prefix: str) -> tuple[int | None, int | None]:
+        direct = cls._number_range(item.get(f"{prefix}_range"))
+        if direct != (None, None):
+            return direct
+        return cls._ordered_pair(item.get(f"{prefix}_min"), item.get(f"{prefix}_max"))
+
+    @staticmethod
+    def _number_range(value: object) -> tuple[int | None, int | None]:
+        if not isinstance(value, list | tuple) or len(value) != 2:
+            return None, None
+        return MealService._ordered_pair(value[0], value[1])
+
+    @staticmethod
+    def _ordered_pair(min_value: object, max_value: object) -> tuple[int | None, int | None]:
+        if not isinstance(min_value, int | float) or not isinstance(max_value, int | float):
+            return None, None
+        low = max(0, int(min_value))
+        high = max(0, int(max_value))
+        if high < low:
+            low, high = high, low
+        return low, high
+
+    @staticmethod
+    def _confidence(value: object) -> str:
+        if value in {"low", "medium", "high"}:
+            return str(value)
+        return "low"
 
     @staticmethod
     def _estimate_manual_meal(text: str) -> dict:

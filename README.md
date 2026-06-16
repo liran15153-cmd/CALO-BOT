@@ -4,6 +4,8 @@ Local-first AI fitness coach foundation.
 
 This first version is a desktop/web app that runs locally. It focuses on a real creative product loop for fitness coaching: onboarding, coach chat, structured memory, workout planning/logging, meal logging with optional image analysis, summaries, dashboard, safety guardrails, and usage tracking.
 
+This is release-ready as a local-first product foundation. It is not ready to expose on the public internet without adding authentication, user ownership boundaries, migrations, deployment hardening, and stronger upload security.
+
 ## Run Locally
 
 ```powershell
@@ -24,6 +26,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
 - `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
 ## Current Scope
 
@@ -33,9 +36,10 @@ Included:
 - SQLite persistence
 - React/Vite frontend
 - AI provider abstraction with Anthropic Claude implementation and no-key fallback
+- Core coaching engine with safety-first intent dispatch for workout plan creation, workout logging, meal logging, and fallback chat
 - Structured memory and summaries
 - Safety guardrails
-- Local upload storage
+- Local upload storage with type allow-list, image signature checks, and a 5 MB meal-image cap
 - Dashboard backed by persisted state
 - Settings export/reset controls
 - Usage metadata for chat, image analysis, and summaries
@@ -68,6 +72,8 @@ Not included:
 - Cloud deployment
 - Mobile app
 - Medical diagnosis or clinical guidance
+- Multi-user authentication or public-user data isolation
+- Full image sanitization, EXIF stripping, malware scanning, or upload retention cleanup
 
 ## Test
 

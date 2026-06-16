@@ -25,6 +25,33 @@ def test_dashboard_returns_live_user_state(tmp_path):
     assert body["next_recommended_action"]
 
 
+def test_dashboard_next_recommended_action_reflects_available_state(tmp_path):
+    client = make_client(tmp_path)
+
+    empty_action = client.get("/api/dashboard").json()["next_recommended_action"]
+    assert empty_action == "Finish onboarding so your coach can build the first plan."
+
+    client.post("/api/onboarding", json=valid_payload())
+    client.post("/api/workout-plans", json={"prompt": "Build me a 3-day plan", "days_per_week": 3})
+    planned_action = client.get("/api/dashboard").json()["next_recommended_action"]
+    assert planned_action == "Complete the next planned workout and log one protein-focused meal."
+    assert planned_action != empty_action
+
+    client.post("/api/workout-logs", json={"text": "I skipped today's workout"})
+    missed_action = client.get("/api/dashboard").json()["next_recommended_action"]
+    assert missed_action == "Reschedule the missed workout before adding more volume."
+    assert missed_action != planned_action
+
+
+def test_dashboard_uses_null_nutrition_range_when_no_estimates_exist(tmp_path):
+    client = make_client(tmp_path)
+
+    response = client.get("/api/dashboard")
+
+    assert response.status_code == 200
+    assert response.json()["estimated_nutrition_range"] is None
+
+
 def make_client(tmp_path) -> TestClient:
     engine = make_engine(f"sqlite:///{tmp_path / 'dashboard.db'}")
     init_db(engine)
@@ -51,4 +78,3 @@ def valid_payload():
         "coaching_style": "direct",
         "consent_disclaimer": True,
     }
-

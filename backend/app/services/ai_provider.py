@@ -88,27 +88,30 @@ class AnthropicProvider:
     def analyze_image(self, image_path: Path, note: str | None = None) -> AIResult:
         mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
         encoded_image = base64.b64encode(image_path.read_bytes()).decode("ascii")
-        response = self.client.messages.create(
-            model=self.model,
-            system="Estimate meal nutrition from the supplied image. Return JSON with ranges and uncertainty.",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": mime_type,
-                                "data": encoded_image,
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                system="Estimate meal nutrition from the supplied image. Return JSON with ranges and uncertainty.",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": mime_type,
+                                    "data": encoded_image,
+                                },
                             },
-                        },
-                        {"type": "text", "text": f"User note: {note or ''}"},
-                    ],
-                }
-            ],
-            max_tokens=700,
-        )
+                            {"type": "text", "text": f"User note: {note or ''}"},
+                        ],
+                    }
+                ],
+                max_tokens=700,
+            )
+        except Exception:
+            return self._provider_error()
         text = _extract_anthropic_text(response)
         usage = getattr(response, "usage", None)
         return AIResult(
@@ -120,12 +123,15 @@ class AnthropicProvider:
         )
 
     def _responses_text(self, request: AIRequest) -> AIResult:
-        response = self.client.messages.create(
-            model=self.model,
-            system=request.instructions,
-            messages=[{"role": "user", "content": request.input_text}],
-            max_tokens=request.max_output_tokens,
-        )
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                system=request.instructions,
+                messages=[{"role": "user", "content": request.input_text}],
+                max_tokens=request.max_output_tokens,
+            )
+        except Exception:
+            return self._provider_error()
         text = _extract_anthropic_text(response)
         usage = getattr(response, "usage", None)
         return AIResult(
@@ -135,6 +141,13 @@ class AnthropicProvider:
             estimated_tokens_in=getattr(usage, "input_tokens", None)
             or _rough_token_count(request.instructions + "\n" + request.input_text),
             estimated_tokens_out=getattr(usage, "output_tokens", None) or _rough_token_count(text),
+        )
+
+    def _provider_error(self) -> AIResult:
+        return AIResult(
+            text="AI provider request failed. Check Anthropic credentials, model access, or request payload.",
+            provider_status="provider_error",
+            used_model=self.model,
         )
 
 

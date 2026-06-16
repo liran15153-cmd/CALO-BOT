@@ -30,6 +30,25 @@ def test_context_builder_uses_compact_context_not_full_chat_history(tmp_path):
     assert "turn 7" in str(context)
 
 
+def test_context_builder_filters_memories_for_intent(tmp_path):
+    db = make_session(tmp_path)
+    profile_service = ProfileService(db)
+    profile = profile_service.upsert_onboarding(valid_payload())
+    db.add_all(
+        [
+            UserMemory(user_id=profile.user_id, memory_type="equipment", content="User has access to dumbbells"),
+            UserMemory(user_id=profile.user_id, memory_type="nutrition", content="User avoids dairy"),
+            UserMemory(user_id=profile.user_id, memory_type="schedule", content="User trains after work"),
+        ]
+    )
+    db.commit()
+
+    context = ContextBuilder(db).build(user_id=profile.user_id, intent="meal_log")
+
+    assert "User avoids dairy" in context["memories"]
+    assert "User has access to dumbbells" not in context["memories"]
+
+
 def make_session(tmp_path):
     engine = make_engine(f"sqlite:///{tmp_path / 'context.db'}")
     init_db(engine)
@@ -49,4 +68,3 @@ def valid_payload():
         coaching_style="direct",
         consent_disclaimer=True,
     )
-

@@ -43,6 +43,22 @@ export type ChatResponse = {
   provider_status: string;
 };
 
+export type ChatSession = {
+  id: number;
+  title: string;
+  is_active: boolean;
+};
+
+export type ChatMessage = {
+  id: number;
+  session_id: number;
+  role: 'user' | 'coach' | 'system';
+  content: string;
+  provider_status?: string | null;
+  safety_flagged?: boolean;
+  created_at?: string | null;
+};
+
 export type WorkoutPlan = {
   id: number;
   is_current: boolean;
@@ -96,9 +112,22 @@ export type MealAnalysis = {
   id: number;
   meal_id: number;
   provider_status: string;
-  detected_items: unknown[];
+  detected_items: Array<{
+    name?: string;
+    quantity?: string | null;
+  }>;
   follow_up_questions?: string[];
   message: string;
+  analysis?: {
+    calorie_range?: [number | null, number | null];
+    calories_range?: [number | null, number | null];
+    macro_ranges?: {
+      protein?: [number | null, number | null];
+      carbs?: [number | null, number | null];
+      fat?: [number | null, number | null];
+    };
+    confidence?: string;
+  };
 };
 
 export type DashboardState = {
@@ -106,7 +135,7 @@ export type DashboardState = {
   current_workout_plan: { name: string } | null;
   completed_workouts_this_week: number;
   meals_logged_this_week: number;
-  estimated_nutrition_range: [number, number] | null;
+  estimated_nutrition_range: [number | null, number | null] | null;
   recent_coach_notes: string[];
   current_streak: number;
   missed_workouts: number;
@@ -175,6 +204,36 @@ export async function sendChatMessage(message: string, sessionId?: number): Prom
   return response.json();
 }
 
+export async function createChatSession(title = 'Coach chat'): Promise<ChatSession> {
+  const response = await fetch(`${API_BASE}/api/chat/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) {
+    throw new Error(`Chat session creation failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function resetChatSession(sessionId: number): Promise<ChatSession> {
+  const response = await fetch(`${API_BASE}/api/chat/sessions/${sessionId}/reset`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    throw new Error(`Chat session reset failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchChatMessages(sessionId: number): Promise<ChatMessage[]> {
+  const response = await fetch(`${API_BASE}/api/chat/messages?session_id=${sessionId}`);
+  if (!response.ok) {
+    throw new Error(`Chat messages fetch failed: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> {
   const response = await fetch(`${API_BASE}/api/workout-plans`, {
     method: 'POST',
@@ -183,6 +242,17 @@ export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> 
   });
   if (!response.ok) {
     throw new Error(`Workout plan generation failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchCurrentWorkoutPlan(): Promise<WorkoutPlan | null> {
+  const response = await fetch(`${API_BASE}/api/workout-plans/current`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`Current workout plan fetch failed: ${response.status}`);
   }
   return response.json();
 }

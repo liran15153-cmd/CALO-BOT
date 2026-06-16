@@ -12,6 +12,9 @@ describe('Workout plan UI', () => {
         if (url.endsWith('/api/health')) {
           return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
         }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse({}, 404);
+        }
         if (url.endsWith('/api/workout-plans') && init?.method === 'POST') {
           return jsonResponse({
             id: 1,
@@ -60,6 +63,46 @@ describe('Workout plan UI', () => {
     expect(screen.getByText(/Goblet squat/i)).toBeInTheDocument();
   });
 
+  it('loads and displays the current persisted workout plan', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse({
+            id: 9,
+            is_current: true,
+            name: 'Saved Strength Plan',
+            goal: 'improve_strength',
+            days_per_week: 2,
+            equipment_needed: ['resistance bands'],
+            days: [
+              {
+                name: 'Tuesday Full Body',
+                warmup: ['5 minutes easy cardio'],
+                difficulty: 'moderate',
+                exercises: [{ name: 'Band row', sets: '3', reps_or_duration: '10-12 reps', rest: '75 sec' }]
+              }
+            ],
+            progression_rule: 'Add reps first.',
+            recovery_note: 'Respect knee limitation.'
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Workouts/i }));
+
+    expect(await screen.findByText(/Saved Strength Plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Band row/i)).toBeInTheDocument();
+  });
+
   it('logs a workout from natural language text', async () => {
     render(<App />);
 
@@ -74,6 +117,6 @@ describe('Workout plan UI', () => {
   });
 });
 
-function jsonResponse(body: unknown): Response {
-  return { ok: true, status: 200, json: async () => body } as Response;
+function jsonResponse(body: unknown, status = 200): Response {
+  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
 }

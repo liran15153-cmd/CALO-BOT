@@ -8,7 +8,7 @@ class ContextBuilder:
     def __init__(self, db: Session):
         self.db = db
 
-    def build(self, user_id: int, session_id: int | None = None) -> dict:
+    def build(self, user_id: int, session_id: int | None = None, intent: str | None = None) -> dict:
         profile = self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
         plan = self.db.scalar(
             select(WorkoutPlan)
@@ -21,12 +21,11 @@ class ContextBuilder:
         meals = self.db.scalars(
             select(Meal).where(Meal.user_id == user_id).order_by(desc(Meal.eaten_on)).limit(5)
         ).all()
-        memories = self.db.scalars(
-            select(UserMemory)
-            .where(UserMemory.user_id == user_id, UserMemory.is_sensitive.is_(False))
-            .order_by(desc(UserMemory.created_at))
-            .limit(6)
-        ).all()
+        memory_query = select(UserMemory).where(UserMemory.user_id == user_id, UserMemory.is_sensitive.is_(False))
+        relevant_types = self._memory_types_for_intent(intent)
+        if relevant_types:
+            memory_query = memory_query.where(UserMemory.memory_type.in_(relevant_types))
+        memories = self.db.scalars(memory_query.order_by(desc(UserMemory.created_at)).limit(6)).all()
 
         recent_chat = []
         if session_id is not None:
@@ -64,6 +63,14 @@ class ContextBuilder:
         }
 
     @staticmethod
+    def _memory_types_for_intent(intent: str | None) -> set[str]:
+        if intent in {"meal_log", "meal_image"}:
+            return {"nutrition", "allergy", "preference"}
+        if intent in {"workout_plan", "workout_log"}:
+            return {"equipment", "schedule", "preference"}
+        return set()
+
+    @staticmethod
     def _profile(profile: UserProfile | None) -> dict:
         if profile is None:
             return {}
@@ -90,4 +97,3 @@ class ContextBuilder:
             "equipment_needed": plan.equipment_needed or [],
             "progression_rule": plan.progression_rule,
         }
-

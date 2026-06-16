@@ -68,6 +68,52 @@ describe('Meals UI', () => {
     expect(await screen.findByText(/120-220 calories/i)).toBeInTheDocument();
     expect(screen.getByText(/25-35g protein/i)).toBeInTheDocument();
   });
+
+  it('shows configured image analysis ranges, detected items, and follow-up questions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'configured' });
+        }
+        if (url.endsWith('/api/meals/upload') && init?.method === 'POST') {
+          return jsonResponse({ id: 1, note: 'Lunch', image_path: 'data/uploads/meals/1/lunch.jpg', confidence: 'not_analyzed' });
+        }
+        if (url.endsWith('/api/meals/1/analyze') && init?.method === 'POST') {
+          return jsonResponse({
+            id: 1,
+            meal_id: 1,
+            provider_status: 'configured',
+            detected_items: [{ name: 'chicken rice bowl', quantity: '1 bowl' }],
+            follow_up_questions: ['How much rice was in the bowl?'],
+            message: '',
+            analysis: {
+              calorie_range: [520, 760],
+              macro_ranges: { protein: [35, 52] },
+              confidence: 'medium'
+            }
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Meals/i }));
+    fireEvent.change(screen.getByLabelText(/Meal note/i), { target: { value: 'Lunch' } });
+    fireEvent.change(screen.getByLabelText(/Meal image/i), {
+      target: { files: [new File(['fake'], 'lunch.jpg', { type: 'image/jpeg' })] }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Upload meal/i }));
+    await screen.findByText(/not_analyzed/i);
+    fireEvent.click(screen.getByRole('button', { name: /Analyze image/i }));
+
+    expect(await screen.findByText(/520-760 calories/i)).toBeInTheDocument();
+    expect(screen.getByText(/35-52g protein/i)).toBeInTheDocument();
+    expect(screen.getByText(/chicken rice bowl/i)).toBeInTheDocument();
+    expect(screen.getByText(/How much rice/i)).toBeInTheDocument();
+  });
 });
 
 function jsonResponse(body: unknown): Response {

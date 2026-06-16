@@ -6,7 +6,7 @@ import { analyzeMealImage, saveManualMeal, uploadMealImage, type Meal, type Meal
 export function MealsPanel() {
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [manualText, setManualText] = useState('Log protein shake 25g protein');
+  const [manualText, setManualText] = useState('');
   const [meal, setMeal] = useState<Meal | null>(null);
   const [manualMeal, setManualMeal] = useState<Meal | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
@@ -43,10 +43,13 @@ export function MealsPanel() {
 
   async function handleManualMeal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmed = manualText.trim();
+    if (!trimmed) return;
     setStatus('uploading');
     try {
-      const saved = await saveManualMeal(manualText);
+      const saved = await saveManualMeal(trimmed);
       setManualMeal(saved);
+      setManualText('');
       setStatus('idle');
     } catch {
       setStatus('error');
@@ -96,7 +99,18 @@ export function MealsPanel() {
       {analysis && (
         <div className="log-result">
           <strong>{analysis.provider_status}</strong>
-          <span>{analysis.message}</span>
+          {analysis.message ? <span>{analysis.message}</span> : null}
+          {formatRange(analysis.analysis?.calorie_range ?? analysis.analysis?.calories_range, 'calories')}
+          {formatRange(analysis.analysis?.macro_ranges?.protein, 'g protein')}
+          {analysis.detected_items.map((item) =>
+            item.name ? (
+              <span key={`${item.name}-${item.quantity ?? ''}`}>
+                {item.name}
+                {item.quantity ? `, ${item.quantity}` : ''}
+              </span>
+            ) : null
+          )}
+          {analysis.follow_up_questions?.map((question) => <span key={question}>{question}</span>)}
         </div>
       )}
 
@@ -105,8 +119,13 @@ export function MealsPanel() {
         <form className="composer" onSubmit={handleManualMeal}>
           <label htmlFor="manual-meal">Manual meal</label>
           <div className="composer-row">
-            <textarea id="manual-meal" value={manualText} onChange={(event) => setManualText(event.target.value)} />
-            <button className="primary-button icon-button" type="submit">
+            <textarea
+              id="manual-meal"
+              value={manualText}
+              onChange={(event) => setManualText(event.target.value)}
+              placeholder="Log protein shake 25g protein."
+            />
+            <button className="primary-button icon-button" type="submit" disabled={!manualText.trim()}>
               Save meal log
             </button>
           </div>
@@ -126,5 +145,19 @@ export function MealsPanel() {
 
       {status === 'error' && <p className="error-text">Meal request failed.</p>}
     </section>
+  );
+}
+
+function formatRange(range: [number | null, number | null] | undefined, unit: string) {
+  if (!range || range[0] == null || range[1] == null) {
+    return null;
+  }
+  const separator = unit.startsWith('g ') ? '' : ' ';
+  return (
+    <span>
+      {range[0]}-{range[1]}
+      {separator}
+      {unit}
+    </span>
   );
 }

@@ -54,6 +54,8 @@ def list_messages(session_id: int, db: Session = Depends(get_db)) -> list[dict[s
             "session_id": message.session_id,
             "role": message.role,
             "content": message.content,
+            "provider_status": (message.metadata_json or {}).get("provider_status"),
+            "safety_flagged": bool((message.metadata_json or {}).get("safety")),
             "created_at": message.created_at.isoformat() if message.created_at else None,
         }
         for message in messages

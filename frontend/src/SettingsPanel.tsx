@@ -7,6 +7,8 @@ export function SettingsPanel() {
   const [settings, setSettings] = useState<SettingsState | null>(null);
   const [usage, setUsage] = useState<UsageState | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [resetArmed, setResetArmed] = useState(false);
+  const [actionStatus, setActionStatus] = useState<'idle' | 'busy' | 'error'>('idle');
   const [actionMessage, setActionMessage] = useState<string>('');
   const [exportData, setExportData] = useState<unknown>(null);
 
@@ -35,16 +37,34 @@ export function SettingsPanel() {
 
   async function handleExport() {
     setActionMessage('');
+    setActionStatus('busy');
     const data = await exportSettingsData();
     setExportData(data);
     setActionMessage('Export ready');
+    setActionStatus('idle');
   }
 
   async function handleReset() {
+    if (!resetArmed) {
+      setResetArmed(true);
+      setActionMessage('Click reset again to confirm deletion.');
+      return;
+    }
     setActionMessage('');
-    const result = await resetLocalData();
-    setExportData(null);
-    setActionMessage(`${result.deleted_records} records deleted`);
+    setActionStatus('busy');
+    try {
+      const result = await resetLocalData();
+      setExportData(null);
+      setResetArmed(false);
+      setActionMessage(`${result.deleted_records} records deleted`);
+      const [settingsData, usageData] = await Promise.all([fetchSettings(), fetchUsage()]);
+      setSettings(settingsData);
+      setUsage(usageData);
+      setActionStatus('idle');
+    } catch {
+      setActionStatus('error');
+      setActionMessage('Reset failed');
+    }
   }
 
   if (status === 'loading') {
@@ -117,13 +137,13 @@ export function SettingsPanel() {
       ) : null}
 
       <div className="settings-actions">
-        <button className="ghost-button" type="button" onClick={handleExport}>
+        <button className="ghost-button" type="button" onClick={handleExport} disabled={actionStatus === 'busy'}>
           <Download size={16} aria-hidden="true" />
           Export
         </button>
-        <button className="ghost-button danger-button" type="button" onClick={handleReset}>
+        <button className="ghost-button danger-button" type="button" onClick={handleReset} disabled={actionStatus === 'busy'}>
           <RotateCcw size={16} aria-hidden="true" />
-          Reset local data
+          {resetArmed ? 'Confirm reset' : 'Reset local data'}
         </button>
       </div>
 

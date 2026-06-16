@@ -1,21 +1,36 @@
 import { Dumbbell } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { generateWorkoutPlan, saveWorkoutLog, type WorkoutLog, type WorkoutPlan } from './api';
+import { fetchCurrentWorkoutPlan, generateWorkoutPlan, saveWorkoutLog, type WorkoutLog, type WorkoutPlan } from './api';
 
 export function WorkoutsPanel() {
-  const [prompt, setPrompt] = useState('Build me a 3-day gym plan for muscle');
-  const [logText, setLogText] = useState('I did 3 sets of bench press 10, 8, 7 with 50kg');
+  const [prompt, setPrompt] = useState('');
+  const [logText, setLogText] = useState('');
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [logStatus, setLogStatus] = useState<'idle' | 'saving' | 'error'>('idle');
 
+  useEffect(() => {
+    let active = true;
+    fetchCurrentWorkoutPlan()
+      .then((currentPlan) => {
+        if (!active || !currentPlan) return;
+        setPlan(currentPlan);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
     setStatus('loading');
     try {
-      const nextPlan = await generateWorkoutPlan(prompt);
+      const nextPlan = await generateWorkoutPlan(trimmed);
       setPlan(nextPlan);
       setStatus('idle');
     } catch {
@@ -25,9 +40,11 @@ export function WorkoutsPanel() {
 
   async function handleLog(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmed = logText.trim();
+    if (!trimmed) return;
     setLogStatus('saving');
     try {
-      const saved = await saveWorkoutLog(logText);
+      const saved = await saveWorkoutLog(trimmed);
       setLastLog(saved);
       setLogText('');
       setLogStatus('idle');
@@ -46,8 +63,13 @@ export function WorkoutsPanel() {
       <form className="composer" onSubmit={handleGenerate}>
         <label htmlFor="plan-request">Plan request</label>
         <div className="composer-row">
-          <textarea id="plan-request" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-          <button className="primary-button icon-button" type="submit" disabled={status === 'loading'}>
+          <textarea
+            id="plan-request"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="Create a 3-day plan using my profile and available equipment."
+          />
+          <button className="primary-button icon-button" type="submit" disabled={status === 'loading' || !prompt.trim()}>
             <Dumbbell size={17} aria-hidden="true" />
             Generate plan
           </button>
@@ -88,8 +110,13 @@ export function WorkoutsPanel() {
         <form className="composer" onSubmit={handleLog}>
           <label htmlFor="workout-log">Workout log</label>
           <div className="composer-row">
-            <textarea id="workout-log" value={logText} onChange={(event) => setLogText(event.target.value)} />
-            <button className="primary-button icon-button" type="submit" disabled={logStatus === 'saving'}>
+            <textarea
+              id="workout-log"
+              value={logText}
+              onChange={(event) => setLogText(event.target.value)}
+              placeholder="I did 3 sets of bench press 10, 8, 7 with 50kg."
+            />
+            <button className="primary-button icon-button" type="submit" disabled={logStatus === 'saving' || !logText.trim()}>
               Save workout log
             </button>
           </div>

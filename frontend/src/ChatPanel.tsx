@@ -1,11 +1,13 @@
 import { RotateCcw, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { sendChatMessage } from './api';
+import { createChatSession, fetchChatMessages, resetChatSession, sendChatMessage } from './api';
 
 type Message = {
   role: 'user' | 'coach';
   content: string;
+  providerStatus?: string | null;
+  safetyFlagged?: boolean;
 };
 
 export function ChatPanel() {
@@ -19,6 +21,31 @@ export function ChatPanel() {
   ]);
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle');
 
+  useEffect(() => {
+    let active = true;
+    createChatSession()
+      .then(async (session) => {
+        if (!active) return;
+        setSessionId(session.id);
+        const persisted = await fetchChatMessages(session.id);
+        if (!active || persisted.length === 0) return;
+        setMessages(
+          persisted
+            .filter((item): item is typeof item & { role: 'user' | 'coach' } => item.role === 'user' || item.role === 'coach')
+            .map((item) => ({
+              role: item.role,
+              content: item.content,
+              providerStatus: item.provider_status,
+              safetyFlagged: item.safety_flagged
+            }))
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = message.trim();
@@ -31,7 +58,15 @@ export function ChatPanel() {
     try {
       const response = await sendChatMessage(trimmed, sessionId);
       setSessionId(response.session_id);
-      setMessages((current) => [...current, { role: 'coach', content: response.response }]);
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'coach',
+          content: response.response,
+          providerStatus: response.provider_status,
+          safetyFlagged: response.safety_flagged
+        }
+      ]);
       setStatus('idle');
     } catch {
       setMessages((current) => [...current, { role: 'coach', content: 'Could not reach the coach API.' }]);
@@ -49,8 +84,12 @@ export function ChatPanel() {
         <button
           className="ghost-button"
           type="button"
-          onClick={() => {
-            setSessionId(undefined);
+          onClick={async () => {
+            if (sessionId) {
+              await resetChatSession(sessionId).catch(() => undefined);
+            }
+            const nextSession = await createChatSession('Coach chat').catch(() => null);
+            setSessionId(nextSession?.id);
             setMessages([
               {
                 role: 'coach',
@@ -68,6 +107,11 @@ export function ChatPanel() {
         {messages.map((item, index) => (
           <div key={`${item.role}-${index}-${item.content.slice(0, 12)}`} className={`message-bubble ${item.role}`}>
             {item.content}
+            {(item.providerStatus || item.safetyFlagged) && (
+              <small>
+                {item.safetyFlagged ? 'Safety flagged' : item.providerStatus}
+              </small>
+            )}
           </div>
         ))}
         {status === 'sending' && <div className="message-bubble coach">Thinking...</div>}

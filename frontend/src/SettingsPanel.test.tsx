@@ -72,6 +72,8 @@ describe('Settings UI', () => {
     expect(await screen.findByText(/Export ready/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Reset local data/i }));
+    expect(await screen.findByText(/confirm deletion/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Confirm reset/i }));
     expect(await screen.findByText(/3 records deleted/i)).toBeInTheDocument();
   });
 });

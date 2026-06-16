@@ -4,7 +4,7 @@ import re
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import WorkoutLog, WorkoutPlan
+from backend.app.models import UserProfile, Workout, WorkoutExercise, WorkoutLog, WorkoutPlan
 from backend.app.schemas import StructuredWorkoutPlan, WorkoutLogRequest, WorkoutPlanRequest
 
 
@@ -13,10 +13,21 @@ class WorkoutService:
         self.db = db
 
     def generate_plan(self, user_id: int, request: WorkoutPlanRequest) -> WorkoutPlan:
-        days_per_week = request.days_per_week or self._infer_days(request.prompt) or 3
-        equipment = request.equipment or ["bodyweight"]
-        goal = self._infer_goal(request.prompt)
-        plan = self._build_plan(goal=goal, days_per_week=days_per_week, equipment=equipment)
+        profile = self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        days_per_week = request.days_per_week or self._infer_days(request.prompt) or self._profile_days(profile) or 3
+        equipment = request.equipment or self._profile_equipment(profile) or ["bodyweight"]
+        goal = self._infer_goal(request.prompt) or (profile.main_goal if profile else None) or "improve_fitness"
+        session_length_minutes = (
+            request.session_length_minutes or (profile.session_length_minutes if profile else None) or 45
+        )
+        plan = self._build_plan(
+            goal=goal,
+            days_per_week=days_per_week,
+            equipment=equipment,
+            session_length_minutes=session_length_minutes,
+            preferred_days=profile.preferred_workout_days if profile else [],
+            limitations=profile.injuries_limitations if profile else None,
+        )
 
         for current in self.db.scalars(
             select(WorkoutPlan).where(WorkoutPlan.user_id == user_id, WorkoutPlan.is_current.is_(True))
@@ -36,6 +47,8 @@ class WorkoutService:
             is_current=True,
         )
         self.db.add(record)
+        self.db.flush()
+        self._create_workout_rows(user_id=user_id, plan_id=record.id, plan=plan)
         self.db.commit()
         self.db.refresh(record)
         return record
@@ -55,6 +68,31 @@ class WorkoutService:
             **record.plan_json,
         }
 
+    def _create_workout_rows(self, user_id: int, plan_id: int, plan: StructuredWorkoutPlan) -> None:
+        for day in plan.days:
+            workout = Workout(
+                user_id=user_id,
+                plan_id=plan_id,
+                name=day.name,
+                scheduled_day=day.name.split(" ", 1)[0],
+                difficulty=day.difficulty,
+                workout_json=day.model_dump(),
+            )
+            self.db.add(workout)
+            self.db.flush()
+            for exercise in day.exercises:
+                self.db.add(
+                    WorkoutExercise(
+                        workout_id=workout.id,
+                        name=exercise.name,
+                        sets=exercise.sets,
+                        reps_or_duration=exercise.reps_or_duration,
+                        rest=exercise.rest,
+                        notes=exercise.notes,
+                        alternatives=exercise.alternatives,
+                    )
+                )
+
     @staticmethod
     def _infer_days(prompt: str) -> int | None:
         match = re.search(r"(\d)[ -]?day", prompt.lower())
@@ -63,7 +101,7 @@ class WorkoutService:
         return None
 
     @staticmethod
-    def _infer_goal(prompt: str) -> str:
+    def _infer_goal(prompt: str) -> str | None:
         text = prompt.lower()
         if "muscle" in text:
             return "build_muscle"
@@ -73,19 +111,44 @@ class WorkoutService:
             return "improve_endurance"
         if "fat" in text:
             return "lose_fat"
-        return "improve_fitness"
+        return None
 
     @staticmethod
-    def _build_plan(goal: str, days_per_week: int, equipment: list[str]) -> StructuredWorkoutPlan:
+    def _profile_days(profile: UserProfile | None) -> int | None:
+        if profile is None:
+            return None
+        return max(1, min(7, profile.weekly_availability))
+
+    @staticmethod
+    def _profile_equipment(profile: UserProfile | None) -> list[str]:
+        if profile is None:
+            return []
+        return profile.available_equipment or []
+
+    @staticmethod
+    def _build_plan(
+        goal: str,
+        days_per_week: int,
+        equipment: list[str],
+        session_length_minutes: int = 45,
+        preferred_days: list[str] | None = None,
+        limitations: str | None = None,
+    ) -> StructuredWorkoutPlan:
         has_dumbbells = any("dumbbell" in item.lower() for item in equipment)
+        has_bands = any("band" in item.lower() for item in equipment)
         primary_lower = "Goblet squat" if has_dumbbells else "Bodyweight squat"
         push = "Dumbbell floor press" if has_dumbbells else "Push-up"
-        pull = "One-arm dumbbell row" if has_dumbbells else "Towel row"
+        pull = "One-arm dumbbell row" if has_dumbbells else "Band row" if has_bands else "Towel row"
+        limitation_note = f" Respect this limitation: {limitations}" if limitations else ""
+        safety_notes = ["Stop if sharp pain appears"]
+        if limitations:
+            safety_notes.append(f"Adjust around limitation: {limitations}")
         days = []
         for index in range(days_per_week):
+            day_label = preferred_days[index] if preferred_days and index < len(preferred_days) else f"Day {index + 1}"
             days.append(
                 {
-                    "name": f"Day {index + 1} Full Body",
+                    "name": f"{day_label} Full Body",
                     "warmup": ["5 minutes easy cardio", "Hip hinge drill", "Shoulder circles"],
                     "exercises": [
                         {
@@ -93,10 +156,10 @@ class WorkoutService:
                             "sets": "3",
                             "reps_or_duration": "8-12 reps",
                             "rest": "90 sec",
-                            "notes": "Use a pain-free range and controlled tempo.",
+                            "notes": f"Use a pain-free range and controlled tempo.{limitation_note}",
                             "difficulty": "moderate",
                             "alternatives": ["Box squat", "Split squat"],
-                            "safety_notes": ["Stop if sharp pain appears"],
+                            "safety_notes": safety_notes,
                         },
                         {
                             "name": push,
@@ -120,9 +183,12 @@ class WorkoutService:
                         },
                     ],
                     "difficulty": "moderate",
-                    "notes": "Finish feeling like you could do a little more.",
+                    "notes": f"Keep the session near {session_length_minutes} minutes and finish with energy left.",
                 }
             )
+        recovery_note = "If soreness or fatigue is high, reduce one set per exercise or take an extra rest day."
+        if limitations:
+            recovery_note = f"{recovery_note} Work around reported limitation: {limitations}."
         return StructuredWorkoutPlan(
             name=f"{days_per_week}-Day {goal.replace('_', ' ').title()} Plan",
             goal=goal,
@@ -131,7 +197,7 @@ class WorkoutService:
             equipment_needed=equipment,
             days=days,
             progression_rule="When all sets reach the top of the rep range with good form, increase load slightly or add reps first.",
-            recovery_note="If soreness or fatigue is high, reduce one set per exercise or take an extra rest day.",
+            recovery_note=recovery_note,
         )
 
     def parse_log(self, user_id: int, request: WorkoutLogRequest) -> WorkoutLog:

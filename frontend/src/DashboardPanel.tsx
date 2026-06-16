@@ -41,9 +41,7 @@ export function DashboardPanel() {
     );
   }
 
-  const nutritionRange = dashboard.estimated_nutrition_range
-    ? `${dashboard.estimated_nutrition_range[0]}-${dashboard.estimated_nutrition_range[1]} kcal`
-    : 'No meal estimates yet';
+  const nutritionRange = formatNutritionRange(dashboard.estimated_nutrition_range);
 
   return (
     <section className="panel dashboard-panel">
@@ -94,6 +92,13 @@ export function DashboardPanel() {
       ) : null}
     </section>
   );
+}
+
+function formatNutritionRange(range: DashboardState['estimated_nutrition_range']): string {
+  if (!range || range[0] == null || range[1] == null) {
+    return 'No meal estimates yet';
+  }
+  return `${range[0]}-${range[1]} kcal`;
 }
 
 function MetricCard({
