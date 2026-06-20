@@ -14,5 +14,5 @@ def test_health_returns_ready_status():
         "service": "calo-coach",
         "database": "configured",
         "ai_provider": "not_configured",
+        "no_api_key_mode": True,
     }
-

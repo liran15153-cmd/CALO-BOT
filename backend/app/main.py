@@ -11,6 +11,7 @@ from backend.app.api.usage import router as usage_router
 from backend.app.api.workouts import logs_router, router as workout_plans_router, workouts_router
 from backend.app.config import get_settings
 from backend.app.db import init_db
+from backend.app.schemas import HealthResponse
 
 
 settings = get_settings()
@@ -27,15 +28,16 @@ app.add_middleware(
 )
 
 
-@app.get("/api/health")
-def health() -> dict[str, str]:
+@app.get("/api/health", response_model=HealthResponse)
+def health() -> HealthResponse:
     current_settings = get_settings()
-    return {
-        "status": "ok",
-        "service": "calo-coach",
-        "database": "configured" if current_settings.database_url else "not_configured",
-        "ai_provider": current_settings.ai_provider_status,
-    }
+    return HealthResponse(
+        status="ok",
+        service="calo-coach",
+        database="configured" if current_settings.database_url else "not_configured",
+        ai_provider=current_settings.ai_provider_status,
+        no_api_key_mode=current_settings.ai_provider_status == "not_configured",
+    )
 
 
 app.include_router(onboarding_router)

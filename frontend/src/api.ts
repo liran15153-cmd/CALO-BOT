@@ -5,6 +5,7 @@ export type HealthStatus = {
   service: string;
   database: string;
   ai_provider: string;
+  no_api_key_mode?: boolean;
 };
 
 export type OnboardingPayload = {

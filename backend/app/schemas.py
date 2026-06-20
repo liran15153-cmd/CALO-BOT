@@ -220,6 +220,14 @@ class SettingsResponse(BaseModel):
     disclaimer: str
 
 
+class HealthResponse(BaseModel):
+    status: str
+    service: str
+    database: str
+    ai_provider: str
+    no_api_key_mode: bool
+
+
 class ResetResponse(BaseModel):
     deleted_records: int
     message: str
