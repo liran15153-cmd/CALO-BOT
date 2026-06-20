@@ -25,6 +25,7 @@ const navItems: Array<{ id: View; label: string; icon: typeof LayoutDashboard }>
 function App() {
   const [view, setView] = useState<View>('dashboard');
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const isNoApiKeyMode = health?.no_api_key_mode ?? health?.ai_provider === 'not_configured';
 
   useEffect(() => {
     fetchHealth()
@@ -76,6 +77,12 @@ function App() {
             <p>בינה מלאכותית: {formatProviderStatus(health?.ai_provider)}</p>
           </div>
         </div>
+        {isNoApiKeyMode ? (
+          <div className="provider-alert" role="status" aria-live="polite">
+            <span>AI provider is not configured</span>
+            <p>The app is running in local-only mode. Core coaching features stay usable without external calls.</p>
+          </div>
+        ) : null}
       </aside>
 
       <section className="workspace">
