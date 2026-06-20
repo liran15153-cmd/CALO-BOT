@@ -162,12 +162,15 @@ export type UsageState = {
   summary_requests_count: number;
   estimated_tokens_in: number;
   estimated_tokens_out: number;
+  estimated_tokens_total: number;
+  daily_ai_token_limit: number;
+  tokens_remaining: number;
 };
 
 export async function fetchHealth(): Promise<HealthStatus> {
   const response = await fetch(`${API_BASE}/api/health`);
   if (!response.ok) {
-    throw new Error(`Health check failed: ${response.status}`);
+    throw new Error(`בדיקת תקינות נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -175,7 +178,7 @@ export async function fetchHealth(): Promise<HealthStatus> {
 export async function fetchOnboarding(): Promise<OnboardingState> {
   const response = await fetch(`${API_BASE}/api/onboarding`);
   if (!response.ok) {
-    throw new Error(`Onboarding fetch failed: ${response.status}`);
+    throw new Error(`טעינת פרופיל ראשוני נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -187,7 +190,7 @@ export async function saveOnboarding(payload: OnboardingPayload): Promise<Onboar
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
-    throw new Error(`Onboarding save failed: ${response.status}`);
+    throw new Error(`שמירת פרופיל ראשוני נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -199,19 +202,19 @@ export async function sendChatMessage(message: string, sessionId?: number): Prom
     body: JSON.stringify({ message, session_id: sessionId ?? null })
   });
   if (!response.ok) {
-    throw new Error(`Chat request failed: ${response.status}`);
+    throw new Error(`בקשת הצ'אט נכשלה: ${response.status}`);
   }
   return response.json();
 }
 
-export async function createChatSession(title = 'Coach chat'): Promise<ChatSession> {
+export async function createChatSession(title = 'צ\'אט מאמן'): Promise<ChatSession> {
   const response = await fetch(`${API_BASE}/api/chat/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title })
   });
   if (!response.ok) {
-    throw new Error(`Chat session creation failed: ${response.status}`);
+    throw new Error(`יצירת שיחת מאמן נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -221,7 +224,7 @@ export async function resetChatSession(sessionId: number): Promise<ChatSession> 
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`Chat session reset failed: ${response.status}`);
+    throw new Error(`איפוס שיחת המאמן נכשל: ${response.status}`);
   }
   return response.json();
 }
@@ -229,7 +232,7 @@ export async function resetChatSession(sessionId: number): Promise<ChatSession> 
 export async function fetchChatMessages(sessionId: number): Promise<ChatMessage[]> {
   const response = await fetch(`${API_BASE}/api/chat/messages?session_id=${sessionId}`);
   if (!response.ok) {
-    throw new Error(`Chat messages fetch failed: ${response.status}`);
+    throw new Error(`טעינת הודעות הצ'אט נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -241,7 +244,7 @@ export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> 
     body: JSON.stringify({ prompt })
   });
   if (!response.ok) {
-    throw new Error(`Workout plan generation failed: ${response.status}`);
+    throw new Error(`יצירת תוכנית האימון נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -252,7 +255,7 @@ export async function fetchCurrentWorkoutPlan(): Promise<WorkoutPlan | null> {
     return null;
   }
   if (!response.ok) {
-    throw new Error(`Current workout plan fetch failed: ${response.status}`);
+    throw new Error(`טעינת תוכנית האימון הנוכחית נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -264,7 +267,7 @@ export async function saveWorkoutLog(text: string): Promise<WorkoutLog> {
     body: JSON.stringify({ text })
   });
   if (!response.ok) {
-    throw new Error(`Workout log save failed: ${response.status}`);
+    throw new Error(`שמירת תיעוד האימון נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -278,7 +281,7 @@ export async function uploadMealImage(note: string, file: File): Promise<Meal> {
     body: formData
   });
   if (!response.ok) {
-    throw new Error(`Meal upload failed: ${response.status}`);
+    throw new Error(`העלאת הארוחה נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -288,7 +291,7 @@ export async function analyzeMealImage(mealId: number): Promise<MealAnalysis> {
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`Meal analysis failed: ${response.status}`);
+    throw new Error(`ניתוח הארוחה נכשל: ${response.status}`);
   }
   return response.json();
 }
@@ -300,7 +303,7 @@ export async function saveManualMeal(text: string): Promise<Meal> {
     body: JSON.stringify({ text })
   });
   if (!response.ok) {
-    throw new Error(`Manual meal save failed: ${response.status}`);
+    throw new Error(`שמירת הארוחה הידנית נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -308,7 +311,7 @@ export async function saveManualMeal(text: string): Promise<Meal> {
 export async function fetchDashboard(): Promise<DashboardState> {
   const response = await fetch(`${API_BASE}/api/dashboard`);
   if (!response.ok) {
-    throw new Error(`Dashboard fetch failed: ${response.status}`);
+    throw new Error(`טעינת לוח הבקרה נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -316,7 +319,7 @@ export async function fetchDashboard(): Promise<DashboardState> {
 export async function fetchSettings(): Promise<SettingsState> {
   const response = await fetch(`${API_BASE}/api/settings`);
   if (!response.ok) {
-    throw new Error(`Settings fetch failed: ${response.status}`);
+    throw new Error(`טעינת ההגדרות נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -324,7 +327,7 @@ export async function fetchSettings(): Promise<SettingsState> {
 export async function exportSettingsData(): Promise<unknown> {
   const response = await fetch(`${API_BASE}/api/settings/export`);
   if (!response.ok) {
-    throw new Error(`Data export failed: ${response.status}`);
+    throw new Error(`ייצוא הנתונים נכשל: ${response.status}`);
   }
   return response.json();
 }
@@ -334,7 +337,7 @@ export async function resetLocalData(): Promise<ResetResult> {
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`Data reset failed: ${response.status}`);
+    throw new Error(`איפוס הנתונים נכשל: ${response.status}`);
   }
   return response.json();
 }
@@ -342,7 +345,7 @@ export async function resetLocalData(): Promise<ResetResult> {
 export async function fetchUsage(): Promise<UsageState> {
   const response = await fetch(`${API_BASE}/api/usage`);
   if (!response.ok) {
-    throw new Error(`Usage fetch failed: ${response.status}`);
+    throw new Error(`טעינת נתוני השימוש נכשלה: ${response.status}`);
   }
   return response.json();
 }

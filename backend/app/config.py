@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
     anthropic_api_key: str | None = Field(default=None, repr=False)
     anthropic_model: str = "claude-haiku-4-5"
+    daily_ai_token_limit: int = Field(default=50000, ge=0)
 
     model_config = SettingsConfigDict(
         env_file=(".env.local", ".env"),

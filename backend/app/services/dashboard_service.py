@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Meal, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
@@ -65,7 +65,14 @@ class DashboardService:
         )
 
     def _recent_memories(self, user_id: int) -> list[UserMemory]:
-        return list(self.db.scalars(select(UserMemory).where(UserMemory.user_id == user_id).limit(4)).all())
+        return list(
+            self.db.scalars(
+                select(UserMemory)
+                .where(UserMemory.user_id == user_id, UserMemory.is_sensitive.is_(False))
+                .order_by(desc(UserMemory.created_at))
+                .limit(4)
+            ).all()
+        )
 
     @staticmethod
     def _nutrition_range(meals: list[Meal]) -> tuple[int, int] | tuple[None, None]:
@@ -82,9 +89,9 @@ class DashboardService:
     @staticmethod
     def _next_recommended_action(profile: UserProfile | None, plan: WorkoutPlan | None, missed: int) -> str:
         if profile is None:
-            return "Finish onboarding so your coach can build the first plan."
+            return "סיים את האונבורדינג כדי שהמאמן יוכל לבנות את התוכנית הראשונה."
         if missed > 0:
-            return "Reschedule the missed workout before adding more volume."
+            return "קבע מחדש את האימון שפוספס לפני שאתה מוסיף עוד נפח."
         if plan is None:
-            return "Create a workout plan that matches your weekly availability."
-        return "Complete the next planned workout and log one protein-focused meal."
+            return "צור תוכנית אימון שמתאימה לזמינות השבועית שלך."
+        return "בצע את האימון המתוכנן הבא ותעד ארוחה אחת עם דגש על חלבון."

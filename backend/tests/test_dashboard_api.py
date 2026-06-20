@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
+from backend.app.models import UserMemory
 
 
 def test_dashboard_returns_live_user_state(tmp_path):
@@ -29,17 +30,17 @@ def test_dashboard_next_recommended_action_reflects_available_state(tmp_path):
     client = make_client(tmp_path)
 
     empty_action = client.get("/api/dashboard").json()["next_recommended_action"]
-    assert empty_action == "Finish onboarding so your coach can build the first plan."
+    assert empty_action == "סיים את האונבורדינג כדי שהמאמן יוכל לבנות את התוכנית הראשונה."
 
     client.post("/api/onboarding", json=valid_payload())
     client.post("/api/workout-plans", json={"prompt": "Build me a 3-day plan", "days_per_week": 3})
     planned_action = client.get("/api/dashboard").json()["next_recommended_action"]
-    assert planned_action == "Complete the next planned workout and log one protein-focused meal."
+    assert planned_action == "בצע את האימון המתוכנן הבא ותעד ארוחה אחת עם דגש על חלבון."
     assert planned_action != empty_action
 
     client.post("/api/workout-logs", json={"text": "I skipped today's workout"})
     missed_action = client.get("/api/dashboard").json()["next_recommended_action"]
-    assert missed_action == "Reschedule the missed workout before adding more volume."
+    assert missed_action == "קבע מחדש את האימון שפוספס לפני שאתה מוסיף עוד נפח."
     assert missed_action != planned_action
 
 
@@ -50,6 +51,36 @@ def test_dashboard_uses_null_nutrition_range_when_no_estimates_exist(tmp_path):
 
     assert response.status_code == 200
     assert response.json()["estimated_nutrition_range"] is None
+
+
+def test_dashboard_does_not_show_sensitive_memories_as_recent_notes(tmp_path):
+    client = make_client(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    db = next(app.dependency_overrides[get_db]())
+    db.add_all(
+        [
+            UserMemory(
+                user_id=1,
+                memory_type="preference",
+                content="המשתמש מעדיף אימונים קצרים",
+                is_sensitive=False,
+            ),
+            UserMemory(
+                user_id=1,
+                memory_type="safety_limitation",
+                content="המשתמש דיווח על רגישות ברך בסקוואט",
+                is_sensitive=True,
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get("/api/dashboard")
+
+    assert response.status_code == 200
+    notes = response.json()["recent_coach_notes"]
+    assert "המשתמש מעדיף אימונים קצרים" in notes
+    assert "המשתמש דיווח על רגישות ברך בסקוואט" not in notes
 
 
 def make_client(tmp_path) -> TestClient:

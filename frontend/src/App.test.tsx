@@ -8,9 +8,10 @@ describe('App shell', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /CALO Coach/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Chat/i })).toBeInTheDocument();
-    expect(screen.getByText(/Local-first fitness coach/i)).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByRole('main')).toHaveAttribute('lang', 'he');
+    expect(screen.getByRole('button', { name: /לוח בקרה/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /צ'אט/i })).toBeInTheDocument();
+    expect(screen.getByText(/מאמן כושר מקומי/i)).toBeInTheDocument();
   });
 });
-

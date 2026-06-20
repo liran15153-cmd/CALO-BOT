@@ -22,7 +22,7 @@ describe('Settings UI', () => {
             recent_coach_notes: [],
             current_streak: 0,
             missed_workouts: 0,
-            next_recommended_action: 'Complete onboarding.'
+            next_recommended_action: 'סיים אונבורדינג.'
           });
         }
         if (url.endsWith('/api/settings')) {
@@ -31,7 +31,7 @@ describe('Settings UI', () => {
             model: 'claude-haiku-4-5',
             database: 'configured',
             api_key_present: false,
-            disclaimer: 'This is not medical advice.'
+            disclaimer: 'זו אינה עצה רפואית.'
           });
         }
         if (url.endsWith('/api/usage')) {
@@ -41,14 +41,17 @@ describe('Settings UI', () => {
             image_analysis_count: 0,
             summary_requests_count: 1,
             estimated_tokens_in: 12,
-            estimated_tokens_out: 4
+            estimated_tokens_out: 4,
+            estimated_tokens_total: 16,
+            daily_ai_token_limit: 50000,
+            tokens_remaining: 49984
           });
         }
         if (url.endsWith('/api/settings/export')) {
           return jsonResponse({ profile: null, meals: [] });
         }
         if (url.endsWith('/api/settings/reset') && init?.method === 'POST') {
-          return jsonResponse({ deleted_records: 3, message: 'Local coaching data reset.' });
+          return jsonResponse({ deleted_records: 3, message: 'הנתונים המקומיים אופסו.' });
         }
         return jsonResponse({});
       })
@@ -60,21 +63,70 @@ describe('Settings UI', () => {
   it('shows provider status without exposing an API key and supports export/reset actions', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
+    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
 
-    expect((await screen.findAllByText(/not_configured/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/לא מוגדר/i)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/not_configured/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/sk-/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/not medical advice/i)).toBeInTheDocument();
-    expect(await screen.findByText(/Chat requests/i)).toBeInTheDocument();
-    expect(screen.getByText(/Summaries/i)).toBeInTheDocument();
+    expect(screen.getByText(/אינה עצה רפואית/i)).toBeInTheDocument();
+    expect(await screen.findByText(/בקשות צ'אט/i)).toBeInTheDocument();
+    expect(screen.getByText(/סיכומים/i)).toBeInTheDocument();
+    expect(screen.getByText(/תקציב שנותר/i)).toBeInTheDocument();
+    expect(screen.getByText(/49,984/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Export/i }));
-    expect(await screen.findByText(/Export ready/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ייצוא/i }));
+    expect(await screen.findByText(/הייצוא מוכן/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Reset local data/i }));
-    expect(await screen.findByText(/confirm deletion/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Confirm reset/i }));
-    expect(await screen.findByText(/3 records deleted/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /איפוס נתונים מקומיים/i }));
+    expect(await screen.findByText(/לאישור מחיקה/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /אישור איפוס/i }));
+    expect(await screen.findByText(/3 רשומות נמחקו/i)).toBeInTheDocument();
+  });
+
+  it('shows an export failure without leaving the settings action busy', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/settings')) {
+          return jsonResponse({
+            ai_provider: 'not_configured',
+            model: 'claude-haiku-4-5',
+            database: 'configured',
+            api_key_present: false,
+            disclaimer: 'זו אינה עצה רפואית.'
+          });
+        }
+        if (url.endsWith('/api/usage')) {
+          return jsonResponse({
+            usage_date: '2026-06-15',
+            chat_requests_count: 0,
+            image_analysis_count: 0,
+            summary_requests_count: 0,
+            estimated_tokens_in: 0,
+            estimated_tokens_out: 0,
+            estimated_tokens_total: 0,
+            daily_ai_token_limit: 50000,
+            tokens_remaining: 50000
+          });
+        }
+        if (url.endsWith('/api/settings/export')) {
+          return { ok: false, status: 500, json: async () => ({}) } as Response;
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /ייצוא/i }));
+
+    expect(await screen.findByText(/הייצוא נכשל/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ייצוא/i })).not.toBeDisabled();
   });
 });
 

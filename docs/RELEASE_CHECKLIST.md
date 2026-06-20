@@ -14,6 +14,7 @@ It is not ready for public internet deployment until the blockers below are addr
 - Root lint command passes.
 - Frontend production dependency audit reports no known vulnerabilities.
 - Root production dependency audit reports no known vulnerabilities.
+- Provider-backed chat and meal image analysis stop before external calls when the daily token budget is spent.
 
 ## Public Release Blockers
 
@@ -25,6 +26,7 @@ It is not ready for public internet deployment until the blockers below are addr
 - Harden uploads with image re-encoding, metadata stripping, retention cleanup, and malware scanning if exposed publicly.
 - Add stronger Python linting/static analysis such as Ruff and a Python dependency audit such as `pip-audit`.
 - Decide whether Supabase/RLS is part of the product. No Supabase code exists in this repo today.
+- Expand the safety layer beyond v1 keyword rules before marketing this as a broad wellness safety system.
 
 ## WhatsApp Readiness
 

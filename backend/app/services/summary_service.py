@@ -23,11 +23,11 @@ class SummaryService:
         protein_max = sum(meal.protein_max or 0 for meal in meals) or None
         completed = sum(1 for log in workouts if log.status == "completed")
         pain_flags = sum(1 for log in workouts if log.pain_flag)
-        next_action = "Log one meal or workout today." if not workouts and not meals else "Plan the next concrete workout or protein-focused meal."
+        next_action = "תעד היום ארוחה אחת או אימון אחד." if not workouts and not meals else "תכנן את האימון הבא או ארוחה אחת עם דגש על חלבון."
         if pain_flags:
-            next_action = "Avoid painful movements and consider qualified guidance if pain persists."
+            next_action = "הימנע מתנועות כואבות ושקול פנייה לאיש מקצוע אם הכאב נמשך."
         return {
-            "summary": f"{completed} workouts completed and {len(meals)} meals logged today.",
+            "summary": f"היום הושלמו {completed} אימונים ותועדו {len(meals)} ארוחות.",
             "metrics": {
                 "date": day.isoformat(),
                 "workouts_completed": completed,
@@ -57,22 +57,32 @@ class SummaryService:
         completed = sum(1 for log in workouts if log.status == "completed")
         missed = sum(1 for log in workouts if log.status == "skipped")
         consistency = round((completed / max(1, completed + missed)) * 100)
-        summary_text = f"Weekly review: {completed} completed workouts, {missed} missed workouts, {len(meals)} meals logged."
-        next_action = "Schedule the next workout now and keep logging protein-focused meals."
-        record = WeeklySummary(
-            user_id=user_id,
-            week_start=week_start,
-            week_end=week_end,
-            summary_text=summary_text,
-            metrics_json={
-                "workouts_completed": completed,
-                "missed_workouts": missed,
-                "consistency_percentage": consistency,
-                "meals_logged": len(meals),
-            },
-            next_action=next_action,
-        )
-        self.db.add(record)
+        summary_text = f"סיכום שבועי: {completed} אימונים הושלמו, {missed} אימונים פוספסו, {len(meals)} ארוחות תועדו."
+        next_action = "קבע עכשיו את האימון הבא והמשך לתעד ארוחות עם דגש על חלבון."
+        metrics = {
+            "workouts_completed": completed,
+            "missed_workouts": missed,
+            "consistency_percentage": consistency,
+            "meals_logged": len(meals),
+        }
+        records = self.db.scalars(
+            select(WeeklySummary)
+            .where(
+                WeeklySummary.user_id == user_id,
+                WeeklySummary.week_start == week_start,
+                WeeklySummary.week_end == week_end,
+            )
+            .order_by(WeeklySummary.id)
+        ).all()
+        record = records[0] if records else None
+        for duplicate in records[1:]:
+            self.db.delete(duplicate)
+        if record is None:
+            record = WeeklySummary(user_id=user_id, week_start=week_start, week_end=week_end)
+            self.db.add(record)
+        record.summary_text = summary_text
+        record.metrics_json = metrics
+        record.next_action = next_action
         self.db.commit()
         self.db.refresh(record)
         UsageService(self.db).record(

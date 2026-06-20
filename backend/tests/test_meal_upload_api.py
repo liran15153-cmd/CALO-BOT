@@ -1,13 +1,15 @@
 from collections.abc import Generator
+from datetime import date
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import Meal, MealImageAnalysis, MealItem
+from backend.app.models import Meal, MealImageAnalysis, MealItem, UsageEvent
 from backend.app.services.ai_provider import AIResult
 
 
@@ -41,7 +43,7 @@ def test_meal_upload_rejects_jpeg_content_type_with_invalid_magic_bytes(tmp_path
     )
 
     assert response.status_code == 400
-    assert "image bytes" in response.json()["detail"].lower()
+    assert "קובץ התמונה" in response.json()["detail"]
     assert db.scalar(select(Meal)) is None
     assert list((tmp_path / "uploads").glob("**/*")) == []
 
@@ -56,7 +58,7 @@ def test_meal_upload_rejects_images_over_5mb(tmp_path):
     )
 
     assert response.status_code == 400
-    assert "too large" in response.json()["detail"].lower()
+    assert "גדולה מדי" in response.json()["detail"]
     assert db.scalar(select(Meal)) is None
     assert list((tmp_path / "uploads").glob("**/*")) == []
 
@@ -75,7 +77,7 @@ def test_meal_image_analysis_no_key_does_not_fake_detection(tmp_path):
     body = response.json()
     assert body["provider_status"] == "not_configured"
     assert body["detected_items"] == []
-    assert "unavailable" in body["message"].lower()
+    assert "לא זמין" in body["message"]
     saved = db.scalar(select(MealImageAnalysis))
     assert saved is not None
     assert saved.provider_status == "not_configured"
@@ -106,7 +108,112 @@ def test_meal_image_analysis_updates_meal_ranges_and_items(tmp_path, monkeypatch
     assert meal.protein_max == 52
     item = db.scalar(select(MealItem))
     assert item is not None
-    assert item.name == "chicken rice bowl"
+    assert item.name == "קערת עוף ואורז"
+
+
+def test_meal_image_analysis_replaces_non_hebrew_provider_text(tmp_path, monkeypatch):
+    client, _db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Lunch"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    monkeypatch.setattr(
+        "backend.app.services.meal_service.build_ai_provider",
+        lambda _api_key, _model: EnglishImageProvider(),
+    )
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["detected_items"][0]["name"] == "פריט מזון שזוהה"
+    assert body["follow_up_questions"] == ["מה הכמות המשוערת ומה שיטת ההכנה?"]
+    assert "English" not in str(body)
+
+
+def test_meal_image_analysis_keeps_hebrew_message_with_short_english_term(tmp_path, monkeypatch):
+    client, _db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Lunch"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    monkeypatch.setattr(
+        "backend.app.services.meal_service.build_ai_provider",
+        lambda _api_key, _model: HebrewWithEnglishTermImageProvider(),
+    )
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "protein timing" in body["message"]
+    assert "טקסט שרובו לא בעברית" not in body["message"]
+
+
+def test_meal_image_analysis_replaces_mixed_english_user_visible_text(tmp_path, monkeypatch):
+    client, _db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Lunch"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    monkeypatch.setattr(
+        "backend.app.services.meal_service.build_ai_provider",
+        lambda _api_key, _model: MixedEnglishImageProvider(),
+    )
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["detected_items"][0]["name"] == "פריט מזון שזוהה"
+    assert body["follow_up_questions"] == ["מה הכמות המשוערת ומה שיטת ההכנה?"]
+    assert "English" not in str(body)
+    assert "chicken" not in str(body)
+    assert "rice" not in str(body)
+    assert "bowl" not in str(body)
+
+
+def test_meal_image_analysis_blocks_provider_when_daily_token_budget_is_spent(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("DAILY_AI_TOKEN_LIMIT", "1")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Dinner"},
+        files={"file": ("dinner.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    db.add(
+        UsageEvent(
+            user_id=None,
+            usage_date=date.today(),
+            task="chat",
+            provider="configured",
+            model="fake-model",
+            estimated_tokens_in=2,
+            estimated_tokens_out=0,
+        )
+    )
+    db.commit()
+
+    def fail_if_called(_api_key, _model):
+        raise AssertionError("provider should not be built after budget is spent")
+
+    monkeypatch.setattr("backend.app.services.meal_service.build_ai_provider", fail_if_called)
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "budget_exceeded"
+    assert "תקציב" in body["message"]
+    assert body["detected_items"] == []
+    saved = db.scalar(select(MealImageAnalysis))
+    assert saved is not None
+    assert saved.provider_status == "budget_exceeded"
 
 
 def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
@@ -127,11 +234,62 @@ class FakeImageProvider:
     def analyze_image(self, _image_path, note=None):
         return AIResult(
             text=(
-                '{"detected_items":[{"name":"chicken rice bowl","quantity":"1 bowl",'
+                '{"detected_items":[{"name":"קערת עוף ואורז","quantity":"קערה אחת",'
                 '"calories_min":520,"calories_max":760,"protein_min":35,"protein_max":52}],'
                 '"calorie_range":[520,760],'
                 '"macro_ranges":{"protein":[35,52],"carbs":[55,90],"fat":[12,24]},'
-                '"confidence":"medium","follow_up_questions":["How much rice was in the bowl?"]}'
+                '"confidence":"medium","follow_up_questions":["כמה אורז היה בקערה?"]}'
+            ),
+            provider_status="configured",
+            used_model="fake-vision",
+            estimated_tokens_in=10,
+            estimated_tokens_out=20,
+        )
+
+
+class EnglishImageProvider:
+    def analyze_image(self, _image_path, note=None):
+        return AIResult(
+            text=(
+                '{"detected_items":[{"name":"chicken rice bowl","quantity":"1 bowl"}],'
+                '"calorie_range":[520,760],'
+                '"macro_ranges":{"protein":[35,52]},'
+                '"message":"English estimate","confidence":"medium",'
+                '"follow_up_questions":["How much rice was in the bowl?"]}'
+            ),
+            provider_status="configured",
+            used_model="fake-vision",
+            estimated_tokens_in=10,
+            estimated_tokens_out=20,
+        )
+
+
+class HebrewWithEnglishTermImageProvider:
+    def analyze_image(self, _image_path, note=None):
+        return AIResult(
+            text=(
+                '{"detected_items":[{"name":"קערת עוף ואורז","quantity":"קערה אחת"}],'
+                '"calorie_range":[520,760],'
+                '"macro_ranges":{"protein":[35,52]},'
+                '"message":"הערכה שמרנית: protein timing לא קריטי כאן, אבל יש כנראה חלבון בכמות בינונית-גבוהה.","confidence":"medium",'
+                '"follow_up_questions":["כמה אורז היה בקערה?"]}'
+            ),
+            provider_status="configured",
+            used_model="fake-vision",
+            estimated_tokens_in=10,
+            estimated_tokens_out=20,
+        )
+
+
+class MixedEnglishImageProvider:
+    def analyze_image(self, _image_path, note=None):
+        return AIResult(
+            text=(
+                '{"detected_items":[{"name":"chicken rice bowl","quantity":"1 bowl"}],'
+                '"calorie_range":[520,760],'
+                '"macro_ranges":{"protein":[35,52]},'
+                '"message":"כן. This is a chicken rice bowl with protein and calories estimate.","confidence":"medium",'
+                '"follow_up_questions":["How much rice was in the bowl?"]}'
             ),
             provider_status="configured",
             used_model="fake-vision",

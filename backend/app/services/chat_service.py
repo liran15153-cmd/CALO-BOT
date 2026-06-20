@@ -8,7 +8,7 @@ class ChatService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_session(self, user_id: int, title: str = "Coach chat") -> ChatSession:
+    def create_session(self, user_id: int, title: str = "צ'אט מאמן") -> ChatSession:
         session = ChatSession(user_id=user_id, title=title, is_active=True)
         self.db.add(session)
         self.db.commit()
@@ -52,9 +52,8 @@ class ChatService:
     def reset_session(self, session_id: int) -> ChatSession:
         session = self.db.get(ChatSession, session_id)
         if session is None:
-            raise ValueError("chat session not found")
+            raise ValueError("שיחת הצ'אט לא נמצאה")
         session.is_active = False
         self.db.commit()
         self.db.refresh(session)
         return session
-

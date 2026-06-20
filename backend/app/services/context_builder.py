@@ -2,13 +2,21 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import ChatMessage, Meal, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
+from backend.app.services.coaching_knowledge import CoachingKnowledgeService
+from backend.app.services.training_adaptation_service import TrainingAdaptationService
 
 
 class ContextBuilder:
     def __init__(self, db: Session):
         self.db = db
 
-    def build(self, user_id: int, session_id: int | None = None, intent: str | None = None) -> dict:
+    def build(
+        self,
+        user_id: int,
+        session_id: int | None = None,
+        intent: str | None = None,
+        user_message: str | None = None,
+    ) -> dict:
         profile = self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
         plan = self.db.scalar(
             select(WorkoutPlan)
@@ -26,6 +34,12 @@ class ContextBuilder:
         if relevant_types:
             memory_query = memory_query.where(UserMemory.memory_type.in_(relevant_types))
         memories = self.db.scalars(memory_query.order_by(desc(UserMemory.created_at)).limit(6)).all()
+        caution_notes = self.db.scalars(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id, UserMemory.memory_type == "safety_limitation")
+            .order_by(desc(UserMemory.created_at))
+            .limit(4)
+        ).all()
 
         recent_chat = []
         if session_id is not None:
@@ -49,6 +63,7 @@ class ContextBuilder:
                 }
                 for log in workout_logs
             ],
+            "training_status": TrainingAdaptationService().summarize(workout_logs),
             "recent_meals": [
                 {
                     "date": meal.eaten_on.isoformat(),
@@ -59,7 +74,9 @@ class ContextBuilder:
                 for meal in meals
             ],
             "memories": [memory.content for memory in memories],
+            "caution_notes": [memory.content for memory in caution_notes],
             "recent_chat": recent_chat,
+            "coaching_knowledge": CoachingKnowledgeService().for_provider_context(intent, query=user_message),
         }
 
     @staticmethod
@@ -90,10 +107,19 @@ class ContextBuilder:
     def _plan(plan: WorkoutPlan | None) -> dict:
         if plan is None:
             return {}
+        plan_json = plan.plan_json or {}
         return {
             "name": plan.name,
             "goal": plan.goal,
+            "plan_type": plan_json.get("plan_type", "multi_week"),
+            "duration_weeks": plan.duration_weeks,
             "days_per_week": plan.days_per_week,
+            "training_split": plan_json.get("training_split", "full_body"),
+            "experience_level": plan_json.get("experience_level"),
+            "session_length_minutes": plan_json.get("session_length_minutes"),
             "equipment_needed": plan.equipment_needed or [],
             "progression_rule": plan.progression_rule,
+            "recovery_note": plan.recovery_note,
+            "source_refs": plan_json.get("source_refs", []),
+            "decision_inputs": plan_json.get("decision_inputs", {}),
         }

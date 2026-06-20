@@ -13,7 +13,7 @@ class ProfileService:
         user = self.db.scalar(select(User).order_by(User.id.asc()))
         if user:
             return user
-        user = User(name="Local user")
+        user = User(name="משתמש מקומי")
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
@@ -64,4 +64,3 @@ class ProfileService:
             coaching_style=profile.coaching_style,
             consent_disclaimer=profile.consent_disclaimer,
         )
-

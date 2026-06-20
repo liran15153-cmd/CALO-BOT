@@ -56,7 +56,7 @@ class ChatSession(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    title: Mapped[str] = mapped_column(String(160), default="Coach chat")
+    title: Mapped[str] = mapped_column(String(160), default="צ'אט מאמן")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -220,4 +220,3 @@ class UsageEvent(Base, TimestampMixin):
     estimated_tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     estimated_tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     cost_estimate: Mapped[float | None] = mapped_column(Float)
-

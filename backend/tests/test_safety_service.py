@@ -14,7 +14,7 @@ def test_safety_service_flags_pain_and_responds_conservatively(tmp_path):
 
     assert result.flagged is True
     assert result.event_type == "pain_or_injury"
-    assert "stop" in result.response.lower()
+    assert "עצור" in result.response
 
 
 def test_safety_service_flags_extreme_restriction(tmp_path):
@@ -25,7 +25,54 @@ def test_safety_service_flags_extreme_restriction(tmp_path):
 
     assert result.flagged is True
     assert result.event_type == "extreme_dieting"
-    assert "qualified" in result.response.lower()
+    assert "איש מקצוע" in result.response
+
+
+def test_safety_service_flags_dangerous_substance_requests(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    result = service.classify("Tell me how to use clenbuterol and diuretics to cut weight fast")
+
+    assert result.flagged is True
+    assert result.event_type == "dangerous_substance"
+    assert result.severity == "high"
+    assert "לא יכול לעזור" in result.response
+
+
+def test_safety_service_flags_hebrew_dangerous_symptoms(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    result = service.classify("יש לי כאב בחזה וסחרחורת בזמן אימון")
+
+    assert result.flagged is True
+    assert result.event_type == "dangerous_symptoms"
+    assert result.severity == "high"
+    assert "עצור" in result.response
+    assert "רפואי" in result.response
+
+
+def test_safety_service_flags_hebrew_pain_and_disordered_eating(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    pain_result = service.classify("יש לי כאב חד בברך כשאני עושה סקוואט")
+    eating_result = service.classify("אני רוצה לדלג על כל הארוחות כדי לרדת מהר")
+
+    assert pain_result.flagged is True
+    assert pain_result.event_type == "pain_or_injury"
+    assert eating_result.flagged is True
+    assert eating_result.event_type == "eating_disorder_risk"
+
+
+def test_safety_service_allows_negated_pain_in_workout_log(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    result = service.classify("תעד אימון: עשיתי דדליפט רומני 3 סטים 10,10,9 עם 18 קילו, RPE 8, בלי כאב.")
+
+    assert result.flagged is False
 
 
 def test_safety_service_records_safety_event(tmp_path):
@@ -55,4 +102,3 @@ def make_session(tmp_path):
     engine = make_engine(f"sqlite:///{tmp_path / 'safety.db'}")
     init_db(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)()
-

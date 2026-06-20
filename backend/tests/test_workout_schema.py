@@ -20,6 +20,53 @@ def test_structured_workout_plan_rejects_day_without_exercises():
         StructuredWorkoutPlan(**payload)
 
 
+def test_structured_workout_plan_rejects_more_than_four_weeks():
+    payload = valid_plan()
+    payload["duration_weeks"] = 5
+
+    with pytest.raises(ValidationError):
+        StructuredWorkoutPlan(**payload)
+
+
+def test_structured_workout_plan_keeps_planning_decision_metadata():
+    payload = valid_plan()
+    payload.update(
+        {
+            "plan_type": "multi_week",
+            "training_split": "full_body",
+            "experience_level": "beginner",
+            "session_length_minutes": 45,
+            "safety_notes": ["Stop for sharp pain or unusual dizziness."],
+            "decision_inputs": {
+                "goal": "improve_strength",
+                "equipment": ["dumbbells"],
+                "limitations": "none provided",
+            },
+            "source_refs": [
+                "ACSM 2026 resistance training guidelines",
+                "CDC adult physical activity guidelines",
+            ],
+        }
+    )
+    payload["days"][0].update({"focus": "full_body", "estimated_duration_minutes": 45})
+    payload["days"][0]["exercises"][0].update(
+        {
+            "movement_pattern": "squat",
+            "target_muscles": ["quads", "glutes"],
+            "progression": "Add reps before load.",
+            "regression": "Use a box squat.",
+        }
+    )
+
+    plan = StructuredWorkoutPlan(**payload)
+
+    assert plan.plan_type == "multi_week"
+    assert plan.training_split == "full_body"
+    assert plan.days[0].focus == "full_body"
+    assert plan.days[0].exercises[0].movement_pattern == "squat"
+    assert "ACSM 2026 resistance training guidelines" in plan.source_refs
+
+
 def valid_plan():
     return {
         "name": "3 Day Strength",
@@ -50,4 +97,3 @@ def valid_plan():
         "progression_rule": "Increase reps first, then load.",
         "recovery_note": "Add rest if soreness is high.",
     }
-

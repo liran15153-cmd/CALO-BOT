@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+import re
 
 from sqlalchemy.orm import Session
 
 from backend.app.models import SafetyEvent
+from backend.app.services.pain_text import has_pain_or_injury_signal
 
 
 @dataclass(frozen=True)
@@ -20,51 +22,141 @@ class SafetyService:
     def classify(self, text: str) -> SafetyResult:
         normalized = text.lower()
 
-        if any(term in normalized for term in ["dizzy", "faint", "chest pain", "passed out", "blackout"]):
+        if any(
+            term in normalized
+            for term in [
+                "dizzy",
+                "faint",
+                "chest pain",
+                "passed out",
+                "blackout",
+                "shortness of breath",
+                "heart palpitations",
+                "כאב בחזה",
+                "לחץ בחזה",
+                "סחרחורת",
+                "עילפון",
+                "התעלפתי",
+                "קוצר נשימה",
+                "דפיקות לב",
+            ]
+        ):
             return SafetyResult(
                 flagged=True,
                 event_type="dangerous_symptoms",
                 severity="high",
                 response=(
-                    "Stop the workout now. Dizziness, fainting, or chest pain during exercise can be serious. "
-                    "Please speak with a qualified medical professional before continuing."
+                    "עצור את האימון עכשיו. סחרחורת, עילפון או כאב בחזה בזמן אימון יכולים להיות סימן רציני. "
+                    "פנה לאיש מקצוע רפואי מוסמך לפני שאתה ממשיך."
                 ),
             )
 
-        if any(term in normalized for term in ["hurts", "pain", "injury", "injured", "sharp pain"]):
+        if has_pain_or_injury_signal(normalized):
             return SafetyResult(
                 flagged=True,
                 event_type="pain_or_injury",
                 severity="medium",
                 response=(
-                    "Stop any movement that causes pain. I cannot diagnose an injury, but you can switch to pain-free "
-                    "light movement and consult a qualified professional if pain persists or is sharp."
+                    "עצור כל תנועה שגורמת לכאב. אני לא יכול לאבחן פציעה, אבל אפשר לעבור לתנועה קלה ללא כאב "
+                    "ולהתייעץ עם איש מקצוע מוסמך אם הכאב חד או נמשך."
                 ),
             )
 
-        if any(term in normalized for term in ["500 calorie", "800 calorie", "starve", "rapid weight loss", "lose weight fast"]):
-            return SafetyResult(
-                flagged=True,
-                event_type="extreme_dieting",
-                severity="high",
-                response=(
-                    "I cannot help with extreme restriction or rapid weight-loss instructions. A qualified dietitian or "
-                    "medical professional can help set a safer plan. I can help with general, sustainable habits instead."
-                ),
-            )
-
-        if any(term in normalized for term in ["laxative", "purge", "not eating", "skip all meals"]):
+        if any(
+            term in normalized
+            for term in [
+                "laxative",
+                "purge",
+                "not eating",
+                "skip all meals",
+                "משלשל",
+                "להקיא",
+                "לא לאכול",
+                "לדלג על כל הארוחות",
+                "בלי אוכל",
+            ]
+        ):
             return SafetyResult(
                 flagged=True,
                 event_type="eating_disorder_risk",
                 severity="high",
                 response=(
-                    "I cannot support harmful food restriction or purging behavior. Please consider speaking with a "
-                    "qualified professional. I can help with general balanced-meal structure if that is useful."
+                    "אני לא יכול לתמוך בהגבלת אוכל מזיקה או בהתנהגות של התרוקנות. שקול לדבר עם איש מקצוע מוסמך. "
+                    "אני יכול לעזור במבנה כללי של ארוחות מאוזנות אם זה מתאים."
+                ),
+            )
+
+        if self._has_extreme_calorie_target(normalized) or self._has_rapid_weight_loss_target(normalized) or any(
+            term in normalized
+            for term in [
+                "500 calorie",
+                "800 calorie",
+                "starve",
+                "rapid weight loss",
+                "lose weight fast",
+                "500 קלוריות",
+                "800 קלוריות",
+                "להרעיב",
+                "ירידה מהירה",
+                "לרדת מהר",
+            ]
+        ):
+            return SafetyResult(
+                flagged=True,
+                event_type="extreme_dieting",
+                severity="high",
+                response=(
+                    "אני לא יכול לעזור עם הגבלה קיצונית או הוראות לירידה מהירה במשקל. איש מקצוע כמו דיאטן קליני "
+                    "או גורם רפואי מוסמך יכול לעזור לבנות תוכנית בטוחה יותר. אני כן יכול לעזור בהרגלים כלליים וברי קיימא."
+                ),
+            )
+
+        if any(
+            term in normalized
+            for term in [
+                "clenbuterol",
+                "dnp",
+                "anabolic",
+                "steroid",
+                "diuretic",
+                "ephedrine",
+                "קלנבוטרול",
+                "סטרואיד",
+                "סטרואידים",
+                "משתן",
+                "משתנים",
+                "אפדרין",
+            ]
+        ):
+            return SafetyResult(
+                flagged=True,
+                event_type="dangerous_substance",
+                severity="high",
+                response=(
+                    "אני לא יכול לעזור בשימוש בחומרים מסוכנים, סטרואידים, ממריצים או משתנים לאימון או ירידה במשקל. "
+                    "איש מקצוע רפואי מוסמך יכול לעזור להעריך סיכונים וחלופות בטוחות יותר."
                 ),
             )
 
         return SafetyResult(flagged=False)
+
+    @staticmethod
+    def _has_extreme_calorie_target(text: str) -> bool:
+        for match in re.finditer(r"\b(\d{3,4})\s*(?:calorie|calories|kcal|קלוריות|קלוריה)\b", text):
+            if int(match.group(1)) <= 1000:
+                return True
+        return False
+
+    @staticmethod
+    def _has_rapid_weight_loss_target(text: str) -> bool:
+        if not any(term in text for term in ["lose", "drop", "cut", "weight loss", "לרדת", "ירידה", "להוריד"]):
+            return False
+        if not any(term in text for term in ["month", "30 days", "חודש"]):
+            return False
+        for match in re.finditer(r"\b(\d{1,2}(?:\.\d+)?)\s*(?:kg|kgs|kilo|kilos|kilogram|kilograms|קילו|קג|ק\"ג)\b", text):
+            if float(match.group(1)) >= 6:
+                return True
+        return False
 
     def record_event(self, user_id: int | None, source_text: str, result: SafetyResult) -> SafetyEvent:
         event = SafetyEvent(
@@ -79,4 +171,3 @@ class SafetyService:
         self.db.commit()
         self.db.refresh(event)
         return event
-

@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.config import get_settings
 from backend.app.models import UsageEvent
 from backend.app.services.ai_provider import AIRequest, AIResult
 
@@ -55,14 +56,28 @@ class UsageService:
     def daily_totals(self, *, usage_date: date | None = None) -> dict[str, Any]:
         day = usage_date or date.today()
         events = self.db.scalars(select(UsageEvent).where(UsageEvent.usage_date == day)).all()
+        estimated_tokens_in = sum(event.estimated_tokens_in or 0 for event in events)
+        estimated_tokens_out = sum(event.estimated_tokens_out or 0 for event in events)
+        estimated_tokens_total = estimated_tokens_in + estimated_tokens_out
+        daily_ai_token_limit = get_settings().daily_ai_token_limit
         return {
             "usage_date": day,
             "chat_requests_count": sum(1 for event in events if event.task == "chat"),
             "image_analysis_count": sum(1 for event in events if event.task == "image_analysis"),
             "summary_requests_count": sum(1 for event in events if event.task == "summary"),
-            "estimated_tokens_in": sum(event.estimated_tokens_in or 0 for event in events),
-            "estimated_tokens_out": sum(event.estimated_tokens_out or 0 for event in events),
+            "estimated_tokens_in": estimated_tokens_in,
+            "estimated_tokens_out": estimated_tokens_out,
+            "estimated_tokens_total": estimated_tokens_total,
+            "daily_ai_token_limit": daily_ai_token_limit,
+            "tokens_remaining": max(0, daily_ai_token_limit - estimated_tokens_total),
         }
+
+    def is_daily_ai_token_budget_exceeded(self, *, usage_date: date | None = None) -> bool:
+        daily_ai_token_limit = get_settings().daily_ai_token_limit
+        if daily_ai_token_limit <= 0:
+            return False
+        totals = self.daily_totals(usage_date=usage_date)
+        return totals["estimated_tokens_total"] >= daily_ai_token_limit
 
 
 def rough_token_count(text: str) -> int:

@@ -21,6 +21,9 @@ def test_usage_tracks_chat_attempts_with_no_provider(tmp_path):
     assert body["summary_requests_count"] == 0
     assert body["estimated_tokens_in"] >= 0
     assert body["estimated_tokens_out"] >= 0
+    assert body["estimated_tokens_total"] == body["estimated_tokens_in"] + body["estimated_tokens_out"]
+    assert body["daily_ai_token_limit"] == 50000
+    assert body["tokens_remaining"] == body["daily_ai_token_limit"] - body["estimated_tokens_total"]
 
 
 def test_usage_tracks_summary_generation(tmp_path):

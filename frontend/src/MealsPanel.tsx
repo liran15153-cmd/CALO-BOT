@@ -2,6 +2,7 @@ import { ImageUp, ScanSearch } from 'lucide-react';
 import { useState } from 'react';
 
 import { analyzeMealImage, saveManualMeal, uploadMealImage, type Meal, type MealAnalysis } from './api';
+import { formatProviderStatus } from './formatters';
 
 export function MealsPanel() {
   const [note, setNote] = useState('');
@@ -59,17 +60,17 @@ export function MealsPanel() {
   return (
     <section className="panel meals-panel">
       <div className="panel-heading">
-        <h3>Meal image</h3>
-        <p>Upload a meal photo. Nutrition estimates are approximate and require an AI provider.</p>
+        <h3>תמונת ארוחה</h3>
+        <p>העלה תמונת ארוחה. הערכות תזונה הן משוערות ודורשות ספק בינה מלאכותית פעיל.</p>
       </div>
 
       <form className="form-grid" onSubmit={handleUpload}>
         <label>
-          <span>Meal note</span>
-          <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Lunch" />
+          <span>הערת ארוחה</span>
+          <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="ארוחת צהריים" />
         </label>
         <label>
-          <span>Meal image</span>
+          <span>תמונת ארוחה</span>
           <input
             accept="image/jpeg,image/png,image/webp"
             type="file"
@@ -79,29 +80,29 @@ export function MealsPanel() {
         <div className="form-actions wide">
           <button className="primary-button icon-button" type="submit" disabled={status === 'uploading'}>
             <ImageUp size={17} aria-hidden="true" />
-            Upload meal
+            העלאת ארוחה
           </button>
-          {meal && <span className="success-text">{meal.confidence}</span>}
+          {meal && <span className="success-text">{formatConfidence(meal.confidence)}</span>}
         </div>
       </form>
 
       {meal && (
         <div className="inline-section">
-          <h4>Uploaded meal</h4>
-          <p>{meal.note || 'No note'} saved. Image reference is stored locally.</p>
+          <h4>ארוחה שהועלתה</h4>
+          <p>{meal.note || 'ללא הערה'} נשמרה. ההפניה לתמונה נשמרת מקומית.</p>
           <button className="ghost-button" type="button" onClick={handleAnalyze} disabled={status === 'analyzing'}>
             <ScanSearch size={16} aria-hidden="true" />
-            Analyze image
+            ניתוח תמונה
           </button>
         </div>
       )}
 
       {analysis && (
         <div className="log-result">
-          <strong>{analysis.provider_status}</strong>
+          <strong>{formatProviderStatus(analysis.provider_status)}</strong>
           {analysis.message ? <span>{analysis.message}</span> : null}
-          {formatRange(analysis.analysis?.calorie_range ?? analysis.analysis?.calories_range, 'calories')}
-          {formatRange(analysis.analysis?.macro_ranges?.protein, 'g protein')}
+          {formatRange(analysis.analysis?.calorie_range ?? analysis.analysis?.calories_range, 'קלוריות')}
+          {formatRange(analysis.analysis?.macro_ranges?.protein, 'גרם חלבון')}
           {analysis.detected_items.map((item) =>
             item.name ? (
               <span key={`${item.name}-${item.quantity ?? ''}`}>
@@ -115,35 +116,35 @@ export function MealsPanel() {
       )}
 
       <section className="inline-section">
-        <h4>Manual meal</h4>
+        <h4>ארוחה ידנית</h4>
         <form className="composer" onSubmit={handleManualMeal}>
-          <label htmlFor="manual-meal">Manual meal</label>
+          <label htmlFor="manual-meal">ארוחה ידנית</label>
           <div className="composer-row">
             <textarea
               id="manual-meal"
               value={manualText}
               onChange={(event) => setManualText(event.target.value)}
-              placeholder="Log protein shake 25g protein."
+              placeholder="תעד שייק חלבון עם 25 גרם חלבון."
             />
             <button className="primary-button icon-button" type="submit" disabled={!manualText.trim()}>
-              Save meal log
+              שמירת ארוחה
             </button>
           </div>
         </form>
         {manualMeal && (
           <div className="log-result">
-            <strong>{manualMeal.confidence}</strong>
+            <strong>{formatConfidence(manualMeal.confidence)}</strong>
             <span>
-              {manualMeal.calories_min}-{manualMeal.calories_max} calories
+              {manualMeal.calories_min}-{manualMeal.calories_max} קלוריות
             </span>
             <span>
-              {manualMeal.protein_min}-{manualMeal.protein_max}g protein
+              {manualMeal.protein_min}-{manualMeal.protein_max} גרם חלבון
             </span>
           </div>
         )}
       </section>
 
-      {status === 'error' && <p className="error-text">Meal request failed.</p>}
+      {status === 'error' && <p className="error-text">בקשת הארוחה נכשלה.</p>}
     </section>
   );
 }
@@ -152,12 +153,23 @@ function formatRange(range: [number | null, number | null] | undefined, unit: st
   if (!range || range[0] == null || range[1] == null) {
     return null;
   }
-  const separator = unit.startsWith('g ') ? '' : ' ';
   return (
     <span>
       {range[0]}-{range[1]}
-      {separator}
+      {' '}
       {unit}
     </span>
+  );
+}
+
+function formatConfidence(confidence: string | null | undefined): string {
+  return (
+    {
+      not_analyzed: 'טרם נותח',
+      unavailable: 'לא זמין',
+      low: 'ביטחון נמוך',
+      medium: 'ביטחון בינוני',
+      high: 'ביטחון גבוה'
+    }[confidence ?? ''] ?? confidence ?? 'לא ידוע'
   );
 }

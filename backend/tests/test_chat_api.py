@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
+from backend.app.models import ChatSession, User
 
 
 def test_chat_session_and_message_persistence(tmp_path):
@@ -36,6 +37,22 @@ def test_chat_reset_deactivates_current_session(tmp_path):
     assert response.json()["is_active"] is False
 
 
+def test_chat_session_model_default_title_is_hebrew(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'chat-default.db'}")
+    init_db(engine)
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    user = User(name="משתמש בדיקה")
+    db.add(user)
+    db.flush()
+
+    session = ChatSession(user_id=user.id)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    assert session.title == "צ'אט מאמן"
+
+
 def make_client(tmp_path) -> TestClient:
     engine = make_engine(f"sqlite:///{tmp_path / 'chat.db'}")
     init_db(engine)
@@ -50,4 +67,3 @@ def make_client(tmp_path) -> TestClient:
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app)
-

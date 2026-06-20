@@ -1,7 +1,8 @@
 import { RotateCcw, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { createChatSession, fetchChatMessages, resetChatSession, sendChatMessage } from './api';
+import { createChatSession, resetChatSession, sendChatMessage } from './api';
+import { formatProviderStatus } from './formatters';
 
 type Message = {
   role: 'user' | 'coach';
@@ -16,35 +17,10 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'coach',
-      content: 'Ask for a workout, log a meal, or summarize your week. If no AI key is configured, I will say so clearly.'
+      content: 'בקש אימון, תעד ארוחה או בקש סיכום שבועי. אם ספק הבינה המלאכותית לא מוגדר, אגיד את זה בצורה ברורה.'
     }
   ]);
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle');
-
-  useEffect(() => {
-    let active = true;
-    createChatSession()
-      .then(async (session) => {
-        if (!active) return;
-        setSessionId(session.id);
-        const persisted = await fetchChatMessages(session.id);
-        if (!active || persisted.length === 0) return;
-        setMessages(
-          persisted
-            .filter((item): item is typeof item & { role: 'user' | 'coach' } => item.role === 'user' || item.role === 'coach')
-            .map((item) => ({
-              role: item.role,
-              content: item.content,
-              providerStatus: item.provider_status,
-              safetyFlagged: item.safety_flagged
-            }))
-        );
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,7 +45,7 @@ export function ChatPanel() {
       ]);
       setStatus('idle');
     } catch {
-      setMessages((current) => [...current, { role: 'coach', content: 'Could not reach the coach API.' }]);
+      setMessages((current) => [...current, { role: 'coach', content: 'לא הצלחתי להגיע לשרת המאמן.' }]);
       setStatus('error');
     }
   }
@@ -78,8 +54,8 @@ export function ChatPanel() {
     <section className="panel chat-panel">
       <div className="panel-heading split-heading">
         <div>
-          <h3>Coach chat</h3>
-          <p>Persistent coach conversations will use your compact profile and recent history.</p>
+          <h3>צ'אט מאמן</h3>
+          <p>השיחות נשמרות ומשתמשות בפרופיל המצומצם ובהיסטוריה האחרונה שלך.</p>
         </div>
         <button
           className="ghost-button"
@@ -88,18 +64,18 @@ export function ChatPanel() {
             if (sessionId) {
               await resetChatSession(sessionId).catch(() => undefined);
             }
-            const nextSession = await createChatSession('Coach chat').catch(() => null);
+            const nextSession = await createChatSession('צ\'אט מאמן').catch(() => null);
             setSessionId(nextSession?.id);
             setMessages([
               {
                 role: 'coach',
-                content: 'New chat started. Your profile and long-term memory are kept.'
+                content: 'צ\'אט חדש התחיל. הפרופיל והזיכרון לטווח ארוך נשמרו.'
               }
             ]);
           }}
         >
           <RotateCcw size={16} aria-hidden="true" />
-          New chat
+          צ'אט חדש
         </button>
       </div>
 
@@ -109,27 +85,27 @@ export function ChatPanel() {
             {item.content}
             {(item.providerStatus || item.safetyFlagged) && (
               <small>
-                {item.safetyFlagged ? 'Safety flagged' : item.providerStatus}
+                {item.safetyFlagged ? 'נדרשה זהירות בטיחותית' : formatProviderStatus(item.providerStatus)}
               </small>
             )}
           </div>
         ))}
-        {status === 'sending' && <div className="message-bubble coach">Thinking...</div>}
-        {status === 'error' && <div className="error-text">Request failed</div>}
+        {status === 'sending' && <div className="message-bubble coach">חושב...</div>}
+        {status === 'error' && <div className="error-text">הבקשה נכשלה</div>}
       </div>
 
       <form className="composer" onSubmit={handleSubmit}>
-        <label htmlFor="coach-message">Message the coach</label>
+        <label htmlFor="coach-message">הודעה למאמן</label>
         <div className="composer-row">
           <textarea
             id="coach-message"
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Ask for a workout, log a meal, or summarize your week."
+            placeholder="בקש אימון, תעד ארוחה או בקש סיכום שבועי."
           />
           <button className="primary-button icon-button" type="submit" disabled={status === 'sending'}>
             <Send size={17} aria-hidden="true" />
-            Send
+            שליחה
           </button>
         </div>
       </form>

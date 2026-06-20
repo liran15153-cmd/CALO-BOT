@@ -22,4 +22,4 @@ def export_data(db: Session = Depends(get_db)) -> dict:
 @router.post("/reset", response_model=ResetResponse)
 def reset_data(db: Session = Depends(get_db)) -> dict:
     deleted_records = SettingsService(db).reset_local_data()
-    return {"deleted_records": deleted_records, "message": "Local coaching data reset."}
+    return {"deleted_records": deleted_records, "message": "הנתונים המקומיים של המאמן אופסו."}

@@ -37,21 +37,65 @@ class MemoryService:
     def _extract(text: str) -> list[tuple[str, str]]:
         normalized = text.lower()
         memories: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
 
-        if "short workout" in normalized or "short workouts" in normalized:
-            memories.append(("preference", "User prefers short workouts"))
-        if "direct coaching" in normalized or "prefer direct" in normalized:
-            memories.append(("preference", "User prefers direct coaching"))
-        if "after work" in normalized:
-            memories.append(("schedule", "User usually trains after work"))
-        if "dumbbell" in normalized:
-            memories.append(("equipment", "User has access to dumbbells"))
-        if "resistance band" in normalized:
-            memories.append(("equipment", "User has access to resistance bands"))
-        if "hate running" in normalized or "dislike running" in normalized:
-            memories.append(("preference", "User dislikes running"))
-        if "knee pain" in normalized or "knee hurts" in normalized:
-            memories.append(("safety_limitation", "User reported knee pain during training"))
+        def remember(memory_type: str, content: str) -> None:
+            candidate = (memory_type, content)
+            if candidate in seen:
+                return
+            seen.add(candidate)
+            memories.append(candidate)
+
+        if _contains_any(normalized, ["short workout", "short workouts", "אימון קצר", "אימונים קצרים"]):
+            remember("preference", "המשתמש מעדיף אימונים קצרים")
+        if _contains_any(normalized, ["direct coaching", "prefer direct", "אימון ישיר", "סגנון ישיר"]):
+            remember("preference", "המשתמש מעדיף אימון ישיר")
+        if _contains_any(normalized, ["after work", "אחרי העבודה", "אחר העבודה"]):
+            remember("schedule", "המשתמש בדרך כלל מתאמן אחרי העבודה")
+        if "בערב" in normalized and _contains_any(normalized, ["אימון", "אימונים", "מתאמן", "להתאמן"]):
+            remember("schedule", "המשתמש מעדיף להתאמן בערב")
+        if "שלישי" in normalized and "חמישי" in normalized and "בערב" in normalized:
+            remember("schedule", "המשתמש מעדיף להתאמן בשלישי וחמישי בערב")
+        if _contains_any(normalized, ["dumbbell", "dumbbells", "משקולות יד", "דאמבל", "דאמבלים"]):
+            remember("equipment", "למשתמש יש גישה למשקולות יד")
+        if _contains_any(normalized, ["resistance band", "resistance bands", "גומיות התנגדות", "גומיות", "גומייה"]):
+            remember("equipment", "למשתמש יש גישה לגומיות התנגדות")
+        if _contains_any(normalized, ["hate running", "dislike running", "לא אוהב ריצה", "שונא ריצה", "בלי ריצה", "ללא ריצה"]):
+            remember("preference", "המשתמש לא אוהב ריצה")
+        if _contains_any(normalized, ["בלי קפיצות", "ללא קפיצות", "לא אוהב קפיצות"]):
+            remember("preference", "המשתמש מעדיף אימונים בלי קפיצות")
+        if _contains_any(
+            normalized,
+            [
+                "knee pain",
+                "knee hurts",
+                "כאב ברך",
+                "כאבי ברך",
+                "ברך כואבת",
+                "כואבת לי הברך",
+                "רגישות ברך",
+            ],
+        ):
+            remember("safety_limitation", "המשתמש דיווח על כאב או רגישות ברך בזמן אימון")
+        if _contains_any(normalized, ["צמחוני", "טבעוני"]):
+            remember("nutrition", "למשתמש יש העדפה תזונתית מהצומח")
+        if _contains_any(
+            normalized,
+            [
+                "רגיש ללקטוז",
+                "רגישה ללקטוז",
+                "רגישים ללקטוז",
+                "רגישות ללקטוז",
+                "רגיש ללאקטוז",
+                "רגישה ללאקטוז",
+                "רגישים ללאקטוז",
+                "רגישות ללאקטוז",
+            ],
+        ):
+            remember("nutrition", "המשתמש דיווח על רגישות ללקטוז")
 
         return memories
 
+
+def _contains_any(text: str, phrases: list[str]) -> bool:
+    return any(phrase in text for phrase in phrases)

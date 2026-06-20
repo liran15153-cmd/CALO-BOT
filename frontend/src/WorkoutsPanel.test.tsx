@@ -19,20 +19,20 @@ describe('Workout plan UI', () => {
           return jsonResponse({
             id: 1,
             is_current: true,
-            name: '3-Day Build Muscle Plan',
+            name: 'תוכנית 3 ימים לבניית שריר',
             goal: 'build_muscle',
             days_per_week: 3,
             equipment_needed: ['dumbbells'],
             days: [
               {
-                name: 'Day 1 Full Body',
-                warmup: ['5 minutes easy cardio'],
+                name: 'יום 1 גוף מלא',
+                warmup: ['5 דקות אירובי קל'],
                 difficulty: 'moderate',
-                exercises: [{ name: 'Goblet squat', sets: '3', reps_or_duration: '8-12 reps', rest: '90 sec' }]
+                exercises: [{ name: 'סקוואט גביע', sets: '3', reps_or_duration: '8-12 חזרות', rest: '90 שניות' }]
               }
             ],
-            progression_rule: 'Increase reps first.',
-            recovery_note: 'Rest if sore.'
+            progression_rule: 'הוסף חזרות קודם.',
+            recovery_note: 'נוח אם הכאב השרירי גבוה.'
           });
         }
         if (url.endsWith('/api/workout-logs') && init?.method === 'POST') {
@@ -55,12 +55,13 @@ describe('Workout plan UI', () => {
   it('generates and displays a structured workout plan', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Workouts/i }));
-    fireEvent.change(screen.getByLabelText(/Plan request/i), { target: { value: 'Build me a 3-day plan' } });
-    fireEvent.click(screen.getByRole('button', { name: /Generate plan/i }));
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+    fireEvent.change(screen.getByLabelText(/בקשת תוכנית/i), { target: { value: 'Build me a 3-day plan' } });
+    fireEvent.click(screen.getByRole('button', { name: /יצירת תוכנית/i }));
 
-    expect(await screen.findByText(/3-Day Build Muscle Plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Goblet squat/i)).toBeInTheDocument();
+    expect(await screen.findByText(/תוכנית 3 ימים לבניית שריר/i)).toBeInTheDocument();
+    expect(screen.getByText(/סקוואט גביע/i)).toBeInTheDocument();
+    expect(screen.getByText(/ימים בשבוע/i)).toBeInTheDocument();
   });
 
   it('loads and displays the current persisted workout plan', async () => {
@@ -75,20 +76,20 @@ describe('Workout plan UI', () => {
           return jsonResponse({
             id: 9,
             is_current: true,
-            name: 'Saved Strength Plan',
+            name: 'תוכנית כוח שמורה',
             goal: 'improve_strength',
             days_per_week: 2,
             equipment_needed: ['resistance bands'],
             days: [
               {
-                name: 'Tuesday Full Body',
-                warmup: ['5 minutes easy cardio'],
+                name: 'יום שלישי גוף מלא',
+                warmup: ['5 דקות אירובי קל'],
                 difficulty: 'moderate',
-                exercises: [{ name: 'Band row', sets: '3', reps_or_duration: '10-12 reps', rest: '75 sec' }]
+                exercises: [{ name: 'חתירה עם גומייה', sets: '3', reps_or_duration: '10-12 חזרות', rest: '75 שניות' }]
               }
             ],
-            progression_rule: 'Add reps first.',
-            recovery_note: 'Respect knee limitation.'
+            progression_rule: 'הוסף חזרות קודם.',
+            recovery_note: 'כבד את המגבלה שתועדה בפרופיל.'
           });
         }
         return jsonResponse({});
@@ -97,23 +98,60 @@ describe('Workout plan UI', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Workouts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
 
-    expect(await screen.findByText(/Saved Strength Plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Band row/i)).toBeInTheDocument();
+    expect(await screen.findByText(/תוכנית כוח שמורה/i)).toBeInTheDocument();
+    expect(screen.getByText(/חתירה עם גומייה/i)).toBeInTheDocument();
   });
 
   it('logs a workout from natural language text', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Workouts/i }));
-    fireEvent.change(screen.getByLabelText(/Workout log/i), {
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+    fireEvent.change(screen.getByLabelText(/תיעוד אימון/i), {
       target: { value: 'I did 3 sets of bench press 10, 8, 7 with 50kg' }
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save workout log/i }));
+    fireEvent.click(screen.getByRole('button', { name: /שמירת תיעוד אימון/i }));
 
-    expect(await screen.findByText(/completed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/הושלם/i)).toBeInTheDocument();
     expect(screen.getByText(/bench press/i)).toBeInTheDocument();
+  });
+
+  it('does not leak unknown internal workout status identifiers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse({}, 404);
+        }
+        if (url.endsWith('/api/workout-logs') && init?.method === 'POST') {
+          return jsonResponse({
+            id: 2,
+            logged_on: '2026-06-15',
+            status: 'internal_status_code',
+            exercise_results: [],
+            pain_flag: false,
+            parse_confidence: 'internal_confidence_code'
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+    fireEvent.change(screen.getByLabelText(/תיעוד אימון/i), { target: { value: 'תיעדתי אימון קצר' } });
+    fireEvent.click(screen.getByRole('button', { name: /שמירת תיעוד אימון/i }));
+
+    expect(await screen.findByText(/סטטוס לא מוכר/i)).toBeInTheDocument();
+    expect(screen.getByText(/רמת ביטחון: לא ידועה/i)).toBeInTheDocument();
+    expect(screen.queryByText(/internal_status_code/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/internal_confidence_code/i)).not.toBeInTheDocument();
   });
 });
 

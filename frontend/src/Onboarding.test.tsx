@@ -33,18 +33,18 @@ describe('Onboarding UI', () => {
   it('saves the required onboarding profile fields', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Onboarding/i }));
-    fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Lior' } });
-    fireEvent.change(screen.getByLabelText(/Main goal/i), { target: { value: 'build_muscle' } });
-    fireEvent.change(screen.getByLabelText(/Experience/i), { target: { value: 'beginner' } });
-    fireEvent.change(screen.getByLabelText(/Training location/i), { target: { value: 'gym' } });
-    fireEvent.change(screen.getByLabelText(/Workout days per week/i), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText(/Session length/i), { target: { value: '45' } });
-    fireEvent.click(screen.getByLabelText(/general fitness and nutrition guidance/i));
-    fireEvent.click(screen.getByRole('button', { name: /Save profile/i }));
+    fireEvent.click(screen.getByRole('button', { name: /פרופיל/i }));
+    fireEvent.change(screen.getByLabelText(/שם/i), { target: { value: 'Lior' } });
+    fireEvent.change(screen.getByLabelText(/מטרה מרכזית/i), { target: { value: 'build_muscle' } });
+    fireEvent.change(screen.getByLabelText(/רמת ניסיון/i), { target: { value: 'beginner' } });
+    fireEvent.change(screen.getByLabelText(/מיקום אימון/i), { target: { value: 'gym' } });
+    fireEvent.change(screen.getByLabelText(/ימי אימון בשבוע/i), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText(/משך אימון/i), { target: { value: '45' } });
+    fireEvent.click(screen.getByLabelText(/הכוונת כושר ותזונה כללית/i));
+    fireEvent.click(screen.getByRole('button', { name: /שמירת פרופיל/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Profile saved/i)).toBeInTheDocument();
+      expect(screen.getByText(/הפרופיל נשמר/i)).toBeInTheDocument();
     });
 
     const fetchMock = vi.mocked(fetch);

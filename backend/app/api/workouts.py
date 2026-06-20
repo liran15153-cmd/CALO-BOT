@@ -26,7 +26,7 @@ def get_current_workout_plan(db: Session = Depends(get_db)) -> dict[str, Any]:
     user = ProfileService(db).get_default_user()
     plan = WorkoutService(db).current_plan(user_id=user.id)
     if plan is None:
-        raise HTTPException(status_code=404, detail="No current workout plan")
+        raise HTTPException(status_code=404, detail="אין תוכנית אימון פעילה")
     return WorkoutService.serialize_plan(plan)
 
 

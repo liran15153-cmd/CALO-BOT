@@ -20,13 +20,13 @@ class FileStorageService:
     async def store_meal_image(self, user_id: int, file: UploadFile) -> Path:
         extension = ALLOWED_IMAGE_TYPES.get(file.content_type or "")
         if extension is None:
-            raise ValueError("Only JPEG, PNG, and WEBP meal images are allowed")
+            raise ValueError("אפשר להעלות רק תמונות ארוחה מסוג JPEG, PNG או WEBP")
 
         content = await file.read(MAX_MEAL_IMAGE_BYTES + 1)
         if len(content) > MAX_MEAL_IMAGE_BYTES:
-            raise ValueError("Meal image is too large; max size is 5 MB")
+            raise ValueError("תמונת הארוחה גדולה מדי; הגודל המרבי הוא 5MB")
         if _detect_image_extension(content) != extension:
-            raise ValueError("Uploaded image bytes do not match JPEG, PNG, or WEBP")
+            raise ValueError("קובץ התמונה לא תואם לסוג JPEG, PNG או WEBP")
 
         today = date.today().isoformat()
         target_dir = self.upload_root / "meals" / str(user_id) / today

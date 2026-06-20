@@ -20,7 +20,24 @@ def test_manual_meal_logging_estimates_protein_shake(tmp_path):
     assert body["protein_min"] == 25
     assert body["calories_min"] < body["calories_max"]
     assert db.scalar(select(Meal)) is not None
-    assert db.scalar(select(MealItem)).name == "protein shake"
+    assert db.scalar(select(MealItem)).name == "שייק חלבון"
+
+
+def test_manual_meal_logging_sums_multiple_recognized_items(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/meals/manual",
+        json={"text": "Greek yogurt, banana and protein shake after training"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["confidence"] == "medium"
+    assert body["calories_min"] >= 280
+    assert body["protein_min"] >= 35
+    items = db.scalars(select(MealItem).order_by(MealItem.id)).all()
+    assert len(items) == 3
 
 
 def test_manual_meal_logging_estimates_pizza_as_low_confidence(tmp_path):
@@ -46,4 +63,3 @@ def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app), db
-

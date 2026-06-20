@@ -28,8 +28,8 @@ from backend.app.services.workout_service import WorkoutService
 
 
 DISCLAIMER = (
-    "This local fitness coach is for general fitness and nutrition support only. "
-    "It is not medical advice and should not replace a qualified clinician."
+    "מאמן הכושר המקומי הזה מיועד לתמיכה כללית בכושר ותזונה בלבד. "
+    "זו אינה עצה רפואית והוא לא מחליף רופא, דיאטן, פיזיותרפיסט או איש מקצוע מוסמך."
 )
 
 

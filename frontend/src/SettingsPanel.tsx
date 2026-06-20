@@ -2,6 +2,7 @@ import { Download, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { exportSettingsData, fetchSettings, fetchUsage, resetLocalData, type SettingsState, type UsageState } from './api';
+import { formatDatabaseStatus, formatProviderStatus } from './formatters';
 
 export function SettingsPanel() {
   const [settings, setSettings] = useState<SettingsState | null>(null);
@@ -38,16 +39,22 @@ export function SettingsPanel() {
   async function handleExport() {
     setActionMessage('');
     setActionStatus('busy');
-    const data = await exportSettingsData();
-    setExportData(data);
-    setActionMessage('Export ready');
-    setActionStatus('idle');
+    try {
+      const data = await exportSettingsData();
+      setExportData(data);
+      setActionMessage('הייצוא מוכן');
+      setActionStatus('idle');
+    } catch {
+      setExportData(null);
+      setActionMessage('הייצוא נכשל');
+      setActionStatus('error');
+    }
   }
 
   async function handleReset() {
     if (!resetArmed) {
       setResetArmed(true);
-      setActionMessage('Click reset again to confirm deletion.');
+      setActionMessage('לחץ שוב על איפוס לאישור מחיקה.');
       return;
     }
     setActionMessage('');
@@ -56,21 +63,21 @@ export function SettingsPanel() {
       const result = await resetLocalData();
       setExportData(null);
       setResetArmed(false);
-      setActionMessage(`${result.deleted_records} records deleted`);
+      setActionMessage(`${result.deleted_records} רשומות נמחקו`);
       const [settingsData, usageData] = await Promise.all([fetchSettings(), fetchUsage()]);
       setSettings(settingsData);
       setUsage(usageData);
       setActionStatus('idle');
     } catch {
       setActionStatus('error');
-      setActionMessage('Reset failed');
+      setActionMessage('האיפוס נכשל');
     }
   }
 
   if (status === 'loading') {
     return (
       <section className="panel settings-panel">
-        <p>Loading settings...</p>
+        <p>טוען הגדרות...</p>
       </section>
     );
   }
@@ -78,8 +85,8 @@ export function SettingsPanel() {
   if (status === 'error' || !settings) {
     return (
       <section className="panel settings-panel">
-        <h3>Settings unavailable</h3>
-        <p className="error-text">The backend did not return settings.</p>
+        <h3>ההגדרות לא זמינות</h3>
+        <p className="error-text">הבקאנד לא החזיר הגדרות.</p>
       </section>
     );
   }
@@ -87,26 +94,26 @@ export function SettingsPanel() {
   return (
     <section className="panel settings-panel">
       <div className="panel-heading">
-        <h3>Provider and data controls</h3>
-        <p>Local configuration status and data controls for this machine.</p>
+        <h3>ספק בינה מלאכותית וניהול נתונים</h3>
+        <p>סטטוס הגדרות מקומי וכלי שליטה בנתונים במחשב הזה.</p>
       </div>
 
       <div className="settings-grid">
         <div className="settings-row">
-          <span>AI provider</span>
-          <strong>{settings.ai_provider}</strong>
+          <span>ספק בינה מלאכותית</span>
+          <strong>{formatProviderStatus(settings.ai_provider)}</strong>
         </div>
         <div className="settings-row">
-          <span>Model</span>
+          <span>מודל</span>
           <strong>{settings.model}</strong>
         </div>
         <div className="settings-row">
-          <span>Database</span>
-          <strong>{settings.database}</strong>
+          <span>מסד נתונים</span>
+          <strong>{formatDatabaseStatus(settings.database)}</strong>
         </div>
         <div className="settings-row">
-          <span>API key</span>
-          <strong>{settings.api_key_present ? 'configured outside browser' : 'not present'}</strong>
+          <span>מפתח API</span>
+          <strong>{settings.api_key_present ? 'מוגדר מחוץ לדפדפן' : 'לא קיים'}</strong>
         </div>
       </div>
 
@@ -116,22 +123,30 @@ export function SettingsPanel() {
       </div>
 
       {usage ? (
-        <div className="usage-grid" aria-label="Usage today">
+        <div className="usage-grid" aria-label="שימוש היום">
           <div>
-            <span>Chat requests</span>
+            <span>בקשות צ'אט</span>
             <strong>{usage.chat_requests_count}</strong>
           </div>
           <div>
-            <span>Image analysis</span>
+            <span>ניתוחי תמונה</span>
             <strong>{usage.image_analysis_count}</strong>
           </div>
           <div>
-            <span>Summaries</span>
+            <span>סיכומים</span>
             <strong>{usage.summary_requests_count}</strong>
           </div>
           <div>
-            <span>Estimated tokens</span>
-            <strong>{usage.estimated_tokens_in + usage.estimated_tokens_out}</strong>
+            <span>טוקנים משוערים</span>
+            <strong>{usage.estimated_tokens_total.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span>תקציב שנותר</span>
+            <strong>{usage.tokens_remaining.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span>תקציב יומי</span>
+            <strong>{usage.daily_ai_token_limit.toLocaleString()}</strong>
           </div>
         </div>
       ) : null}
@@ -139,19 +154,19 @@ export function SettingsPanel() {
       <div className="settings-actions">
         <button className="ghost-button" type="button" onClick={handleExport} disabled={actionStatus === 'busy'}>
           <Download size={16} aria-hidden="true" />
-          Export
+          ייצוא
         </button>
         <button className="ghost-button danger-button" type="button" onClick={handleReset} disabled={actionStatus === 'busy'}>
           <RotateCcw size={16} aria-hidden="true" />
-          {resetArmed ? 'Confirm reset' : 'Reset local data'}
+          {resetArmed ? 'אישור איפוס' : 'איפוס נתונים מקומיים'}
         </button>
       </div>
 
-      {actionMessage ? <p className="success-text">{actionMessage}</p> : null}
+      {actionMessage ? <p className={actionStatus === 'error' ? 'error-text' : 'success-text'}>{actionMessage}</p> : null}
 
       {exportPreview ? (
         <label className="export-preview">
-          Export preview
+          תצוגת ייצוא
           <textarea readOnly value={exportPreview} />
         </label>
       ) : null}

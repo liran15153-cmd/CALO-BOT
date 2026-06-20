@@ -9,6 +9,7 @@ from backend.app.config import get_settings
 from backend.app.models import Meal, MealImageAnalysis, MealItem
 from backend.app.schemas import MealTextRequest
 from backend.app.services.ai_provider import build_ai_provider
+from backend.app.services.language_guard import contains_hebrew, has_disallowed_latin_text
 from backend.app.services.usage_service import UsageService, rough_token_count
 
 
@@ -33,12 +34,43 @@ class MealService:
     def analyze_image(self, meal_id: int) -> MealImageAnalysis:
         meal = self.db.get(Meal, meal_id)
         if meal is None or meal.image_path is None:
-            raise ValueError("meal image not found")
+            raise ValueError("תמונת הארוחה לא נמצאה")
 
         settings = get_settings()
+        usage_service = UsageService(self.db)
+        if settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded():
+            usage_service.record(
+                user_id=meal.user_id,
+                task="image_analysis",
+                provider="budget_exceeded",
+                model=None,
+                estimated_tokens_in=0,
+                estimated_tokens_out=0,
+            )
+            payload = {
+                "message": (
+                    "תקציב הבינה המלאכותית היומי נוצל. ניתוח תמונת הארוחה לא נשלח לספק הבינה המלאכותית."
+                ),
+                "detected_items": [],
+                "calorie_range": [None, None],
+                "macro_ranges": {},
+                "confidence": "unavailable",
+            }
+            analysis = MealImageAnalysis(
+                meal_id=meal.id,
+                detected_items=[],
+                follow_up_questions=[],
+                analysis_json=payload,
+                provider_status="budget_exceeded",
+            )
+            self.db.add(analysis)
+            self.db.commit()
+            self.db.refresh(analysis)
+            return analysis
+
         provider = build_ai_provider(settings.anthropic_api_key, settings.anthropic_model)
         result = provider.analyze_image(Path(meal.image_path), note=meal.note)
-        UsageService(self.db).record(
+        usage_service.record(
             user_id=meal.user_id,
             task="image_analysis",
             provider=result.provider_status,
@@ -49,7 +81,7 @@ class MealService:
 
         if result.provider_status == "not_configured":
             payload = {
-                "message": "Meal image analysis is unavailable until an AI provider is configured.",
+                "message": "ניתוח תמונת ארוחה לא זמין עד שמוגדר ספק בינה מלאכותית.",
                 "detected_items": [],
                 "calorie_range": [None, None],
                 "macro_ranges": {},
@@ -151,15 +183,53 @@ class MealService:
         try:
             parsed = json.loads(text)
             if isinstance(parsed, dict):
-                return parsed
+                return MealService._ensure_hebrew_analysis_payload(parsed)
         except json.JSONDecodeError:
             pass
-        return {
+        return MealService._ensure_hebrew_analysis_payload(
+            {
             "message": text,
             "detected_items": [],
-            "follow_up_questions": ["Tell me approximate portion sizes to improve accuracy."],
+            "follow_up_questions": ["כתוב לי כמויות משוערות כדי לשפר את הדיוק."],
             "confidence": "low",
-        }
+            }
+        )
+
+    @staticmethod
+    def _ensure_hebrew_analysis_payload(payload: dict) -> dict:
+        normalized = dict(payload)
+        message = normalized.get("message")
+        if isinstance(message, str) and message.strip() and (
+            not contains_hebrew(message) or has_disallowed_latin_text(message)
+        ):
+            normalized["message"] = "ניתוח התמונה חזר עם טקסט שרובו לא בעברית, ולכן מוצגת הערכה שמרנית בלבד."
+
+        normalized["detected_items"] = [
+            MealService._ensure_hebrew_detected_item(item)
+            for item in normalized.get("detected_items", [])
+            if isinstance(item, dict)
+        ]
+
+        questions = [
+            question
+            for question in normalized.get("follow_up_questions", [])
+            if isinstance(question, str) and contains_hebrew(question) and not has_disallowed_latin_text(question)
+        ]
+        if normalized.get("follow_up_questions") and not questions:
+            questions = ["מה הכמות המשוערת ומה שיטת ההכנה?"]
+        normalized["follow_up_questions"] = questions
+        return normalized
+
+    @staticmethod
+    def _ensure_hebrew_detected_item(item: dict) -> dict:
+        normalized = dict(item)
+        name = str(normalized.get("name") or "").strip()
+        quantity = str(normalized.get("quantity") or "").strip()
+        if name and (not contains_hebrew(name) or has_disallowed_latin_text(name)):
+            normalized["name"] = "פריט מזון שזוהה"
+        if quantity and (not contains_hebrew(quantity) or has_disallowed_latin_text(quantity)):
+            normalized["quantity"] = "כמות לא ודאית"
+        return normalized
 
     def _apply_image_estimate(self, meal: Meal, payload: dict) -> None:
         calories = self._range_from_payload(payload, "calorie_range", "calories_range")
@@ -242,7 +312,66 @@ class MealService:
     @staticmethod
     def _estimate_manual_meal(text: str) -> dict:
         normalized = text.lower()
-        if "protein shake" in normalized:
+        items = []
+        if "protein shake" in normalized or "שייק חלבון" in normalized or "אבקת חלבון" in normalized:
+            items.append(
+                {
+                    "name": "שייק חלבון",
+                    "quantity": "מנה משוערת",
+                    "calories_min": 120,
+                    "calories_max": 220,
+                    "protein_min": 25,
+                    "protein_max": 35,
+                    "carbs_min": 2,
+                    "carbs_max": 15,
+                    "fat_min": 1,
+                    "fat_max": 8,
+                }
+            )
+        if "greek yogurt" in normalized or "yogurt" in normalized or "יוגורט" in normalized:
+            items.append(
+                {
+                    "name": "יוגורט יווני",
+                    "quantity": "מנה משוערת",
+                    "calories_min": 90,
+                    "calories_max": 160,
+                    "protein_min": 10,
+                    "protein_max": 20,
+                    "carbs_min": 4,
+                    "carbs_max": 15,
+                    "fat_min": 0,
+                    "fat_max": 8,
+                }
+            )
+        if "banana" in normalized or "בננה" in normalized:
+            items.append(
+                {
+                    "name": "בננה",
+                    "quantity": "יחידה משוערת",
+                    "calories_min": 80,
+                    "calories_max": 130,
+                    "protein_min": 1,
+                    "protein_max": 2,
+                    "carbs_min": 18,
+                    "carbs_max": 32,
+                    "fat_min": 0,
+                    "fat_max": 1,
+                }
+            )
+        if items:
+            return {
+                "calories_min": sum(item["calories_min"] for item in items),
+                "calories_max": sum(item["calories_max"] for item in items),
+                "protein_min": sum(item["protein_min"] for item in items),
+                "protein_max": sum(item["protein_max"] for item in items),
+                "carbs_min": sum(item["carbs_min"] for item in items),
+                "carbs_max": sum(item["carbs_max"] for item in items),
+                "fat_min": sum(item["fat_min"] for item in items),
+                "fat_max": sum(item["fat_max"] for item in items),
+                "confidence": "medium",
+                "items": items,
+            }
+        if "protein shake" in normalized or "שייק חלבון" in normalized or "אבקת חלבון" in normalized:
             return {
                 "calories_min": 120,
                 "calories_max": 220,
@@ -255,8 +384,8 @@ class MealService:
                 "confidence": "medium",
                 "items": [
                     {
-                        "name": "protein shake",
-                        "quantity": "1 serving",
+                        "name": "שייק חלבון",
+                        "quantity": "מנה משוערת",
                         "calories_min": 120,
                         "calories_max": 220,
                         "protein_min": 25,
@@ -264,7 +393,7 @@ class MealService:
                     }
                 ],
             }
-        if "egg" in normalized:
+        if "egg" in normalized or "ביצה" in normalized or "ביצים" in normalized:
             return {
                 "calories_min": 140,
                 "calories_max": 260,
@@ -275,9 +404,9 @@ class MealService:
                 "fat_min": 8,
                 "fat_max": 18,
                 "confidence": "medium",
-                "items": [{"name": "eggs", "quantity": "estimated serving"}],
+                "items": [{"name": "ביצים", "quantity": "מנה משוערת"}],
             }
-        if "pizza" in normalized:
+        if "pizza" in normalized or "פיצה" in normalized:
             return {
                 "calories_min": 500,
                 "calories_max": 1000,
@@ -288,7 +417,7 @@ class MealService:
                 "fat_min": 18,
                 "fat_max": 55,
                 "confidence": "low",
-                "items": [{"name": "pizza", "quantity": "unknown portion"}],
+                "items": [{"name": "פיצה", "quantity": "כמות לא ידועה"}],
             }
         return {
             "calories_min": 300,
@@ -300,5 +429,5 @@ class MealService:
             "fat_min": 8,
             "fat_max": 35,
             "confidence": "low",
-            "items": [{"name": "manual meal", "quantity": "unknown portion"}],
+            "items": [{"name": "ארוחה ידנית", "quantity": "כמות לא ידועה"}],
         }

@@ -25,13 +25,15 @@ CALO Coach is a local-first product foundation, not a fake demo. The frontend is
 - `AIProvider`: chat, structured extraction, image analysis, summarization, honest no-key fallback
 - `CoachEngine`: safety check, context build, AI response, persistence
 - `CoachIntentService`: deterministic v1 intent classification for module dispatch before generic chat
+- `CoachingKnowledgeService`: compact, source-backed general fitness coaching rules injected into provider context
 - `SafetyService`: rule-based safety classification and conservative responses
 - `ContextBuilder`: compact AI context from structured state and intent-relevant memories, never full database dumps
 - `MemoryService`: durable memory extraction and retrieval
 - `WorkoutService`: profile-aware plan generation, row-level workout/exercise persistence, and workout log parsing
+- `TrainingAdaptationService`: compact interpretation of recent workout logs for load, adherence, pain and recovery signals
 - `MealService`: image/manual meal logging, configured image-analysis normalization, and estimate handling
 - `SummaryService`: daily and weekly summaries from stored facts
-- `UsageService`: per-call usage/cost tracking foundation
+- `UsageService`: per-call usage tracking plus a daily token budget gate before provider-backed calls
 - `FileStorageService`: sanitized local upload storage with type allow-list, magic-byte checks, and size caps
 - `SettingsService`: provider status, JSON export, and local data reset
 
@@ -48,7 +50,7 @@ Workout plans are stored both as the original structured `plan_json` and as `Wor
 - Workouts: structured plan generation and natural-language log parsing
 - Meals: image upload, image analysis ranges, detected items, follow-up questions, and manual meal estimates
 - Dashboard: current goal, plan, weekly activity, nutrition range, memories, and next action
-- Settings: provider status, disclaimer, export/reset, and usage totals
+- Settings: provider status, disclaimer, export/reset, usage totals, and remaining daily AI token budget
 
 ## Adapter Direction
 

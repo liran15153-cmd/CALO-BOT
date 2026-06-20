@@ -16,6 +16,8 @@ Goal = Literal[
 Experience = Literal["beginner", "intermediate", "advanced"]
 TrainingLocation = Literal["home", "gym", "outdoors", "mixed"]
 CoachingStyle = Literal["direct", "supportive", "strict", "minimal", "detailed"]
+WorkoutPlanType = Literal["multi_week", "single_session"]
+ReadinessLevel = Literal["green", "yellow", "red"]
 
 
 class OnboardingPayload(BaseModel):
@@ -43,7 +45,7 @@ class OnboardingPayload(BaseModel):
     @classmethod
     def consent_required(cls, value: bool) -> bool:
         if not value:
-            raise ValueError("consent_disclaimer must be accepted")
+            raise ValueError("יש לאשר שהאפליקציה מספקת הכוונת כושר ותזונה כללית בלבד")
         return value
 
     @field_validator("available_equipment", "preferred_workout_days")
@@ -82,7 +84,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatSessionCreate(BaseModel):
-    title: str = Field(default="Coach chat", min_length=1, max_length=160)
+    title: str = Field(default="צ'אט מאמן", min_length=1, max_length=160)
 
 
 class ChatMessageCreate(BaseModel):
@@ -102,9 +104,15 @@ class ChatResponse(BaseModel):
 
 class WorkoutPlanRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=2000)
+    plan_type: WorkoutPlanType | None = None
+    goal: Goal | None = None
+    experience_level: Experience | None = None
+    duration_weeks: int | None = Field(default=None, ge=1, le=4)
     days_per_week: int | None = Field(default=None, ge=1, le=7)
     session_length_minutes: int | None = Field(default=None, ge=10, le=120)
     equipment: list[str] = Field(default_factory=list)
+    limitations: str | None = Field(default=None, max_length=1200)
+    readiness: ReadinessLevel | None = None
 
 
 class StructuredExercise(BaseModel):
@@ -116,10 +124,17 @@ class StructuredExercise(BaseModel):
     difficulty: str = Field(default="moderate", max_length=40)
     alternatives: list[str] = Field(default_factory=list)
     safety_notes: list[str] = Field(default_factory=list)
+    movement_pattern: str | None = Field(default=None, max_length=80)
+    target_muscles: list[str] = Field(default_factory=list)
+    progression: str | None = Field(default=None, max_length=300)
+    regression: str | None = Field(default=None, max_length=300)
+    source_refs: list[str] = Field(default_factory=list)
 
 
 class StructuredWorkoutDay(BaseModel):
     name: str = Field(min_length=1, max_length=160)
+    focus: str = Field(default="full_body", max_length=80)
+    estimated_duration_minutes: int | None = Field(default=None, ge=1, le=180)
     warmup: list[str] = Field(min_length=1)
     exercises: list[StructuredExercise] = Field(min_length=1)
     difficulty: str = Field(default="moderate", max_length=40)
@@ -129,12 +144,20 @@ class StructuredWorkoutDay(BaseModel):
 class StructuredWorkoutPlan(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     goal: str = Field(min_length=1, max_length=120)
-    duration_weeks: int = Field(ge=1, le=52)
+    plan_type: WorkoutPlanType = "multi_week"
+    training_split: str = Field(default="full_body", max_length=80)
+    experience_level: str = Field(default="beginner", max_length=40)
+    duration_weeks: int = Field(ge=1, le=4)
     days_per_week: int = Field(ge=1, le=7)
+    session_length_minutes: int | None = Field(default=None, ge=1, le=180)
     equipment_needed: list[str] = Field(default_factory=list)
     days: list[StructuredWorkoutDay] = Field(min_length=1)
     progression_rule: str = Field(min_length=1, max_length=1000)
+    progression_model: str | None = Field(default=None, max_length=500)
     recovery_note: str | None = Field(default=None, max_length=1000)
+    safety_notes: list[str] = Field(default_factory=list)
+    decision_inputs: dict[str, Any] = Field(default_factory=dict)
+    source_refs: list[str] = Field(default_factory=list)
 
 
 class WorkoutLogRequest(BaseModel):
@@ -184,3 +207,6 @@ class UsageResponse(BaseModel):
     summary_requests_count: int
     estimated_tokens_in: int
     estimated_tokens_out: int
+    estimated_tokens_total: int
+    daily_ai_token_limit: int
+    tokens_remaining: int

@@ -56,34 +56,34 @@ export function WorkoutsPanel() {
   return (
     <section className="panel workouts-panel">
       <div className="panel-heading">
-        <h3>Workout plan</h3>
-        <p>Generate a structured plan that can be inspected and edited later.</p>
+        <h3>תוכנית אימון</h3>
+        <p>צור תוכנית מובנית שאפשר לבדוק, לעדכן ולתעד מולה בהמשך.</p>
       </div>
 
       <form className="composer" onSubmit={handleGenerate}>
-        <label htmlFor="plan-request">Plan request</label>
+        <label htmlFor="plan-request">בקשת תוכנית</label>
         <div className="composer-row">
           <textarea
             id="plan-request"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Create a 3-day plan using my profile and available equipment."
+            placeholder="צור תוכנית ל-3 ימים לפי הפרופיל והציוד הזמין שלי."
           />
           <button className="primary-button icon-button" type="submit" disabled={status === 'loading' || !prompt.trim()}>
             <Dumbbell size={17} aria-hidden="true" />
-            Generate plan
+            יצירת תוכנית
           </button>
         </div>
       </form>
 
-      {status === 'error' && <p className="error-text">Could not generate plan.</p>}
+      {status === 'error' && <p className="error-text">לא הצלחתי ליצור תוכנית.</p>}
 
       {plan && (
         <div className="plan-view">
           <div className="plan-summary">
             <h4>{plan.name}</h4>
-            <span>{plan.days_per_week} days/week</span>
-            <span>{plan.equipment_needed.join(', ') || 'bodyweight'}</span>
+            <span>{plan.days_per_week} ימים בשבוע</span>
+            <span>{formatEquipment(plan.equipment_needed)}</span>
           </div>
           {plan.days.map((day) => (
             <article className="plan-day" key={day.name}>
@@ -93,7 +93,7 @@ export function WorkoutsPanel() {
                 {day.exercises.map((exercise) => (
                   <div className="exercise-row" key={exercise.name}>
                     <strong>{exercise.name}</strong>
-                    <span>{exercise.sets} sets</span>
+                    <span>{exercise.sets} סטים</span>
                     <span>{exercise.reps_or_duration}</span>
                     <span>{exercise.rest}</span>
                   </div>
@@ -106,27 +106,27 @@ export function WorkoutsPanel() {
       )}
 
       <section className="inline-section">
-        <h4>Workout log</h4>
+        <h4>תיעוד אימון</h4>
         <form className="composer" onSubmit={handleLog}>
-          <label htmlFor="workout-log">Workout log</label>
+          <label htmlFor="workout-log">תיעוד אימון</label>
           <div className="composer-row">
             <textarea
               id="workout-log"
               value={logText}
               onChange={(event) => setLogText(event.target.value)}
-              placeholder="I did 3 sets of bench press 10, 8, 7 with 50kg."
+              placeholder='עשיתי 3 סטים של לחיצת חזה 10, 8, 7 חזרות עם 50 ק"ג.'
             />
             <button className="primary-button icon-button" type="submit" disabled={logStatus === 'saving' || !logText.trim()}>
-              Save workout log
+              שמירת תיעוד אימון
             </button>
           </div>
         </form>
-        {logStatus === 'error' && <p className="error-text">Could not save workout log.</p>}
+        {logStatus === 'error' && <p className="error-text">לא הצלחתי לשמור את תיעוד האימון.</p>}
         {lastLog && (
           <div className="log-result">
-            <strong>{lastLog.status}</strong>
-            <span>Confidence: {lastLog.parse_confidence}</span>
-            {lastLog.pain_flag && <span className="error-text">Pain flag saved</span>}
+            <strong>{formatWorkoutStatus(lastLog.status)}</strong>
+            <span>רמת ביטחון: {formatConfidence(lastLog.parse_confidence)}</span>
+            {lastLog.pain_flag && <span className="error-text">סימון כאב נשמר</span>}
             {lastLog.exercise_results.map((result) => (
               <span key={`${result.exercise}-${result.weight ?? ''}`}>
                 {result.exercise} {result.reps?.join(', ')} {result.weight ?? ''}
@@ -137,4 +137,19 @@ export function WorkoutsPanel() {
       </section>
     </section>
   );
+}
+
+function formatEquipment(equipment: string[]): string {
+  if (equipment.length === 0) return 'משקל גוף';
+  return equipment
+    .map((item) => ({ dumbbells: 'משקולות יד', 'resistance bands': 'גומיות התנגדות', bodyweight: 'משקל גוף' })[item] ?? item)
+    .join(', ');
+}
+
+function formatWorkoutStatus(status: string): string {
+  return { completed: 'הושלם', skipped: 'פוספס', partial: 'חלקי', modified: 'שונה' }[status] ?? 'סטטוס לא מוכר';
+}
+
+function formatConfidence(confidence: string): string {
+  return { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' }[confidence] ?? 'לא ידועה';
 }

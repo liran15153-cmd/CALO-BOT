@@ -21,7 +21,7 @@ def test_settings_returns_masked_provider_state(tmp_path, monkeypatch):
     assert body["ai_provider"] in {"configured", "not_configured"}
     assert body["api_key_present"] is True
     assert "fake-anthropic-key" not in serialized
-    assert "medical" in body["disclaimer"].lower()
+    assert "עצה רפואית" in body["disclaimer"]
     get_settings.cache_clear()
 
 

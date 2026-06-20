@@ -9,8 +9,9 @@ build/
 coverage/
 .env
 .env.local
-data/app.db
-data/app.db-*
+*.log
+data/*.db
+data/*.db-*
 data/uploads/
 frontend/.vite/
 *.tsbuildinfo

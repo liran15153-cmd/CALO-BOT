@@ -21,7 +21,7 @@ describe('Meals UI', () => {
             meal_id: 1,
             provider_status: 'not_configured',
             detected_items: [],
-            message: 'Meal image analysis is unavailable until an AI provider is configured.'
+            message: 'ניתוח תמונת ארוחה לא זמין עד שמוגדר ספק בינה מלאכותית.'
           });
         }
         if (url.endsWith('/api/meals/manual') && init?.method === 'POST') {
@@ -46,27 +46,28 @@ describe('Meals UI', () => {
   it('uploads a meal image and shows no-provider analysis state', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Meals/i }));
-    fireEvent.change(screen.getByLabelText(/Meal note/i), { target: { value: 'Lunch' } });
-    fireEvent.change(screen.getByLabelText(/Meal image/i), {
+    fireEvent.click(screen.getByRole('button', { name: /תזונה/i }));
+    fireEvent.change(screen.getByLabelText(/הערת ארוחה/i), { target: { value: 'Lunch' } });
+    fireEvent.change(screen.getByLabelText(/תמונת ארוחה/i), {
       target: { files: [new File(['fake'], 'lunch.jpg', { type: 'image/jpeg' })] }
     });
-    fireEvent.click(screen.getByRole('button', { name: /Upload meal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /העלאת ארוחה/i }));
 
-    expect(await screen.findByText(/not_analyzed/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Analyze image/i }));
-    expect(await screen.findByText(/analysis is unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/טרם נותח/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ניתוח תמונה/i }));
+    expect(await screen.findByText(/לא זמין/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not_configured/i)).not.toBeInTheDocument();
   });
 
   it('logs a manual meal with approximate ranges', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Meals/i }));
-    fireEvent.change(screen.getByLabelText(/Manual meal/i), { target: { value: 'Log protein shake 25g protein' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save meal log/i }));
+    fireEvent.click(screen.getByRole('button', { name: /תזונה/i }));
+    fireEvent.change(screen.getByLabelText(/ארוחה ידנית/i), { target: { value: 'Log protein shake 25g protein' } });
+    fireEvent.click(screen.getByRole('button', { name: /שמירת ארוחה/i }));
 
-    expect(await screen.findByText(/120-220 calories/i)).toBeInTheDocument();
-    expect(screen.getByText(/25-35g protein/i)).toBeInTheDocument();
+    expect(await screen.findByText(/120-220 קלוריות/i)).toBeInTheDocument();
+    expect(screen.getByText(/25-35 גרם חלבון/i)).toBeInTheDocument();
   });
 
   it('shows configured image analysis ranges, detected items, and follow-up questions', async () => {
@@ -85,8 +86,8 @@ describe('Meals UI', () => {
             id: 1,
             meal_id: 1,
             provider_status: 'configured',
-            detected_items: [{ name: 'chicken rice bowl', quantity: '1 bowl' }],
-            follow_up_questions: ['How much rice was in the bowl?'],
+            detected_items: [{ name: 'קערת עוף ואורז', quantity: 'קערה אחת' }],
+            follow_up_questions: ['כמה אורז היה בקערה?'],
             message: '',
             analysis: {
               calorie_range: [520, 760],
@@ -100,19 +101,19 @@ describe('Meals UI', () => {
     );
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Meals/i }));
-    fireEvent.change(screen.getByLabelText(/Meal note/i), { target: { value: 'Lunch' } });
-    fireEvent.change(screen.getByLabelText(/Meal image/i), {
+    fireEvent.click(screen.getByRole('button', { name: /תזונה/i }));
+    fireEvent.change(screen.getByLabelText(/הערת ארוחה/i), { target: { value: 'Lunch' } });
+    fireEvent.change(screen.getByLabelText(/תמונת ארוחה/i), {
       target: { files: [new File(['fake'], 'lunch.jpg', { type: 'image/jpeg' })] }
     });
-    fireEvent.click(screen.getByRole('button', { name: /Upload meal/i }));
-    await screen.findByText(/not_analyzed/i);
-    fireEvent.click(screen.getByRole('button', { name: /Analyze image/i }));
+    fireEvent.click(screen.getByRole('button', { name: /העלאת ארוחה/i }));
+    await screen.findByText(/טרם נותח/i);
+    fireEvent.click(screen.getByRole('button', { name: /ניתוח תמונה/i }));
 
-    expect(await screen.findByText(/520-760 calories/i)).toBeInTheDocument();
-    expect(screen.getByText(/35-52g protein/i)).toBeInTheDocument();
-    expect(screen.getByText(/chicken rice bowl/i)).toBeInTheDocument();
-    expect(screen.getByText(/How much rice/i)).toBeInTheDocument();
+    expect(await screen.findByText(/520-760 קלוריות/i)).toBeInTheDocument();
+    expect(screen.getByText(/35-52 גרם חלבון/i)).toBeInTheDocument();
+    expect(screen.getByText(/קערת עוף ואורז/i)).toBeInTheDocument();
+    expect(screen.getByText(/כמה אורז/i)).toBeInTheDocument();
   });
 });
 

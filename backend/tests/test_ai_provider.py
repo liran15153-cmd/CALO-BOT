@@ -7,7 +7,7 @@ def test_no_configured_provider_does_not_fake_ai_response():
     result = provider.chat(AIRequest(instructions="coach", input_text="Build a plan"))
 
     assert result.provider_status == "not_configured"
-    assert result.text == "AI provider is not configured. Set ANTHROPIC_API_KEY to enable Claude coach responses."
+    assert "ספק הבינה המלאכותית לא מוגדר" in result.text
     assert result.used_model is None
 
 
@@ -40,7 +40,7 @@ def test_anthropic_provider_reports_provider_error_when_request_fails():
 
     assert result.provider_status == "provider_error"
     assert result.used_model == "claude-haiku-4-5"
-    assert "request failed" in result.text.lower()
+    assert "בקשת הבינה המלאכותית נכשלה" in result.text
 
 
 class FakeUsage:

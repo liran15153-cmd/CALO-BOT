@@ -53,7 +53,7 @@ class NoConfiguredAIProvider:
     @staticmethod
     def _not_configured() -> AIResult:
         return AIResult(
-            text="AI provider is not configured. Set ANTHROPIC_API_KEY to enable Claude coach responses.",
+            text="ספק הבינה המלאכותית לא מוגדר. הגדר את ANTHROPIC_API_KEY כדי להפעיל תשובות מאמן דרך Claude.",
             provider_status="not_configured",
             used_model=None,
         )
@@ -77,7 +77,7 @@ class AnthropicProvider:
     def structured(self, request: AIRequest) -> AIResult:
         structured_request = AIRequest(
             instructions=request.instructions,
-            input_text=f"{request.input_text}\n\nReturn valid JSON only.",
+            input_text=f"{request.input_text}\n\nהחזר JSON תקין בלבד.",
             max_output_tokens=request.max_output_tokens,
         )
         return self._responses_text(structured_request)
@@ -91,7 +91,7 @@ class AnthropicProvider:
         try:
             response = self.client.messages.create(
                 model=self.model,
-                system="Estimate meal nutrition from the supplied image. Return JSON with ranges and uncertainty.",
+                system="הערך תזונת ארוחה מתמונה. החזר JSON עם טווחים, אי-ודאות, וכל טקסט למשתמש בעברית בלבד.",
                 messages=[
                     {
                         "role": "user",
@@ -104,7 +104,7 @@ class AnthropicProvider:
                                     "data": encoded_image,
                                 },
                             },
-                            {"type": "text", "text": f"User note: {note or ''}"},
+                            {"type": "text", "text": f"הערת משתמש: {note or ''}"},
                         ],
                     }
                 ],
@@ -145,7 +145,7 @@ class AnthropicProvider:
 
     def _provider_error(self) -> AIResult:
         return AIResult(
-            text="AI provider request failed. Check Anthropic credentials, model access, or request payload.",
+            text="בקשת הבינה המלאכותית נכשלה. בדוק את פרטי Anthropic, הרשאת המודל או מבנה הבקשה.",
             provider_status="provider_error",
             used_model=self.model,
         )
