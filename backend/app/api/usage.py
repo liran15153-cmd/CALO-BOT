@@ -11,8 +11,3 @@ router = APIRouter(prefix="/api/usage", tags=["usage"])
 @router.get("", response_model=UsageResponse)
 def usage(db: Session = Depends(get_db)) -> dict:
     return UsageService(db).daily_totals()
-
-
-@router.get("/today", response_model=UsageResponse)
-def usage_today(db: Session = Depends(get_db)) -> dict:
-    return UsageService(db).daily_totals()

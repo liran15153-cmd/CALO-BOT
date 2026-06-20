@@ -56,7 +56,7 @@ The goal is better coaching behavior: safer plans, clearer progression, consiste
 - Beginner/returning-user behavior: start small, make the next action achievable, and build consistency.
 - Behavior-change protocols: ABC conversation, barrier problem-solving, if-then action plans, self-monitoring feedback, social support, and relapse recovery after missed workouts.
 - Adherence micro-protocols: OARS-style short coaching, barrier-to-plan mapping, implementation intentions, minimum viable workouts, self-monitoring feedback, relapse recovery, and autonomy-supportive choices.
-- Hebrew coaching language: natural Hebrew response structure, terminology register, plain-language autonomy support, jargon policy, and non-punitive correction patterns.
+- Hebrew coaching language: natural Israeli fitness Hebrew, terminology register, plain-language autonomy support, jargon policy, non-punitive correction patterns, and explicit avoidance of literal gym-term translations such as מערכות/הישנויות/פריקת עומס.
 - Common fitness myth handling: spot reduction, DOMS as an unreliable quality signal, sweat as water/heat regulation rather than fat loss, fasted cardio as optional rather than superior, and strength-training bulky-fear coaching.
 - Nutrition support: general fueling, protein/carbohydrate/hydration awareness, pre/post-workout timing, ranges rather than certainty.
 - Practical nutrition coaching: non-clinical scope, simple plate building, protein anchors, fiber/produce habits, hydration habits, meal-prep fallback, workout-adjacent meals, and food-image uncertainty.
@@ -167,6 +167,14 @@ The goal is better coaching behavior: safer plans, clearer progression, consiste
 - Physical-activity habit-formation intervention meta-analysis: https://ijbnpa.biomedcentral.com/articles/10.1186/s12966-023-01493-3
 - CDC plain language materials and resources: https://www.cdc.gov/health-literacy/php/develop-materials/plain-language.html
 - CDC plain writing guidance: https://www.cdc.gov/other/plainwriting.html
+- FitIL Hebrew fitness product language examples: https://fitil.app/glossary
+- Hebrew progressive-overload usage example: https://www.fitlife.co.il/%D7%A4%D7%A8%D7%95%D7%92%D7%A8%D7%A1%D7%99%D7%91-%D7%90%D7%95%D7%91%D7%A8%D7%9C%D7%95%D7%90%D7%93-progressive-overload/
+- Wingate Hebrew hypertrophy terminology example: https://wingate.org.il/%D7%9B%D7%9C-%D7%9E%D7%94-%D7%A9%D7%A8%D7%A6%D7%99%D7%AA%D7%9D-%D7%9C%D7%93%D7%A2%D7%AA-%D7%A2%D7%9C-%D7%94%D7%99%D7%A4%D7%A8%D7%98%D7%A8%D7%95%D7%A4%D7%99%D7%94-%D7%A9%D7%9C-%D7%A9%D7%A8%D7%99%D7%A8/
+- Sagi Gluzman Hebrew RPE/RIR usage example: https://www.sagigluzman.com/post/rpe-rir
+- May Kimhi Hebrew RPE/RIR explainer: https://www.maykimhi.com/post/%D7%90%D7%99%D7%9A-%D7%9C%D7%93%D7%A2%D7%AA-%D7%90%D7%9D-%D7%90%D7%A0%D7%99-%D7%9E%D7%AA%D7%90%D7%9E%D7%A0-%D7%AA-%D7%A7%D7%A9%D7%94-%D7%9E%D7%A1%D7%A4%D7%99%D7%A7-%D7%94%D7%A1%D7%91%D7%A8-%D7%A4%D7%A9%D7%95%D7%98-%D7%A9%D7%9C-rir-%D7%95-rpe
+- Trainero Hebrew workout-plan product language: https://trainero.com/he/tochnit-imun
+- Google Play Hebrew fitness-app listing language: https://play.google.com/store/apps/details?hl=he&id=fitness.online.app
+- NxCode Hebrew fitness-tracker feature language: https://www.nxcode.io/he/case-studies/fitness-tracker
 - Academy of Nutrition and Dietetics timing pre/post-workout nutrition: https://www.eatright.org/fitness/physical-activity/exercise-nutrition/timing-your-pre-and-post-workout-nutrition
 - CDC sleep basics: https://www.cdc.gov/sleep/about/index.html
 - ISSN position stand on protein and exercise: https://scholarcommons.sc.edu/sph_physical_activity_public_health_facpub/366/
@@ -292,6 +300,7 @@ The goal is better coaching behavior: safer plans, clearer progression, consiste
 - Provider context always includes a compact adherence summary for motivation and consistency questions. The richer `behavior_change_protocols` table stays internal for tests and future coaching modules.
 - General-chat provider context also receives `adherence_micro_summary` for OARS-style support, barrier identification, if-then/minimum-action planning, and autonomy-supportive choices. The full `adherence_micro_protocols` table stays internal.
 - The full `hebrew_coaching_language_protocols` table stays internal; provider contexts receive only compact Hebrew-language behavior rules through `coaching_behavior` so responses stay natural, short, autonomy-supportive, and careful with fitness terminology.
+- Short, common terminology questions now use local answers before provider routing when no personalized generation is needed. This currently covers RPE/RIR, hypertrophy and hard sets, progression, deload, DOMS, Zone 2, split choice, common equipment substitutions, and returning after missed workouts. RPE/RIR responses preserve stated values such as `RIR 3` instead of forcing a canned `RIR 2` answer.
 - The full `common_fitness_myth_protocols` table stays internal; general-chat provider contexts receive only compact `fitness_myths_summary` so the coach can answer common myth questions without turning workout-plan prompts into a lecture.
 - The full mobility/balance programming table remains internal; provider context receives only `mobility_balance_summary` so the bot learns the domain without sending a long manual on every request.
 - The full `warmup_cooldown_protocols` table remains internal; workout provider contexts receive only the existing compact `warmup_mobility_summary` with dynamic warmup, ramp-set, static-stretching, and DOMS truthfulness language.

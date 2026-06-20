@@ -1,4 +1,10 @@
-from backend.app.services.coaching_knowledge import CoachingKnowledgeService
+from backend.app.services.coaching_knowledge import (
+    CoachingKnowledgeService,
+    _BASE_CONTEXT,
+    _RETRIEVAL_SKIP_KEYS,
+    _iter_knowledge_entries,
+    _tokenize,
+)
 
 
 def test_coaching_knowledge_contains_evidence_based_training_rules():
@@ -1874,6 +1880,9 @@ def test_coaching_knowledge_contains_hebrew_coach_language_protocols():
     assert any("RIR" in item and "חזרות" in item for item in terminology_rules)
     assert any("DOMS" in item and "כאבי שרירים" in item for item in terminology_rules)
     assert any("רפס" in item and "חזרות" in item for item in terminology_rules)
+    assert any("סטים" in item and "חזרות" in item and "מערכות" in item for item in terminology_rules)
+    assert any("דילואד" in item and "הורדת עומס" in item for item in protocols["jargon_policy"]["rules"])
+    assert any("progressive overload" in item and "התקדמות הדרגתית" in item for item in protocols["jargon_policy"]["rules"])
     assert any("פעולה אחת" in item for item in protocols["response_shape"]["rules"])
     assert any("אפשר" in item or "נבחר" in item for item in protocols["plain_language_autonomy"]["examples"])
     assert any("Zone 2" in item and "לדבר" in item for item in protocols["jargon_policy"]["rules"])
@@ -1890,7 +1899,10 @@ def test_provider_context_includes_compact_hebrew_language_guidance():
 
     for context in [workout_context, general_context, meal_context]:
         behavior = context["coaching_behavior"]
-        assert any("עברית" in item and ("RPE" in item or "DOMS" in item) for item in behavior)
+        assert any("עברית ישראלית טבעית" in item and ("RPE" in item or "DOMS" in item) for item in behavior)
+        assert any("סטים" in item and "חזרות" in item and "מערכות" in item for item in behavior)
+        assert any("דילואד" in item and "progressive overload" in item for item in behavior)
+        assert any("bullet" in item for item in behavior)
         assert any("פעולה אחת" in item for item in behavior)
         assert any("אשמה" in item or "חובה" in item for item in behavior)
         assert "hebrew_coaching_language_protocols" not in context
@@ -2346,3 +2358,85 @@ def test_provider_context_exercise_library_summary_mentions_expanded_patterns():
     assert any("זרועות" in item or "בייספס" in item for item in summary)
     assert "exercise_library" not in context
     assert len(str(context)) < 8500
+
+
+def _retrieved_topics(intent: str, query: str) -> list[str]:
+    context = CoachingKnowledgeService().for_provider_context(intent, query=query)
+    return [hit["topic"] for hit in context.get("retrieved_knowledge", [])]
+
+
+def test_retrieval_iterator_reaches_every_non_meta_knowledge_key():
+    reachable = {table_key for _topic, table_key, _entry_key, _entry in _iter_knowledge_entries(_BASE_CONTEXT)}
+    unreachable = [
+        key
+        for key in _BASE_CONTEXT
+        if key not in reachable and key not in _RETRIEVAL_SKIP_KEYS
+    ]
+
+    assert unreachable == []
+    # The whole knowledge base, minus a few metadata keys, is searchable.
+    assert len(reachable) >= len(_BASE_CONTEXT) - len(_RETRIEVAL_SKIP_KEYS) - 1
+
+
+def test_retrieval_surfaces_previously_unreachable_tables():
+    # Tables that used to be stored-but-never-sent should now retrieve.
+    assert "protein_guidelines" in _retrieved_topics("general_chat", "כמה חלבון לאכול ביום לבניית שריר?")
+    assert "walking_running_protocols.beginner_walk_run" in _retrieved_topics(
+        "general_chat", "איך מתחילים לרוץ בלי לפצוע את עצמי?"
+    )
+    assert "program_lifecycle_protocols.deload_week" in _retrieved_topics(
+        "general_chat", "מה זה דילואד ומתי עושים אותו?"
+    )
+    assert "exercise_library.squat" in _retrieved_topics("workout_plan", "מה הטכניקה הנכונה בסקוואט?")
+    assert any(
+        topic.startswith("goal_specific_programming")
+        or topic.startswith("advanced_strength_hypertrophy_protocols")
+        for topic in _retrieved_topics("workout_plan", "כמה סטים לעשות להיפרטרופיה?")
+    )
+
+
+def test_retrieval_keeps_spot_reduction_top_hit_and_budget():
+    context = CoachingKnowledgeService().for_provider_context(
+        "general_chat", query="האם כפיפות בטן באמת מורידות שומן בבטן?"
+    )
+
+    assert context["retrieved_knowledge"][0]["topic"] == "common_fitness_myth_protocols.spot_reduction"
+    assert "common_fitness_myth_protocols" not in context
+    assert len(str(context)) < 7000
+
+
+def test_retrieved_hits_carry_actual_content_for_varied_field_shapes():
+    # exercise_library entries use non-standard fields (coaching_cues, progressions...).
+    # The generic projection must still surface real content, not an empty shell.
+    context = CoachingKnowledgeService().for_provider_context("workout_plan", query="מה הטכניקה הנכונה בסקוואט?")
+    squat_hit = next(hit for hit in context["retrieved_knowledge"] if hit["topic"] == "exercise_library.squat")
+
+    assert squat_hit.get("guidance") or squat_hit.get("action")
+    assert any(any("֐" <= ch <= "׿" for ch in item) for item in squat_hit.get("guidance", []) + squat_hit.get("action", []))
+
+
+def test_tokenize_strips_hebrew_prefixes_for_matching():
+    # A query word carrying attached prefixes must still share a token with the bare word.
+    assert "חלבון" in _tokenize("ובחלבון")
+    assert "ריצה" in _tokenize("שהריצה")
+    assert _tokenize("כמה חלבון") & _tokenize("צריכת החלבון היומית")
+
+
+def test_retrieval_respects_provider_context_budget_for_all_intents():
+    queries = {
+        "general_chat": "מה זה דילואד ואיך יודעים שצריך?",
+        "workout_plan": "כמה סטים לעשות להיפרטרופיה עם משקולות?",
+        "workout_log": "עשיתי אימון כבד ואני תפוס, מה עכשיו?",
+        "meal_log": "מה לאכול לפני אימון בערב?",
+        "meal_image": "כמה קלוריות בצלחת הזאת בערך?",
+    }
+    budgets = {
+        "general_chat": 7000,
+        "workout_plan": 8500,
+        "workout_log": 8500,
+        "meal_log": 10500,
+        "meal_image": 10500,
+    }
+    for intent, query in queries.items():
+        context = CoachingKnowledgeService().for_provider_context(intent, query=query)
+        assert len(str(context)) <= budgets[intent], intent

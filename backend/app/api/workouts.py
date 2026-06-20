@@ -12,30 +12,68 @@ from backend.app.services.workout_service import WorkoutService
 
 router = APIRouter(prefix="/api/workout-plans", tags=["workout-plans"])
 logs_router = APIRouter(prefix="/api/workout-logs", tags=["workout-logs"])
+workouts_router = APIRouter(prefix="/api/workouts", tags=["workouts"])
 
 
 @router.post("")
 def create_workout_plan(payload: WorkoutPlanRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     user = ProfileService(db).get_default_user()
-    plan = WorkoutService(db).generate_plan(user_id=user.id, request=payload)
-    return WorkoutService.serialize_plan(plan)
+    service = WorkoutService(db)
+    plan = service.generate_plan(user_id=user.id, request=payload)
+    return service.serialize_plan_with_rows(plan)
 
 
 @router.get("/current")
 def get_current_workout_plan(db: Session = Depends(get_db)) -> dict[str, Any]:
     user = ProfileService(db).get_default_user()
-    plan = WorkoutService(db).current_plan(user_id=user.id)
+    service = WorkoutService(db)
+    plan = service.current_plan(user_id=user.id)
     if plan is None:
         raise HTTPException(status_code=404, detail="אין תוכנית אימון פעילה")
-    return WorkoutService.serialize_plan(plan)
+    return service.serialize_plan_with_rows(plan)
+
+
+@workouts_router.get("/next")
+def get_next_workout(db: Session = Depends(get_db)) -> dict[str, Any]:
+    user = ProfileService(db).get_default_user()
+    next_workout = WorkoutService(db).next_workout(user_id=user.id)
+    if next_workout is None:
+        raise HTTPException(status_code=404, detail="אין אימון הבא כי אין תוכנית פעילה")
+    return next_workout
+
+
+@logs_router.get("/recent")
+def recent_workout_logs(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    user = ProfileService(db).get_default_user()
+    logs = WorkoutService(db).recent_logs(user_id=user.id)
+    return [WorkoutService.serialize_log(log) for log in logs]
 
 
 @logs_router.post("")
 def create_workout_log(payload: WorkoutLogRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     user = ProfileService(db).get_default_user()
-    log = WorkoutService(db).parse_log(user_id=user.id, request=payload)
-    if log.pain_flag:
-        safety_result = SafetyService(db).classify(payload.text)
+    workout_service = WorkoutService(db)
+    try:
+        log = workout_service.log_workout(user_id=user.id, request=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    source_text = _workout_log_safety_source(payload, pain_flag=log.pain_flag)
+    if source_text:
+        safety_result = SafetyService(db).classify(source_text)
         if safety_result.flagged:
-            SafetyService(db).record_event(user_id=user.id, source_text=payload.text, result=safety_result)
-    return WorkoutService.serialize_log(log)
+            SafetyService(db).record_event(user_id=user.id, source_text=source_text, result=safety_result)
+    workout_ids = [log.workout_id] if log.workout_id else None
+    adaptation = workout_service.training_status(user_id=user.id, workout_ids=workout_ids)
+    return WorkoutService.serialize_log(log, adaptation=adaptation)
+
+
+def _workout_log_safety_source(payload: WorkoutLogRequest, *, pain_flag: bool) -> str:
+    parts = [
+        payload.text,
+        payload.notes,
+        " ".join(exercise.notes or "" for exercise in payload.exercises),
+    ]
+    source_text = " ".join(part.strip() for part in parts if part and part.strip()).strip()
+    if source_text:
+        return source_text
+    return "כאב דווח בתיעוד אימון מובנה" if pain_flag else ""

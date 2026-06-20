@@ -51,7 +51,7 @@ describe('Settings UI', () => {
           return jsonResponse({ profile: null, meals: [] });
         }
         if (url.endsWith('/api/settings/reset') && init?.method === 'POST') {
-          return jsonResponse({ deleted_records: 3, message: 'הנתונים המקומיים אופסו.' });
+          return jsonResponse({ deleted_records: 1, message: 'הנתונים המקומיים אופסו.' });
         }
         return jsonResponse({});
       })
@@ -80,7 +80,40 @@ describe('Settings UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /איפוס נתונים מקומיים/i }));
     expect(await screen.findByText(/לאישור מחיקה/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /אישור איפוס/i }));
-    expect(await screen.findByText(/3 רשומות נמחקו/i)).toBeInTheDocument();
+    expect(await screen.findByText(/רשומה אחת נמחקה/i)).toBeInTheDocument();
+    expect(screen.queryByText(/1 רשומות נמחקו/i)).not.toBeInTheDocument();
+  });
+
+  it('shows settings even when usage metrics fail to load', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/settings')) {
+          return jsonResponse({
+            ai_provider: 'not_configured',
+            model: 'claude-haiku-4-5',
+            database: 'configured',
+            api_key_present: false,
+            disclaimer: 'זו אינה עצה רפואית.'
+          });
+        }
+        if (url.endsWith('/api/usage')) {
+          return { ok: false, status: 500, json: async () => ({}) } as Response;
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
+
+    expect(await screen.findByText(/claude-haiku-4-5/i)).toBeInTheDocument();
+    expect(screen.queryByText(/ההגדרות לא זמינות/i)).not.toBeInTheDocument();
   });
 
   it('shows an export failure without leaving the settings action busy', async () => {

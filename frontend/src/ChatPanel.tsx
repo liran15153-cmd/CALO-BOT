@@ -50,6 +50,26 @@ export function ChatPanel() {
     }
   }
 
+  async function handleNewChat() {
+    try {
+      if (sessionId) {
+        await resetChatSession(sessionId).catch(() => undefined);
+      }
+      const nextSession = await createChatSession('צ\'אט מאמן');
+      setSessionId(nextSession.id);
+      setMessages([
+        {
+          role: 'coach',
+          content: 'צ\'אט חדש התחיל. הפרופיל והזיכרון לטווח ארוך נשמרו.'
+        }
+      ]);
+      setStatus('idle');
+    } catch {
+      setMessages((current) => [...current, { role: 'coach', content: 'לא הצלחתי להתחיל צ\'אט חדש. נסה שוב בעוד רגע.' }]);
+      setStatus('error');
+    }
+  }
+
   return (
     <section className="panel chat-panel">
       <div className="panel-heading split-heading">
@@ -60,19 +80,7 @@ export function ChatPanel() {
         <button
           className="ghost-button"
           type="button"
-          onClick={async () => {
-            if (sessionId) {
-              await resetChatSession(sessionId).catch(() => undefined);
-            }
-            const nextSession = await createChatSession('צ\'אט מאמן').catch(() => null);
-            setSessionId(nextSession?.id);
-            setMessages([
-              {
-                role: 'coach',
-                content: 'צ\'אט חדש התחיל. הפרופיל והזיכרון לטווח ארוך נשמרו.'
-              }
-            ]);
-          }}
+          onClick={handleNewChat}
         >
           <RotateCcw size={16} aria-hidden="true" />
           צ'אט חדש
@@ -82,11 +90,14 @@ export function ChatPanel() {
       <div className="message-list" aria-live="polite">
         {messages.map((item, index) => (
           <div key={`${item.role}-${index}-${item.content.slice(0, 12)}`} className={`message-bubble ${item.role}`}>
-            {item.content}
+            <span>{item.content}</span>
             {(item.providerStatus || item.safetyFlagged) && (
-              <small>
+              <>
+                {' '}
+                <small>
                 {item.safetyFlagged ? 'נדרשה זהירות בטיחותית' : formatProviderStatus(item.providerStatus)}
-              </small>
+                </small>
+              </>
             )}
           </div>
         ))}

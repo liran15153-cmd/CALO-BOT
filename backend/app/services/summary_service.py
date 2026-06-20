@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ class SummaryService:
         if pain_flags:
             next_action = "הימנע מתנועות כואבות ושקול פנייה לאיש מקצוע אם הכאב נמשך."
         return {
-            "summary": f"היום הושלמו {completed} אימונים ותועדו {len(meals)} ארוחות.",
+            "summary": f"היום {_completed_workouts_summary(completed)} ו{_meals_logged_summary(len(meals))}.",
             "metrics": {
                 "date": day.isoformat(),
                 "workouts_completed": completed,
@@ -41,6 +42,49 @@ class SummaryService:
         }
 
     def weekly_summary(self, user_id: int, target_date: date | None = None) -> WeeklySummary:
+        payload = self._build_weekly_payload(user_id=user_id, target_date=target_date)
+        week_start = payload["week_start"]
+        week_end = payload["week_end"]
+        metrics = payload["metrics"]
+        records = self._weekly_records(user_id=user_id, week_start=week_start, week_end=week_end)
+        record = records[0] if records else None
+        for duplicate in records[1:]:
+            self.db.delete(duplicate)
+        if record is None:
+            record = WeeklySummary(user_id=user_id, week_start=week_start, week_end=week_end)
+            self.db.add(record)
+        record.summary_text = payload["summary"]
+        record.metrics_json = metrics
+        record.next_action = payload["next_action"]
+        self.db.commit()
+        self.db.refresh(record)
+        UsageService(self.db).record(
+            user_id=user_id,
+            task="summary",
+            provider="local",
+            model=None,
+            estimated_tokens_in=0,
+            estimated_tokens_out=0,
+        )
+        return record
+
+    def current_weekly_summary(self, user_id: int, target_date: date | None = None) -> dict[str, Any]:
+        payload = self._build_weekly_payload(user_id=user_id, target_date=target_date)
+        records = self._weekly_records(
+            user_id=user_id,
+            week_start=payload["week_start"],
+            week_end=payload["week_end"],
+        )
+        return {
+            "summary": payload["summary"],
+            "metrics": payload["metrics"],
+            "next_action": payload["next_action"],
+            "week_start": payload["week_start"].isoformat(),
+            "week_end": payload["week_end"].isoformat(),
+            "persisted": bool(records),
+        }
+
+    def _build_weekly_payload(self, user_id: int, target_date: date | None = None) -> dict[str, Any]:
         today = target_date or date.today()
         week_start = today - timedelta(days=today.weekday())
         week_end = week_start + timedelta(days=6)
@@ -57,15 +101,24 @@ class SummaryService:
         completed = sum(1 for log in workouts if log.status == "completed")
         missed = sum(1 for log in workouts if log.status == "skipped")
         consistency = round((completed / max(1, completed + missed)) * 100)
-        summary_text = f"סיכום שבועי: {completed} אימונים הושלמו, {missed} אימונים פוספסו, {len(meals)} ארוחות תועדו."
-        next_action = "קבע עכשיו את האימון הבא והמשך לתעד ארוחות עם דגש על חלבון."
-        metrics = {
-            "workouts_completed": completed,
-            "missed_workouts": missed,
-            "consistency_percentage": consistency,
-            "meals_logged": len(meals),
+        return {
+            "summary": (
+                f"סיכום שבועי: {_completed_workouts_summary(completed)}, "
+                f"{_missed_workouts_summary(missed)}, {_meals_logged_summary(len(meals))}."
+            ),
+            "metrics": {
+                "workouts_completed": completed,
+                "missed_workouts": missed,
+                "consistency_percentage": consistency,
+                "meals_logged": len(meals),
+            },
+            "next_action": "קבע עכשיו את האימון הבא והמשך לתעד ארוחות עם דגש על חלבון.",
+            "week_start": week_start,
+            "week_end": week_end,
         }
-        records = self.db.scalars(
+
+    def _weekly_records(self, *, user_id: int, week_start: date, week_end: date) -> list[WeeklySummary]:
+        return self.db.scalars(
             select(WeeklySummary)
             .where(
                 WeeklySummary.user_id == user_id,
@@ -74,23 +127,21 @@ class SummaryService:
             )
             .order_by(WeeklySummary.id)
         ).all()
-        record = records[0] if records else None
-        for duplicate in records[1:]:
-            self.db.delete(duplicate)
-        if record is None:
-            record = WeeklySummary(user_id=user_id, week_start=week_start, week_end=week_end)
-            self.db.add(record)
-        record.summary_text = summary_text
-        record.metrics_json = metrics
-        record.next_action = next_action
-        self.db.commit()
-        self.db.refresh(record)
-        UsageService(self.db).record(
-            user_id=user_id,
-            task="summary",
-            provider="local",
-            model=None,
-            estimated_tokens_in=0,
-            estimated_tokens_out=0,
-        )
-        return record
+
+
+def _completed_workouts_summary(count: int) -> str:
+    if count == 1:
+        return "הושלם אימון אחד"
+    return f"הושלמו {count} אימונים"
+
+
+def _missed_workouts_summary(count: int) -> str:
+    if count == 1:
+        return "אימון אחד פוספס"
+    return f"{count} אימונים פוספסו"
+
+
+def _meals_logged_summary(count: int) -> str:
+    if count == 1:
+        return "תועדה ארוחה אחת"
+    return f"תועדו {count} ארוחות"

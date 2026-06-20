@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -24,7 +24,18 @@ def _ensure_sqlite_parent(database_url: str) -> None:
 def make_engine(database_url: str) -> Engine:
     _ensure_sqlite_parent(database_url)
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, connect_args=connect_args)
+    created_engine = create_engine(database_url, connect_args=connect_args)
+    if database_url.startswith("sqlite"):
+        event.listen(created_engine, "connect", _enable_sqlite_foreign_keys)
+    return created_engine
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
 settings = get_settings()
@@ -44,4 +55,3 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
-

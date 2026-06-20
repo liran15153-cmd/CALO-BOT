@@ -16,8 +16,22 @@ def test_coach_prompt_is_short_and_safety_aware():
     assert "עברית בלבד" in prompt
     assert "אבחון רפואי" in prompt
     assert "coaching_knowledge" in prompt
-    assert "אל תטען שאתה מאמן מוסמך" in prompt
+    assert "אל תטען שהמאמן מוסמך" in prompt
     assert "קצרים" in prompt
+
+
+def test_coach_prompt_requires_natural_israeli_fitness_hebrew():
+    prompt = coach_chat_prompt()
+
+    assert "עברית ישראלית טבעית" in prompt
+    assert "לא תרגום אוטומטי" in prompt
+    assert "אל תתרגם מילולית מונחי כושר" in prompt
+    assert "RPE 8" in prompt
+    assert "bullet" in prompt
+    assert "אם המשתמש מבקש לא לפנות בלשון זכר או נקבה" in prompt
+    assert "ניסוח ניטרלי" in prompt
+    for term in ["RPE", "RIR", "DOMS", "full-body", "דילואד", "progressive overload"]:
+        assert term in prompt
 
 
 def test_all_prompt_builders_return_task_specific_text():

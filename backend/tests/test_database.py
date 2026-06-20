@@ -1,4 +1,7 @@
-from sqlalchemy import inspect
+import pytest
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from backend.app.db import init_db, make_engine
 
@@ -28,3 +31,21 @@ def test_init_db_creates_core_tables(tmp_path):
         "usage_events",
     }.issubset(tables)
 
+
+def test_sqlite_engine_enforces_foreign_keys(tmp_path):
+    db_path = tmp_path / "app.db"
+    engine = make_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
+
+    with pytest.raises(IntegrityError):
+        with Session(engine) as session:
+            session.execute(
+                text(
+                    "INSERT INTO chat_messages (session_id, user_id, role, content) "
+                    "VALUES (999, 999, 'user', 'orphan')"
+                )
+            )
+            session.commit()

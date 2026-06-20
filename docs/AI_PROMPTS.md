@@ -18,6 +18,9 @@ Prompts are intentionally short and task-specific.
 - Do not send full chat history
 - Do not send the entire database
 - Require Hebrew-first user-facing output, allowing short English fitness/nutrition terms inside otherwise Hebrew responses
+- Require natural Israeli fitness Hebrew, not literal translation. Use terms such as סטים, חזרות, דילואד/שבוע הורדת עומס, RPE, RIR, DOMS, full-body, Zone 2, and progressive overload when they are clearer than forced Hebrew.
+- Avoid broken literal phrasing such as מערכות for sets, הישנויות for reps, פריקת עומס for deload, or long translated definitions in ordinary chat.
+- If the user asks not to be addressed in masculine or feminine language, use neutral Hebrew phrasing such as אפשר, כדאי, לבחור, לבצע, and avoid direct אתה/את forms.
 - Prefer short outputs
 - Refuse unsafe requests conservatively
 - Use `coaching_knowledge` as bounded general coaching knowledge
@@ -68,6 +71,8 @@ Prompts are intentionally short and task-specific.
 ## Current Implementation Notes
 
 - Coach chat uses a short coach prompt plus bounded context JSON, including compact `coaching_knowledge` with program design variables, deload rules, safety boundaries, and technique cue summaries.
+- Coach chat now carries a compact Hebrew style contract: write natural Israeli Hebrew, do not sound machine-translated, do not translate fitness terms literally, keep normal gym terms where Israeli users expect them, honor explicit neutral-address requests, and stay plain text without raw Markdown.
+- Common Hebrew fitness-term questions such as RPE/RIR, DOMS, deload, progression, hypertrophy, Zone 2, split choice, warmup/cooldown, low-energy one-action guidance, weekly action-plan guidance, stimulant/pre-workout supplement safety, workout-adjacent nutrition, and food-image uncertainty are handled locally before provider routing when a deterministic short answer is enough.
 - Provider-backed chat now passes the current user message into the context builder so `coaching_knowledge` can add compact query-specific `retrieved_knowledge` hits. The model should use those hits as the most relevant coaching knowledge for the immediate answer, while still respecting safety and Hebrew-first response rules.
 - Full protocol tables are still kept out of prompts. `retrieved_knowledge` is a small runtime selection layer, not a dump of `coaching_knowledge.py`.
 - Workout contexts include compact program-quality audit language so the coach can review an existing plan for goal fit, weekly structure, movement coverage, volume/recovery, progression, exercise selection, adherence feasibility, and safety scope without receiving the full audit table.
@@ -109,7 +114,8 @@ Prompts are intentionally short and task-specific.
 - Meal contexts add `practical_nutrition_summary` for plate structure, protein anchors, fiber/produce, hydration, meal-prep fallback, and uncertainty language without sending the full protocol table.
 - General-chat and meal contexts add `supplement_education_summary` for creatine, caffeine/pre-workout, protein powder, electrolytes, low-evidence products, and supplement quality/scope boundaries.
 - Configured coach chat has a response guard: provider text with no Hebrew characters is replaced by a Hebrew retry message.
-- Configured coach chat also rejects dominant-English provider text, such as an English sentence or paragraph with only a little Hebrew, while allowing short English fitness/nutrition terms or brief headings inside otherwise Hebrew responses.
+- Configured coach chat also rejects dominant-English provider text, generic English headings, and generic English phrases such as `Weekly summary`, `Action plan`, `recover tomorrow`, `workout`, and `protein timing`. It still allows professional terms such as RPE, RIR, DOMS, HIIT, Zone 2, full-body, push/pull/legs, split, deload, and progressive overload inside otherwise natural Hebrew responses.
+- Configured coach chat also rejects provider text that violates an explicit neutral-address request. If the intent has a vetted local answer, the local Hebrew answer is returned; otherwise the user sees a neutral retry message and the offending provider text is not stored as the coach response.
 - Configured coach chat strips common Markdown markers from provider text before language validation and storage because the chat UI renders plain text.
 - Common creatine questions and knee-sensitive squat substitution requests are local deterministic chat intents, so they do not depend on provider output quality for basic safe coaching.
 - Meal image analysis asks for JSON with ranges, uncertainty, and Hebrew-first user-facing strings.

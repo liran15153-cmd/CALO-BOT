@@ -10,7 +10,7 @@ class ProfileService:
         self.db = db
 
     def get_default_user(self) -> User:
-        user = self.db.scalar(select(User).order_by(User.id.asc()))
+        user = self.get_existing_default_user()
         if user:
             return user
         user = User(name="משתמש מקומי")
@@ -19,8 +19,13 @@ class ProfileService:
         self.db.refresh(user)
         return user
 
-    def get_profile(self) -> UserProfile | None:
-        user = self.get_default_user()
+    def get_existing_default_user(self) -> User | None:
+        return self.db.scalar(select(User).order_by(User.id.asc()))
+
+    def get_profile(self, *, create_user: bool = True) -> UserProfile | None:
+        user = self.get_default_user() if create_user else self.get_existing_default_user()
+        if user is None:
+            return None
         return self.db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
 
     def upsert_onboarding(self, payload: OnboardingPayload) -> UserProfile:

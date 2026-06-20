@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
@@ -20,6 +22,7 @@ def export_data(db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/reset", response_model=ResetResponse)
-def reset_data(db: Session = Depends(get_db)) -> dict:
-    deleted_records = SettingsService(db).reset_local_data()
+def reset_data(request: Request, db: Session = Depends(get_db)) -> dict:
+    upload_root = Path(getattr(request.app.state, "upload_root", Path("data/uploads")))
+    deleted_records = SettingsService(db).reset_local_data(upload_root=upload_root)
     return {"deleted_records": deleted_records, "message": "הנתונים המקומיים של המאמן אופסו."}

@@ -14,6 +14,12 @@ def daily_summary(db: Session = Depends(get_db)) -> dict:
     return SummaryService(db).daily_summary(user_id=user.id)
 
 
+@router.get("/weekly/current")
+def current_weekly_summary(db: Session = Depends(get_db)) -> dict:
+    user = ProfileService(db).get_default_user()
+    return SummaryService(db).current_weekly_summary(user_id=user.id)
+
+
 @router.get("/weekly")
 def weekly_summary(db: Session = Depends(get_db)) -> dict:
     user = ProfileService(db).get_default_user()
@@ -25,4 +31,3 @@ def weekly_summary(db: Session = Depends(get_db)) -> dict:
         "week_start": summary.week_start.isoformat(),
         "week_end": summary.week_end.isoformat(),
     }
-

@@ -30,6 +30,7 @@ class ChatService:
         return self.create_session(user_id)
 
     def add_message(self, user_id: int, session_id: int, role: str, content: str, metadata: dict | None = None) -> ChatMessage:
+        self._require_user_session(user_id=user_id, session_id=session_id)
         message = ChatMessage(
             user_id=user_id,
             session_id=session_id,
@@ -42,18 +43,23 @@ class ChatService:
         self.db.refresh(message)
         return message
 
-    def list_messages(self, session_id: int) -> list[ChatMessage]:
+    def list_messages(self, user_id: int, session_id: int) -> list[ChatMessage]:
+        self._require_user_session(user_id=user_id, session_id=session_id)
         return list(
             self.db.scalars(
                 select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(asc(ChatMessage.created_at), asc(ChatMessage.id))
             )
         )
 
-    def reset_session(self, session_id: int) -> ChatSession:
-        session = self.db.get(ChatSession, session_id)
-        if session is None:
-            raise ValueError("שיחת הצ'אט לא נמצאה")
+    def reset_session(self, user_id: int, session_id: int) -> ChatSession:
+        session = self._require_user_session(user_id=user_id, session_id=session_id)
         session.is_active = False
         self.db.commit()
         self.db.refresh(session)
+        return session
+
+    def _require_user_session(self, user_id: int, session_id: int) -> ChatSession:
+        session = self.db.get(ChatSession, session_id)
+        if session is None or session.user_id != user_id:
+            raise ValueError("שיחת הצ'אט לא נמצאה")
         return session

@@ -15,16 +15,24 @@ export function SettingsPanel() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([fetchSettings(), fetchUsage()])
-      .then(([settingsData, usageData]) => {
+    fetchSettings()
+      .then((settingsData) => {
         if (!active) return;
         setSettings(settingsData);
-        setUsage(usageData);
         setStatus('ready');
       })
       .catch(() => {
         if (!active) return;
         setStatus('error');
+      });
+    fetchUsage()
+      .then((usageData) => {
+        if (!active) return;
+        setUsage(usageData);
+      })
+      .catch(() => {
+        if (!active) return;
+        setUsage(null);
       });
     return () => {
       active = false;
@@ -63,10 +71,18 @@ export function SettingsPanel() {
       const result = await resetLocalData();
       setExportData(null);
       setResetArmed(false);
-      setActionMessage(`${result.deleted_records} רשומות נמחקו`);
-      const [settingsData, usageData] = await Promise.all([fetchSettings(), fetchUsage()]);
-      setSettings(settingsData);
-      setUsage(usageData);
+      setActionMessage(formatDeletedRecords(result.deleted_records));
+      try {
+        setSettings(await fetchSettings());
+        setStatus('ready');
+      } catch {
+        setStatus('error');
+      }
+      try {
+        setUsage(await fetchUsage());
+      } catch {
+        setUsage(null);
+      }
       setActionStatus('idle');
     } catch {
       setActionStatus('error');
@@ -172,4 +188,8 @@ export function SettingsPanel() {
       ) : null}
     </section>
   );
+}
+
+function formatDeletedRecords(count: number): string {
+  return count === 1 ? 'רשומה אחת נמחקה' : `${count} רשומות נמחקו`;
 }

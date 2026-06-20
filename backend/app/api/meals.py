@@ -12,6 +12,13 @@ from backend.app.services.profile_service import ProfileService
 router = APIRouter(prefix="/api/meals", tags=["meals"])
 
 
+@router.get("/recent")
+def recent_meals(db: Session = Depends(get_db)) -> list[dict]:
+    user = ProfileService(db).get_default_user()
+    service = MealService(db)
+    return [service.serialize_meal_with_items(meal) for meal in service.recent_meals(user_id=user.id)]
+
+
 @router.post("/upload")
 async def upload_meal_image(
     request: Request,
@@ -30,9 +37,10 @@ async def upload_meal_image(
 
 
 @router.post("/{meal_id}/analyze")
-def analyze_meal_image(meal_id: int, db: Session = Depends(get_db)) -> dict:
+def analyze_meal_image(meal_id: int, request: Request, db: Session = Depends(get_db)) -> dict:
+    upload_root = Path(getattr(request.app.state, "upload_root", Path("data/uploads")))
     try:
-        analysis = MealService(db).analyze_image(meal_id)
+        analysis = MealService(db).analyze_image(meal_id, upload_root=upload_root)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return MealService.serialize_analysis(analysis)

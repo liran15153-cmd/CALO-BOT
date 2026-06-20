@@ -1,6 +1,8 @@
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.db import init_db, make_engine
+from backend.app.models import User
 from backend.app.schemas import OnboardingPayload
 from backend.app.services.profile_service import ProfileService
 
@@ -49,6 +51,16 @@ def test_profile_service_creates_default_user_and_profile(tmp_path):
     assert profile.consent_disclaimer is True
 
 
+def test_profile_read_can_avoid_creating_default_user(tmp_path):
+    db = make_session(tmp_path)
+    service = ProfileService(db)
+
+    profile = service.get_profile(create_user=False)
+
+    assert profile is None
+    assert db.scalar(select(User)) is None
+
+
 def test_profile_service_updates_existing_local_profile(tmp_path):
     db = make_session(tmp_path)
     service = ProfileService(db)
@@ -59,4 +71,3 @@ def test_profile_service_updates_existing_local_profile(tmp_path):
     assert first.id == second.id
     assert second.user.name == "Lee"
     assert second.main_goal == "improve_strength"
-

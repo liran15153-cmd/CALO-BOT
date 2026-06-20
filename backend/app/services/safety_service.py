@@ -46,8 +46,8 @@ class SafetyService:
                 event_type="dangerous_symptoms",
                 severity="high",
                 response=(
-                    "עצור את האימון עכשיו. סחרחורת, עילפון או כאב בחזה בזמן אימון יכולים להיות סימן רציני. "
-                    "פנה לאיש מקצוע רפואי מוסמך לפני שאתה ממשיך."
+                    "לעצור את האימון עכשיו. סחרחורת, עילפון או כאב בחזה בזמן אימון יכולים להיות סימן רציני. "
+                    "לפנות לאיש מקצוע רפואי מוסמך לפני המשך אימון."
                 ),
             )
 
@@ -57,7 +57,7 @@ class SafetyService:
                 event_type="pain_or_injury",
                 severity="medium",
                 response=(
-                    "עצור כל תנועה שגורמת לכאב. אני לא יכול לאבחן פציעה, אבל אפשר לעבור לתנועה קלה ללא כאב "
+                    "לעצור כל תנועה שגורמת לכאב. אני לא יכול לאבחן פציעה, אבל אפשר לעבור לתנועה קלה ללא כאב "
                     "ולהתייעץ עם איש מקצוע מוסמך אם הכאב חד או נמשך."
                 ),
             )
@@ -86,7 +86,20 @@ class SafetyService:
                 ),
             )
 
-        if self._has_extreme_calorie_target(normalized) or self._has_rapid_weight_loss_target(normalized) or any(
+        dangerous_substance = self._dangerous_substance_label(normalized)
+        if dangerous_substance:
+            return SafetyResult(
+                flagged=True,
+                event_type="dangerous_substance",
+                severity="high",
+                response=(
+                    f"אני לא יכול לעזור בשימוש ב-{dangerous_substance} או בחומרים מסוכנים לירידה במשקל או לאימון. "
+                    "זה יכול להיות מסוכן גם כשנשמע כמו קיצור דרך. פנה לאיש מקצוע רפואי מוסמך אם כבר נלקח חומר כזה "
+                    "או אם יש תסמינים חריגים. הפעולה הבאה: לבחור יעד בטוח יותר דרך אימונים, אוכל מספק ושינה."
+                ),
+            )
+
+        if any(
             term in normalized
             for term in [
                 "500 calorie",
@@ -100,7 +113,7 @@ class SafetyService:
                 "ירידה מהירה",
                 "לרדת מהר",
             ]
-        ):
+        ) or self._has_extreme_calorie_target(normalized) or self._has_rapid_weight_loss_target(normalized):
             return SafetyResult(
                 flagged=True,
                 event_type="extreme_dieting",
@@ -111,37 +124,32 @@ class SafetyService:
                 ),
             )
 
-        if any(
-            term in normalized
-            for term in [
-                "clenbuterol",
-                "dnp",
-                "anabolic",
-                "steroid",
-                "diuretic",
-                "ephedrine",
-                "קלנבוטרול",
-                "סטרואיד",
-                "סטרואידים",
-                "משתן",
-                "משתנים",
-                "אפדרין",
-            ]
-        ):
-            return SafetyResult(
-                flagged=True,
-                event_type="dangerous_substance",
-                severity="high",
-                response=(
-                    "אני לא יכול לעזור בשימוש בחומרים מסוכנים, סטרואידים, ממריצים או משתנים לאימון או ירידה במשקל. "
-                    "איש מקצוע רפואי מוסמך יכול לעזור להעריך סיכונים וחלופות בטוחות יותר."
-                ),
-            )
-
         return SafetyResult(flagged=False)
 
     @staticmethod
     def _has_extreme_calorie_target(text: str) -> bool:
+        if not any(
+            term in text
+            for term in [
+                "per day",
+                "daily",
+                "diet",
+                "target",
+                "limit",
+                "only eat",
+                "meal plan",
+                "lose weight",
+                "cut weight",
+                "ביום",
+                "יומי",
+                "דיאטה",
+                "יעד",
+                "להגביל",
+                "רק לאכול",
+                "לרדת במשקל",
+            ]
+        ):
+            return False
         for match in re.finditer(r"\b(\d{3,4})\s*(?:calorie|calories|kcal|קלוריות|קלוריה)\b", text):
             if int(match.group(1)) <= 1000:
                 return True
@@ -157,6 +165,27 @@ class SafetyService:
             if float(match.group(1)) >= 6:
                 return True
         return False
+
+    @staticmethod
+    def _dangerous_substance_label(text: str) -> str | None:
+        labels = {
+            "dnp": "DNP",
+            "clenbuterol": "clenbuterol",
+            "קלנבוטרול": "קלנבוטרול",
+            "anabolic": "סטרואידים אנאבוליים",
+            "steroid": "סטרואידים",
+            "סטרואיד": "סטרואידים",
+            "סטרואידים": "סטרואידים",
+            "diuretic": "משתנים",
+            "משתן": "משתנים",
+            "משתנים": "משתנים",
+            "ephedrine": "ephedrine",
+            "אפדרין": "אפדרין",
+        }
+        for term, label in labels.items():
+            if term in text:
+                return label
+        return None
 
     def record_event(self, user_id: int | None, source_text: str, result: SafetyResult) -> SafetyEvent:
         event = SafetyEvent(

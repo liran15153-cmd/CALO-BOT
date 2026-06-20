@@ -14,6 +14,26 @@ SOURCE_REFS = [
     "Mayo Clinic exercise warning symptoms: https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/exercise-and-chronic-disease/art-20046049",
 ]
 
+SINGLE_SESSION_TERMS = [
+    "today",
+    "single",
+    "one workout",
+    "one session",
+    "right now",
+    "tonight",
+    "היום",
+    "אימון אחד",
+]
+
+
+def infer_plan_type(plan_type: str | None, prompt: str) -> str:
+    if plan_type in {"multi_week", "single_session"}:
+        return plan_type
+    text = prompt.lower()
+    if any(term in text for term in SINGLE_SESSION_TERMS):
+        return "single_session"
+    return "multi_week"
+
 
 @dataclass(frozen=True)
 class WorkoutPlanningInput:
@@ -66,7 +86,7 @@ class WorkoutPlanBuilder:
             for index, focus in enumerate(day_specs)
         ]
 
-        return StructuredWorkoutPlan(
+        plan = StructuredWorkoutPlan(
             name=self._plan_name(
                 plan_type=plan_type,
                 days_per_week=days_per_week,
@@ -85,13 +105,13 @@ class WorkoutPlanBuilder:
             days=days,
             progression_rule=variables["progression_rule"],
             progression_model=(
-                "Double progression: add clean reps inside the target range first, then add a small load "
-                "or one set only when recovery and technique are stable."
+                "התקדמות כפולה: קודם הוסף חזרות נקיות בתוך טווח היעד, ורק אחר כך הוסף עומס קטן "
+                "או סט אחד אם ההתאוששות והטכניקה יציבות."
             ),
             recovery_note=self._recovery_note(variables, display_limitations, readiness, plan_type),
             safety_notes=safety_notes,
             decision_inputs={
-                "plan_type": "single session" if plan_type == "single_session" else "multi week",
+                "plan_type": "אימון יחיד" if plan_type == "single_session" else "תוכנית רב-שבועית",
                 "goal": planning_input.goal,
                 "experience_level": planning_input.experience_level,
                 "days_per_week": days_per_week,
@@ -105,16 +125,11 @@ class WorkoutPlanBuilder:
             },
             source_refs=SOURCE_REFS,
         )
+        return _neutralize_plan_guidance_copy(plan)
 
     @staticmethod
     def _normalize_plan_type(plan_type: str | None, prompt: str) -> str:
-        if plan_type in {"multi_week", "single_session"}:
-            return plan_type
-        text = prompt.lower()
-        single_terms = ["today", "single", "one workout", "one session", "right now", "tonight", "היום", "אימון אחד"]
-        if any(term in text for term in single_terms):
-            return "single_session"
-        return "multi_week"
+        return infer_plan_type(plan_type, prompt)
 
     @staticmethod
     def _infer_readiness(prompt: str) -> str:
@@ -244,15 +259,15 @@ class WorkoutPlanBuilder:
     @staticmethod
     def _safety_notes(display_limitations: str, readiness: str, training_status: dict | None = None) -> list[str]:
         notes = [
-            "Stop for sharp pain, chest pain, unusual dizziness, fainting, or unusual shortness of breath.",
-            "Use a pain-free range of motion and keep technique stable before adding load.",
+            "עצור אם מופיעים כאב חד, כאב בחזה, סחרחורת חריגה, עילפון או קוצר נשימה חריג.",
+            "עבוד בטווח ללא כאב ושמור טכניקה יציבה לפני הוספת עומס.",
         ]
         if display_limitations:
-            notes.append(f"Adapt around the documented limitation: {display_limitations}.")
+            notes.append(f"התאם את האימון סביב המגבלה שתועדה: {display_limitations}.")
         if readiness == "yellow":
-            notes.append("Reduce volume or intensity today for recovery before progressing.")
+            notes.append("הורד היום נפח או עצימות כדי לאפשר התאוששות לפני התקדמות.")
         if readiness == "red":
-            notes.append("Do not train hard today; use only easy movement and seek qualified help for red flags.")
+            notes.append("אל תתאמן חזק היום; בחר תנועה קלה בלבד ופנה לעזרה מקצועית אם יש סימני אזהרה.")
         if training_status and training_status.get("next_adjustment"):
             notes.append(training_status["next_adjustment"])
         return notes
@@ -280,7 +295,7 @@ class WorkoutPlanBuilder:
     def _plan_name(plan_type: str, days_per_week: int, goal: str, duration_weeks: int, split: str) -> str:
         if plan_type == "single_session":
             return f"אימון יחיד ל{_goal_label_he(goal)}"
-        return f"תוכנית {duration_weeks} שבועות - {days_per_week} ימים ל{_goal_label_he(goal)} ({split})"
+        return f"תוכנית {duration_weeks} שבועות - {days_per_week} ימים ל{_goal_label_he(goal)} ({_focus_label_he(split)})"
 
 
 def infer_duration_weeks(prompt: str) -> int | None:
@@ -311,12 +326,17 @@ def infer_experience(prompt: str) -> str | None:
 def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_limitations: str) -> dict[str, StructuredExercise]:
     has_dumbbells = any("dumbbell" in item.lower() or "משקול" in item for item in equipment)
     has_bands = any("band" in item.lower() or "גומי" in item for item in equipment)
+    has_gym = any(
+        term in item.lower()
+        for item in equipment
+        for term in ["gym", "machine", "cable", "חדר כושר", "מכון", "מכונה", "מכונות", "כבל"]
+    )
     limitation_note = f" כבד את {display_limitations}." if display_limitations else ""
     source_refs = SOURCE_REFS[:5]
 
     return {
         "squat": StructuredExercise(
-            name="סקוואט גביע" if has_dumbbells else "סקוואט משקל גוף",
+            name="לחיצת רגליים במכונה" if has_gym else "סקוואט גביע" if has_dumbbells else "סקוואט משקל גוף",
             sets="3",
             reps_or_duration=variables["main_reps"],
             rest=variables["main_rest"],
@@ -326,12 +346,12 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["עצור אם מופיע כאב חד", "שמור ברכיים בקו כף הרגל"],
             movement_pattern="squat",
             target_muscles=["quadriceps", "glutes", "core"],
-            progression="Add clean reps inside the target range before adding load.",
-            regression="Use a box squat or reduce depth.",
+            progression="הוסף חזרות נקיות בתוך טווח היעד לפני הוספת עומס.",
+            regression="עבור לסקוואט לקופסה או הקטן עומק.",
             source_refs=source_refs,
         ),
         "horizontal_push": StructuredExercise(
-            name="לחיצת רצפה עם משקולות" if has_dumbbells else "שכיבת סמיכה",
+            name="לחיצת חזה במכונה" if has_gym else "לחיצת רצפה עם משקולות" if has_dumbbells else "שכיבת סמיכה",
             sets="3",
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
@@ -341,12 +361,12 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["שמור על כתפיים נוחות"],
             movement_pattern="horizontal_push",
             target_muscles=["chest", "triceps", "anterior shoulders"],
-            progression="Add reps, then lower the incline or add light load.",
-            regression="Use an incline push-up.",
+            progression="הוסף חזרות, ואז הורד שיפוע או הוסף עומס קל.",
+            regression="עבור לשכיבת סמיכה בשיפוע.",
             source_refs=source_refs,
         ),
         "horizontal_pull": StructuredExercise(
-            name="חתירה ביד אחת עם משקולת" if has_dumbbells else "חתירה עם גומייה" if has_bands else "חתירה עם מגבת",
+            name="חתירה במכונה" if has_gym else "חתירה ביד אחת עם משקולת" if has_dumbbells else "חתירה עם גומייה" if has_bands else "חתירה עם מגבת",
             sets="3",
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
@@ -356,12 +376,12 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["שמור על עמוד שדרה ניטרלי"],
             movement_pattern="horizontal_pull",
             target_muscles=["upper back", "lats", "biceps"],
-            progression="Add controlled reps, then load or band tension.",
-            regression="Use chest support or lighter band tension.",
+            progression="הוסף חזרות בשליטה, ואז עומס או מתח גומייה.",
+            regression="השתמש בתמיכת חזה או בגומייה קלה יותר.",
             source_refs=source_refs,
         ),
         "hinge": StructuredExercise(
-            name="דדליפט רומני עם משקולות" if has_dumbbells else "היפ הינג' עם תיק",
+            name="דדליפט רומני עם משקולות" if has_dumbbells or has_gym else "היפ הינג' עם תיק",
             sets="2",
             reps_or_duration=variables["hinge_reps"],
             rest=variables["main_rest"],
@@ -371,8 +391,8 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["עצור אם מופיע כאב חד בגב או בירך"],
             movement_pattern="hip_hinge",
             target_muscles=["hamstrings", "glutes", "spinal stabilizers"],
-            progression="Add range and control before load.",
-            regression="Use glute bridge or dowel hip hinge.",
+            progression="הוסף טווח ושליטה לפני הוספת עומס.",
+            regression="עבור לגשר ישבן או היפ הינג' עם מקל.",
             source_refs=source_refs,
         ),
         "core": StructuredExercise(
@@ -386,12 +406,12 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["עצור אם מופיע כאב חד"],
             movement_pattern="core_anti_extension",
             target_muscles=["abdominals", "trunk stabilizers"],
-            progression="Add time in small steps while breathing stays controlled.",
-            regression="Use dead bug or knee plank.",
+            progression="הוסף זמן בהדרגה כל עוד הנשימה נשארת בשליטה.",
+            regression="עבור לדד באג או פלאנק ברכיים.",
             source_refs=source_refs,
         ),
         "vertical_push": StructuredExercise(
-            name="לחיצת כתפיים עם משקולות" if has_dumbbells else "לחיצת כתפיים עם גומייה" if has_bands else "פייק פוש-אפ מוגבה",
+            name="לחיצת כתפיים במכונה" if has_gym else "לחיצת כתפיים עם משקולות" if has_dumbbells else "לחיצת כתפיים עם גומייה" if has_bands else "פייק פוש-אפ מוגבה",
             sets="2",
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
@@ -401,12 +421,12 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["עצור אם מופיע כאב חד בכתף"],
             movement_pattern="vertical_push",
             target_muscles=["shoulders", "triceps", "upper chest"],
-            progression="Add reps before load.",
-            regression="Use lighter range or half-kneeling press.",
+            progression="הוסף חזרות לפני הוספת עומס.",
+            regression="עבור לטווח קל יותר או לחיצה בחצי כריעה.",
             source_refs=source_refs,
         ),
         "vertical_pull": StructuredExercise(
-            name="משיכת גומייה מלמעלה" if has_bands else "פולאובר עם משקולת" if has_dumbbells else "משיכת מגבת איזומטרית",
+            name="פולי עליון" if has_gym else "משיכת גומייה מלמעלה" if has_bands else "פולאובר עם משקולת" if has_dumbbells else "משיכת מגבת איזומטרית",
             sets="2",
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
@@ -416,8 +436,8 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["שמור צוואר וכתפיים נוחים"],
             movement_pattern="vertical_pull",
             target_muscles=["lats", "upper back", "biceps"],
-            progression="Increase band tension or reps after clean control.",
-            regression="Use lower band tension or horizontal row.",
+            progression="הוסף מתח גומייה או חזרות אחרי שליטה נקייה.",
+            regression="עבור לגומייה קלה יותר או חתירה אופקית.",
             source_refs=source_refs,
         ),
         "lunge": StructuredExercise(
@@ -431,8 +451,8 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["הקטן טווח אם מופיע כאב ברך"],
             movement_pattern="single_leg",
             target_muscles=["quadriceps", "glutes", "adductors"],
-            progression="Add reps per side before load.",
-            regression="Use support or lower step height.",
+            progression="הוסף חזרות לכל צד לפני הוספת עומס.",
+            regression="השתמש בתמיכה או במדרגה נמוכה יותר.",
             source_refs=source_refs,
         ),
         "glute_bridge": StructuredExercise(
@@ -446,8 +466,8 @@ def _exercise_catalog(equipment: list[str], variables: dict[str, str], display_l
             safety_notes=["עצור אם מופיע כאב חד בגב"],
             movement_pattern="glute_bridge",
             target_muscles=["glutes", "hamstrings"],
-            progression="Add pause time, then single-leg or load.",
-            regression="Use shorter range.",
+            progression="הוסף זמן עצירה, ואז עבור לרגל אחת או עומס.",
+            regression="עבוד בטווח קצר יותר.",
             source_refs=source_refs,
         ),
     }
@@ -457,9 +477,100 @@ def _reduce_exercise(exercise: StructuredExercise, readiness: str) -> Structured
     data = exercise.model_dump()
     data["sets"] = "1" if readiness == "red" else "2"
     data["difficulty"] = "easy" if readiness == "red" else data["difficulty"]
-    data["notes"] = f"{data.get('notes') or ''} Reduce effort today; stop well before form breaks.".strip()
-    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "Do not progress load on a low-readiness day."]))
+    data["notes"] = f"{data.get('notes') or ''} הורד מאמץ היום ועצור הרבה לפני שהטכניקה מתפרקת.".strip()
+    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "אל תעלה עומס ביום מוכנות נמוכה."]))
     return StructuredExercise(**data)
+
+
+def _neutralize_plan_guidance_copy(plan: StructuredWorkoutPlan) -> StructuredWorkoutPlan:
+    days = []
+    for day in plan.days:
+        exercises = []
+        for exercise in day.exercises:
+            exercises.append(
+                exercise.model_copy(
+                    update={
+                        "notes": _neutralize_hebrew_guidance(exercise.notes),
+                        "progression": _neutralize_hebrew_guidance(exercise.progression),
+                        "regression": _neutralize_hebrew_guidance(exercise.regression),
+                        "safety_notes": [_neutralize_hebrew_guidance(note) for note in exercise.safety_notes],
+                    }
+                )
+            )
+        days.append(
+            day.model_copy(
+                update={
+                    "warmup": [_neutralize_hebrew_guidance(note) for note in day.warmup],
+                    "notes": _neutralize_hebrew_guidance(day.notes),
+                    "exercises": exercises,
+                }
+            )
+        )
+
+    return plan.model_copy(
+        update={
+            "days": days,
+            "progression_rule": _neutralize_hebrew_guidance(plan.progression_rule),
+            "progression_model": _neutralize_hebrew_guidance(plan.progression_model),
+            "recovery_note": _neutralize_hebrew_guidance(plan.recovery_note),
+            "safety_notes": [_neutralize_hebrew_guidance(note) for note in plan.safety_notes],
+        }
+    )
+
+
+def _neutralize_hebrew_guidance(text: str | None) -> str | None:
+    if not text:
+        return text
+
+    phrase_replacements = [
+        ("לפני שאתה מוסיף", "לפני הוספת"),
+        ("כשאתה רענן", "כשהגוף רענן"),
+        ("להעניש את עצמך בעומס קיצוני", "ענישה בעומס קיצוני"),
+        ("להעניש את עצמך", "ענישה"),
+        ("ואל תנסה", "ולא לנסות"),
+        ("ואל תרדוף", "ולא לרדוף"),
+        ("ואל תדחוף", "ולא לדחוף"),
+        ("ואל תעמיס", "ולא להעמיס"),
+        ("ואל תתאמן", "ולא להתאמן"),
+        ("ואל תעלה", "ולא להעלות"),
+        ("אל תנסה", "לא לנסות"),
+        ("אל תרדוף", "לא לרדוף"),
+        ("אל תדחוף", "לא לדחוף"),
+        ("אל תעמיס", "לא להעמיס"),
+        ("אל תתאמן", "לא להתאמן"),
+        ("אל תעלה", "לא להעלות"),
+    ]
+    token_replacements = [
+        ("הוסף", "להוסיף"),
+        ("העלה", "להעלות"),
+        ("שמור", "לשמור"),
+        ("עצור", "לעצור"),
+        ("עבוד", "לעבוד"),
+        ("בחר", "לבחור"),
+        ("בצע", "לבצע"),
+        ("הורד", "להוריד"),
+        ("הפחת", "להפחית"),
+        ("קח", "לקחת"),
+        ("חזור", "לחזור"),
+        ("התקדם", "להתקדם"),
+        ("עבור", "לעבור"),
+        ("השתמש", "להשתמש"),
+        ("הקטן", "להקטין"),
+        ("התמקד", "להתמקד"),
+        ("משוך", "למשוך"),
+        ("התאם", "להתאים"),
+        ("אסוף", "לאסוף"),
+        ("כבד", "לכבד"),
+        ("השאר", "להשאיר"),
+    ]
+
+    neutral = text
+    for source, target in phrase_replacements:
+        neutral = neutral.replace(source, target)
+    for source, target in token_replacements:
+        neutral = re.sub(rf"(?<![\u0590-\u05ff])ו{re.escape(source)}(?![\u0590-\u05ff])", f"ו{target}", neutral)
+        neutral = re.sub(rf"(?<![\u0590-\u05ff]){re.escape(source)}(?![\u0590-\u05ff])", target, neutral)
+    return neutral
 
 
 def _goal_label_he(goal: str) -> str:

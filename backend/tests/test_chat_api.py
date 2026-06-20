@@ -16,15 +16,36 @@ def test_chat_session_and_message_persistence(tmp_path):
     session_id = session_response.json()["id"]
 
     message_response = client.post(
-        "/api/chat/messages",
-        json={"session_id": session_id, "role": "user", "content": "Build me a 3-day plan"},
+        "/api/chat",
+        json={"session_id": session_id, "message": "Build me a 3-day plan"},
     )
     assert message_response.status_code == 200
-    assert message_response.json()["content"] == "Build me a 3-day plan"
+    assert message_response.json()["session_id"] == session_id
 
     messages = client.get(f"/api/chat/messages?session_id={session_id}")
     assert messages.status_code == 200
-    assert messages.json()[0]["role"] == "user"
+    assert [message["role"] for message in messages.json()] == ["user", "coach"]
+    assert messages.json()[0]["content"] == "Build me a 3-day plan"
+
+
+def test_public_chat_message_write_endpoint_is_not_exposed(tmp_path):
+    client = make_client(tmp_path)
+    session_id = client.post("/api/chat/sessions", json={"title": "Plan chat"}).json()["id"]
+
+    response = client.post(
+        "/api/chat/messages",
+        json={"session_id": session_id, "role": "user", "content": "Injected context"},
+    )
+
+    assert response.status_code == 405
+
+
+def test_chat_message_read_rejects_unknown_session(tmp_path):
+    client = make_client(tmp_path)
+
+    response = client.get("/api/chat/messages?session_id=999999")
+
+    assert response.status_code == 404
 
 
 def test_chat_reset_deactivates_current_session(tmp_path):

@@ -49,6 +49,27 @@ describe('Chat UI', () => {
     expect(urls.some((url) => url.endsWith('/api/chat/sessions'))).toBe(false);
   });
 
+  it('does not show new-chat success when session creation fails', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/health')) {
+        return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+      }
+      if (url.endsWith('/api/chat/sessions') && init?.method === 'POST') {
+        return { ok: false, status: 500, json: async () => ({}) } as Response;
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /צ'אט/i }));
+    fireEvent.click(screen.getByRole('button', { name: /צ'אט חדש/i }));
+
+    expect(await screen.findByText(/לא הצלחתי להתחיל צ'אט חדש/i)).toBeInTheDocument();
+    expect(screen.queryByText(/צ'אט חדש התחיל/i)).not.toBeInTheDocument();
+  });
+
   it('sends a message and renders the coach response', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -82,6 +103,37 @@ describe('Chat UI', () => {
         method: 'POST'
       })
     );
+  });
+
+  it('keeps provider status visually separated from the coach response text', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/health')) {
+        return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'configured' });
+      }
+      if (url.endsWith('/api/chat') && init?.method === 'POST') {
+        return jsonResponse({
+          session_id: 1,
+          user_message_id: 1,
+          coach_message_id: 2,
+          response: 'לעצור אם יש דפיקות לב, סחרחורת או כאב בחזה.',
+          safety_flagged: false,
+          provider_status: 'local_tool'
+        });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /צ'אט/i }));
+    fireEvent.change(screen.getByLabelText(/הודעה למאמן/i), { target: { value: 'פרה-וורקאאוט?' } });
+    fireEvent.click(screen.getByRole('button', { name: /שליחה/i }));
+
+    const response = await screen.findByText(/כאב בחזה\./i);
+    const bubbleText = response.closest('.message-bubble')?.textContent ?? '';
+    expect(bubbleText).toContain('כאב בחזה. כלי מקומי');
+    expect(bubbleText).not.toContain('כאב בחזה.כלי מקומי');
   });
 
   it('shows a Hebrew-only network error when the coach request fails', async () => {

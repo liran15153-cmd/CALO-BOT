@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 Goal = Literal[
@@ -18,6 +18,7 @@ TrainingLocation = Literal["home", "gym", "outdoors", "mixed"]
 CoachingStyle = Literal["direct", "supportive", "strict", "minimal", "detailed"]
 WorkoutPlanType = Literal["multi_week", "single_session"]
 ReadinessLevel = Literal["green", "yellow", "red"]
+WorkoutLogStatus = Literal["completed", "partial", "skipped", "modified"]
 
 
 class OnboardingPayload(BaseModel):
@@ -87,12 +88,6 @@ class ChatSessionCreate(BaseModel):
     title: str = Field(default="צ'אט מאמן", min_length=1, max_length=160)
 
 
-class ChatMessageCreate(BaseModel):
-    session_id: int
-    role: Literal["user", "coach", "system"]
-    content: str = Field(min_length=1, max_length=4000)
-
-
 class ChatResponse(BaseModel):
     session_id: int
     user_message_id: int
@@ -160,10 +155,40 @@ class StructuredWorkoutPlan(BaseModel):
     source_refs: list[str] = Field(default_factory=list)
 
 
+class WorkoutSetLogInput(BaseModel):
+    set_index: int = Field(ge=1, le=40)
+    reps: int | None = Field(default=None, ge=0, le=300)
+    weight: str | None = Field(default=None, max_length=80)
+    duration_seconds: int | None = Field(default=None, ge=0, le=7200)
+    completed: bool = True
+
+
+class WorkoutExerciseLogInput(BaseModel):
+    exercise_id: int | None = None
+    exercise_name: str = Field(min_length=1, max_length=160)
+    status: WorkoutLogStatus = "completed"
+    sets: list[WorkoutSetLogInput] = Field(default_factory=list, max_length=40)
+    rpe: int | None = Field(default=None, ge=1, le=10)
+    rir: int | None = Field(default=None, ge=0, le=10)
+    notes: str | None = Field(default=None, max_length=700)
+
+
 class WorkoutLogRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
     workout_id: int | None = None
     logged_on: date | None = None
+    status: WorkoutLogStatus | None = None
+    exercises: list[WorkoutExerciseLogInput] = Field(default_factory=list, max_length=80)
+    rpe: int | None = Field(default=None, ge=1, le=10)
+    rir: int | None = Field(default=None, ge=0, le=10)
+    pain_flag: bool = False
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def has_log_content(self) -> "WorkoutLogRequest":
+        if self.text or self.notes or self.exercises or self.status in {"skipped", "partial", "modified", "completed"}:
+            return self
+        raise ValueError("Workout log requires text, structured exercises, notes, or status")
 
 
 class MealTextRequest(BaseModel):

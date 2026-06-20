@@ -59,13 +59,68 @@ def test_training_adaptation_flags_high_effort_recovery_need():
     assert "התאוששות" in summary["next_adjustment"]
 
 
-def workout_log(status: str, pain_flag: bool = False, notes: str = "", rpe: int | None = None) -> WorkoutLog:
+def test_training_adaptation_uses_structured_completed_sets_for_exercise_progression():
+    logs = [
+        workout_log(
+            status="completed",
+            rpe=8,
+            exercise_results=[
+                {
+                    "exercise_name": "Goblet squat",
+                    "status": "completed",
+                    "sets": [
+                        {"set_index": 1, "reps": 12, "completed": True},
+                        {"set_index": 2, "reps": 12, "completed": True},
+                        {"set_index": 3, "reps": 12, "completed": True},
+                    ],
+                    "rpe": 8,
+                    "rir": 2,
+                }
+            ],
+        )
+    ]
+
+    summary = TrainingAdaptationService().summarize(logs)
+
+    assert summary["load_signal"] == "progress_candidate"
+    assert summary["exercise_adjustments"][0]["exercise_name"] == "Goblet squat"
+    assert summary["exercise_adjustments"][0]["adjustment"] == "small_progression"
+
+
+def test_training_adaptation_uses_minimum_version_for_partial_structured_log():
+    logs = [
+        workout_log(
+            status="partial",
+            exercise_results=[
+                {
+                    "exercise_name": "Bench press",
+                    "status": "partial",
+                    "sets": [{"set_index": 1, "reps": 6, "completed": True}],
+                    "rpe": 7,
+                }
+            ],
+        )
+    ]
+
+    summary = TrainingAdaptationService().summarize(logs)
+
+    assert summary["load_signal"] == "adherence_risk"
+    assert summary["exercise_adjustments"][0]["adjustment"] == "minimum_version"
+
+
+def workout_log(
+    status: str,
+    pain_flag: bool = False,
+    notes: str = "",
+    rpe: int | None = None,
+    exercise_results: list[dict] | None = None,
+) -> WorkoutLog:
     return WorkoutLog(
         user_id=1,
         workout_id=None,
         logged_on=date.today() - timedelta(days=1),
         status=status,
-        exercise_results=[],
+        exercise_results=exercise_results or [],
         rpe=rpe,
         notes=notes,
         pain_flag=pain_flag,

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 @router.get("")
 def get_onboarding(db: Session = Depends(get_db)) -> dict[str, Any]:
     service = ProfileService(db)
-    profile = service.get_profile()
+    profile = service.get_profile(create_user=False)
     if profile is None:
         return {"completed": False, "profile": None}
     return {"completed": True, "profile": service.to_response(profile).model_dump()}
@@ -24,4 +24,3 @@ def save_onboarding(payload: OnboardingPayload, db: Session = Depends(get_db)) -
     service = ProfileService(db)
     profile = service.upsert_onboarding(payload)
     return {"completed": True, "profile": service.to_response(profile).model_dump()}
-

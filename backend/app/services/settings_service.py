@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -121,7 +122,12 @@ class SettingsService:
             ],
         }
 
-    def reset_local_data(self) -> int:
+    def reset_local_data(self, upload_root: Path | None = None) -> int:
+        image_paths = [
+            meal.image_path
+            for meal in self.db.scalars(select(Meal).where(Meal.image_path.is_not(None))).all()
+            if meal.image_path
+        ]
         deleted = 0
         for model in (
             UsageEvent,
@@ -143,4 +149,18 @@ class SettingsService:
             result = self.db.execute(delete(model))
             deleted += result.rowcount or 0
         self.db.commit()
+        self._delete_meal_image_files(image_paths=image_paths, upload_root=upload_root or Path("data/uploads"))
         return deleted
+
+    @staticmethod
+    def _delete_meal_image_files(*, image_paths: list[str], upload_root: Path) -> None:
+        root = upload_root.resolve()
+        for raw_path in image_paths:
+            path = Path(raw_path)
+            try:
+                resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
+                resolved.relative_to(root)
+            except (OSError, ValueError):
+                continue
+            if resolved.is_file():
+                resolved.unlink()

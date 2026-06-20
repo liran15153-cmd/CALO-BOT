@@ -57,11 +57,14 @@ Included:
 - `GET /api/chat/messages`
 - `POST /api/workout-plans`
 - `GET /api/workout-plans/current`
+- `GET /api/workouts/next`
 - `POST /api/workout-logs`
+- `GET /api/workout-logs/recent`
 - `POST /api/meals/upload`
 - `POST /api/meals/{meal_id}/analyze`
 - `POST /api/meals/manual`
 - `GET /api/summaries/daily`
+- `GET /api/summaries/weekly/current`
 - `GET /api/summaries/weekly`
 - `GET /api/dashboard`
 - `GET /api/settings`

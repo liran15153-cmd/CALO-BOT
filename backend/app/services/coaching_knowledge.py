@@ -39,7 +39,7 @@ class CoachingKnowledgeService:
             "referral_rules": context["referral_rules"][:2],
             "safety_boundaries": context["safety_boundaries"][:3],
             "coaching_behavior": [
-                "עברית טבעית: RPE/RIR/DOMS/HIIT/Zone 2 נשארים כמונחי אימון עם הסבר קצר.",
+                "עברית ישראלית טבעית: RPE/RIR/DOMS; סטים/חזרות לא מערכות/הישנויות; דילואד/progressive overload; RPE8≈2RIR; בלי bullet.",
                 "תן סיבה קצרה, פעולה אחת, ושאלת המשך אחת רק כשחסר מידע.",
                 "בלי אשמה או שפת חובה; אחרי פספוס מציעים גרסת מינימום ובחירה.",
             ],
@@ -253,25 +253,18 @@ def _retrieve_relevant_knowledge(context: dict, *, query: str, intent: str | Non
         return []
 
     candidates = []
-    for table_key in _RETRIEVAL_PROTOCOL_KEYS:
-        table = context.get(table_key)
-        if not isinstance(table, dict):
-            continue
-        for entry_key, entry in table.items():
-            if not isinstance(entry, dict):
-                continue
-            topic = f"{table_key}.{entry_key}"
-            score = _score_knowledge_entry(
-                topic=topic,
-                table_key=table_key,
-                entry_key=entry_key,
-                entry=entry,
-                query=query,
-                query_tokens=query_tokens,
-                intent=intent,
-            )
-            if score >= _MIN_RETRIEVAL_SCORE:
-                candidates.append((score, topic, entry))
+    for topic, table_key, entry_key, entry in _iter_knowledge_entries(context):
+        score = _score_knowledge_entry(
+            topic=topic,
+            table_key=table_key,
+            entry_key=entry_key,
+            entry=entry,
+            query=query,
+            query_tokens=query_tokens,
+            intent=intent,
+        )
+        if score >= _MIN_RETRIEVAL_SCORE:
+            candidates.append((score, topic, entry))
 
     candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
     hits = []
@@ -287,6 +280,36 @@ def _retrieve_relevant_knowledge(context: dict, *, query: str, intent: str | Non
         if len(hits) >= _MAX_RETRIEVED_KNOWLEDGE:
             break
     return hits
+
+
+def _iter_knowledge_entries(context: dict):
+    """Yield (topic, table_key, entry_key, entry) for every knowledge item.
+
+    Covers dict-of-dict protocol tables, single dicts (per field) and rule lists,
+    so any knowledge added to _BASE_CONTEXT becomes retrievable automatically
+    instead of relying on a hand-maintained allow-list.
+    """
+    for table_key, value in context.items():
+        if table_key in _RETRIEVAL_SKIP_KEYS or not isinstance(value, (dict, list)):
+            continue
+        if isinstance(value, dict):
+            dict_entries = [(key, entry) for key, entry in value.items() if isinstance(entry, dict)]
+            if dict_entries:
+                for entry_key, entry in dict_entries:
+                    yield f"{table_key}.{entry_key}", table_key, entry_key, entry
+            else:
+                for entry_key, entry_value in value.items():
+                    yield f"{table_key}.{entry_key}", table_key, entry_key, _as_retrieval_entry(entry_value)
+        else:
+            yield table_key, table_key, table_key, _as_retrieval_entry(value)
+
+
+def _as_retrieval_entry(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list):
+        return {"rules": value}
+    return {"rules": [str(value)]}
 
 
 def _score_knowledge_entry(
@@ -326,40 +349,110 @@ def _score_knowledge_entry(
 
 
 def _compact_knowledge_hit(topic: str, entry: dict) -> dict:
+    guidance = _pick_entry_items(entry, _HIT_GUIDANCE_FIELDS, limit=2)
+    action = _pick_entry_items(entry, _HIT_ACTION_FIELDS, limit=2)
+    avoid = _pick_entry_items(entry, _HIT_AVOID_FIELDS, limit=1)
+    if not guidance and not action:
+        fallback_fields = [name for name in entry if name not in _HIT_META_FIELDS]
+        guidance = _pick_entry_items(entry, fallback_fields, limit=2)
     hit = {
         "topic": topic,
-        "guidance": _pick_entry_items(
-            entry,
-            [
-                "coach_position",
-                "coaching_position",
-                "rules",
-                "substitution_rules",
-                "planning_rules",
-                "adjustment_rules",
-                "signals",
-                "coaching_goal",
-                "evidence_notes",
-            ],
-            limit=2,
-        ),
-        "action": _pick_entry_items(
-            entry,
-            [
-                "what_to_do_instead",
-                "progression_options",
-                "practical_notes",
-                "adjustment_rules",
-                "substitution_rules",
-                "planning_rules",
-                "decision_gate",
-            ],
-            limit=2,
-        ),
-        "avoid": _pick_entry_items(entry, ["avoid", "caution_notes"], limit=1),
+        "guidance": guidance,
+        "action": action,
+        "avoid": avoid,
         "sources": _pick_entry_items(entry, ["source_refs"], limit=2, max_chars=90),
     }
     return {key: value for key, value in hit.items() if value}
+
+
+# Field name buckets used to project any knowledge entry into a compact hit.
+# Ordered by usefulness; the generic fallback in _compact_knowledge_hit guarantees
+# content even for entries whose field names are not listed here.
+_HIT_GUIDANCE_FIELDS = [
+    "coach_position",
+    "coaching_position",
+    "coaching_goal",
+    "goal",
+    "use_when",
+    "coaching_cues",
+    "rules",
+    "programming_rules",
+    "decision_rules",
+    "interpretation",
+    "interpretation_rules",
+    "signals",
+    "primary_focus",
+    "pattern",
+    "primary_muscles",
+    "muscle_groups",
+    "movement_patterns",
+    "evidence_notes",
+    "coach_assessment",
+    "coach_uses",
+    "set_range",
+    "rep_range",
+    "intensity_guidance",
+    "structure_rules",
+    "balance_rules",
+    "examples",
+]
+_HIT_ACTION_FIELDS = [
+    "what_to_do_instead",
+    "decision_gate",
+    "progression_gate",
+    "progression_options",
+    "progressions",
+    "progression",
+    "progression_rules",
+    "adjust_if_hard",
+    "adjust_if_missing",
+    "adjustment_rules",
+    "adjustment_options",
+    "action_rules",
+    "coach_moves",
+    "coaching_moves",
+    "next_action",
+    "next_check",
+    "practical_notes",
+    "substitution_rules",
+    "planning_rules",
+    "protocol_notes",
+    "programming_notes",
+    "rest_guidance",
+    "exercise_options",
+    "methods",
+    "follow_up",
+    "instructions",
+    "coach_response",
+    "execution",
+    "setup",
+    "frequency",
+    "duration",
+    "intensity",
+    "intensity_or_quality",
+    "checks",
+    "decision",
+]
+_HIT_AVOID_FIELDS = [
+    "avoid",
+    "caution_notes",
+    "safety_notes",
+    "safety_limits",
+    "stop_flags",
+    "common_errors",
+    "regressions",
+    "do_not_test_if",
+    "referral_action",
+]
+_HIT_META_FIELDS = {
+    "source_refs",
+    "test_id",
+    "scoring_units",
+    "record_fields",
+    "retest_window",
+    "population_fit",
+    "required_profile_inputs",
+}
 
 
 def _pick_entry_items(entry: dict, field_names: list[str], *, limit: int, max_chars: int = 220) -> list[str]:
@@ -415,11 +508,31 @@ def _flatten_values(value) -> list[str]:
 
 
 def _tokenize(text: str) -> set[str]:
-    return {
-        token
-        for token in _TOKEN_PATTERN.findall(_normalize_text(text))
-        if len(token) >= 2 and token not in _STOPWORDS
-    }
+    tokens: set[str] = set()
+    for raw in _TOKEN_PATTERN.findall(_normalize_text(text)):
+        for token in _token_variants(raw):
+            if len(token) >= 2 and token not in _STOPWORDS:
+                tokens.add(token)
+    return tokens
+
+
+def _token_variants(token: str) -> set[str]:
+    """Return the token plus Hebrew prefix-stripped forms.
+
+    Hebrew attaches single-letter prefixes (ב/ה/ו/כ/ל/מ/ש) to words, so a query token
+    like "בחלבון" would never match the entry token "חלבון" by exact overlap. We add the
+    stripped forms (up to two leading prefixes) so Hebrew matching actually fires.
+    """
+    variants = {token}
+    if _HEBREW_ONLY_RE.match(token):
+        current = token
+        for _ in range(2):
+            if len(current) >= 3 and current[0] in _HEBREW_PREFIX_LETTERS:
+                current = current[1:]
+                variants.add(current)
+            else:
+                break
+    return variants
 
 
 def _normalize_text(text: str) -> str:
@@ -473,6 +586,8 @@ def _provider_source_organizations(sources: list[dict]) -> list[str]:
 
 
 _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9\u0590-\u05FF]+")
+_HEBREW_ONLY_RE = re.compile(r"^[\u0590-\u05FF]+$")
+_HEBREW_PREFIX_LETTERS = "\u05D1\u05D4\u05D5\u05DB\u05DC\u05DE\u05E9"
 _MIN_RETRIEVAL_SCORE = 4
 _ALIAS_MATCH_BOOST = 8
 _INTENT_TOPIC_BOOST = 2
@@ -512,23 +627,16 @@ _STOPWORDS = {
     "רק",
 }
 
-_RETRIEVAL_PROTOCOL_KEYS = [
-    "common_fitness_myth_protocols",
-    "equipment_substitution_protocols",
-    "readiness_recovery_protocols",
-    "advanced_recovery_readiness_protocols",
-    "concurrent_training_protocols",
-    "environment_training_risk_protocols",
-    "supplement_education_protocols",
-    "program_adaptation_protocols",
-    "volume_progression_protocols",
-    "load_prescription_protocols",
-    "practical_nutrition_protocols",
-    "body_composition_strategy_protocols",
-    "daily_activity_neat_protocols",
-    "warmup_cooldown_protocols",
-    "exercise_setup_safety_protocols",
-]
+# Top-level keys excluded from message retrieval: pure metadata or content that is
+# always projected into provider context directly. Every other knowledge table, single
+# dict or rule list is discovered automatically by _iter_knowledge_entries.
+_RETRIEVAL_SKIP_KEYS = {
+    "version",
+    "scope",
+    "non_certification_note",
+    "sources",
+    "intent_focus",
+}
 
 _TOPIC_ALIASES = {
     "common_fitness_myth_protocols.spot_reduction": [
@@ -621,6 +729,75 @@ _TOPIC_ALIASES = {
         "כאבי שרירים",
         "כאב שרירים",
     ],
+    "protein_guidelines": [
+        "חלבון",
+        "כמה חלבון",
+        "גרם חלבון",
+        "protein",
+        "פרוטאין",
+    ],
+    "program_lifecycle_protocols.deload_week": [
+        "דילואד",
+        "deload",
+        "שבוע הורדת עומס",
+        "הורדת עומס",
+        "שבוע קל",
+    ],
+    "walking_running_protocols.beginner_walk_run": [
+        "ריצה",
+        "לרוץ",
+        "רץ",
+        "להתחיל לרוץ",
+        "running",
+        "run walk",
+        "הליכה ריצה",
+    ],
+    "goal_specific_programming.hypertrophy": [
+        "היפרטרופיה",
+        "hypertrophy",
+        "מסת שריר",
+        "לבנות שריר",
+        "בניית שריר",
+    ],
+    "advanced_strength_hypertrophy_protocols.hypertrophy_volume_landmarks": [
+        "כמה סטים",
+        "נפח אימון",
+        "training volume",
+        "כמה נפח",
+    ],
+    "goal_specific_programming.strength": [
+        "כוח",
+        "strength",
+        "להתחזק",
+        "1rm",
+        "מקס",
+    ],
+    "cardio_programming.base": [
+        "zone 2",
+        "אזור 2",
+        "אירובי",
+        "cardio",
+        "aerobic",
+        "סיבולת לב ריאה",
+    ],
+    "program_adaptation_protocols.performance_plateau": [
+        "תקיעה",
+        "פלאטו",
+        "plateau",
+        "נתקעתי",
+        "לא מתקדם",
+    ],
+    "exercise_library.squat": [
+        "סקוואט",
+        "squat",
+        "כריעה",
+    ],
+    "practical_nutrition_protocols.plate_builder": [
+        "מה לאכול",
+        "בניית צלחת",
+        "ארוחה מאוזנת",
+        "צלחת",
+    ],
 }
 
 _INTENT_TABLE_BOOSTS = {
@@ -634,13 +811,21 @@ _INTENT_TABLE_BOOSTS = {
         "volume_progression_protocols": 2,
         "load_prescription_protocols": 2,
         "concurrent_training_protocols": 2,
+        "goal_specific_programming": 2,
         "exercise_setup_safety_protocols": 1,
+        "session_structure_protocols": 1,
+        "weekly_structure_protocols": 1,
+        "technique_cues": 1,
+        "exercise_library": 1,
+        "mobility_balance_programming": 1,
     },
     "workout_log": {
         "readiness_recovery_protocols": 3,
         "advanced_recovery_readiness_protocols": 3,
         "program_adaptation_protocols": 2,
         "load_prescription_protocols": 1,
+        "program_lifecycle_protocols": 1,
+        "progress_measurement_protocols": 1,
     },
     "meal_log": {
         "practical_nutrition_protocols": 3,
@@ -2501,7 +2686,7 @@ _BASE_CONTEXT = {
                 "RPE נשאר RPE ומוסבר בקצרה כ'דירוג מאמץ מ-1 עד 10' כאשר המשתמש לא מכיר.",
                 "RIR נשאר RIR ומוסבר כ'כמה חזרות נקיות נשארו לך במיכל'.",
                 "DOMS יוצג כ'כאבי שרירים מאוחרים (DOMS)' או 'שרירים תפוסים אחרי אימון', לא כ'דומס' לבד.",
-                "כתוב חזרות, סטים, אימון, התאוששות וקלוריות; לא 'רפס', לא תרגום מילולי של every fitness term.",
+                "כתוב חזרות, סטים, אימון, התאוששות וקלוריות; לא 'רפס', לא מערכות/הישנויות ולא תרגום מילולי של every fitness term.",
             ],
             "examples": [
                 "נשמור היום על RPE 7 בערך: קשה אבל בשליטה.",
@@ -2546,8 +2731,8 @@ _BASE_CONTEXT = {
             "rules": [
                 "Zone 2 נשאר Zone 2 או אזור 2, עם הסבר: קצב שאפשר לדבר בו במשפטים קצרים.",
                 "HIIT נשאר HIIT או 'אימון אינטרוולים עצים'; לא מציעים אותו כשאין בסיס או התאוששות.",
-                "deload הוא 'שבוע הורדת עומס' למשתמש כללי; advanced user יכול לקבל גם את המונח deload.",
-                "progressive overload עדיף 'העלאת עומס הדרגתית': עוד חזרה, עוד סט או קצת יותר משקל כשהשליטה טובה.",
+                "deload הוא 'דילואד' או 'שבוע הורדת עומס'; למשתמש כללי עדיף להסביר הורדת עומס לפני הז'רגון.",
+                "progressive overload עדיף 'התקדמות הדרגתית' או 'העלאת עומס הדרגתית': עוד חזרה, עוד סט או קצת יותר משקל כשהשליטה טובה.",
             ],
             "examples": [
                 "30 דקות Zone 2: קצב שאתה יכול לדבר בו במשפטים קצרים.",
@@ -5084,7 +5269,7 @@ _BASE_CONTEXT = {
         "התחל מהדבר הבא הכי קטן ובר ביצוע.",
         "התאם אימון שהוחמץ במקום להעניש: קצר, הזז או הורד נפח.",
         "תן סיבה קצרה, פעולה אחת, ורק שאלה אחת אם חסר מידע.",
-        "שמור על עברית בלבד למשתמש, למעט שמות תרגילים או מוצרים שאין להם תרגום טבעי.",
+        "עברית ישראלית טבעית: RPE/RIR/DOMS; סטים/חזרות לא מערכות/הישנויות; דילואד/progressive overload; RPE8≈2RIR; בלי bullet.",
     ],
     "sources": [
         {

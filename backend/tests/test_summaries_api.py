@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import WeeklySummary
+from backend.app.models import UsageEvent, WeeklySummary
 
 
 def test_daily_summary_uses_stored_workouts_and_meals(tmp_path):
@@ -22,6 +22,10 @@ def test_daily_summary_uses_stored_workouts_and_meals(tmp_path):
     assert body["metrics"]["workouts_completed"] == 1
     assert body["metrics"]["meals_logged"] == 1
     assert body["metrics"]["calories_range"] == [120, 220]
+    assert "אימון אחד" in body["summary"]
+    assert "ארוחה אחת" in body["summary"]
+    assert "1 אימונים" not in body["summary"]
+    assert "1 ארוחות" not in body["summary"]
     assert body["next_action"]
 
 
@@ -38,6 +42,11 @@ def test_weekly_summary_tracks_consistency_and_persists_summary(tmp_path):
     assert body["metrics"]["workouts_completed"] == 1
     assert body["metrics"]["missed_workouts"] == 1
     assert body["metrics"]["consistency_percentage"] == 50
+    assert "הושלם אימון אחד" in body["summary"]
+    assert "אימון אחד פוספס" in body["summary"]
+    assert "תועדה ארוחה אחת" in body["summary"]
+    assert "1 אימונים" not in body["summary"]
+    assert "1 ארוחות" not in body["summary"]
     assert body["next_action"]
 
 
@@ -86,6 +95,31 @@ def test_weekly_summary_consolidates_existing_duplicate_week_records(tmp_path):
     saved = db.scalars(select(WeeklySummary)).all()
     assert len(saved) == 1
     assert saved[0].summary_text.startswith("סיכום שבועי")
+
+
+def test_current_weekly_summary_is_read_only_for_dashboard(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/workout-logs", json={"text": "I did 3 sets of bench press 10, 8, 7 with 50kg"})
+    client.post("/api/meals/manual", json={"text": "I ate yogurt and banana"})
+
+    preview = client.get("/api/summaries/weekly/current")
+
+    assert preview.status_code == 200
+    body = preview.json()
+    assert body["metrics"]["workouts_completed"] == 1
+    assert body["metrics"]["meals_logged"] == 1
+    assert body["persisted"] is False
+    assert db.scalars(select(WeeklySummary)).all() == []
+    assert db.scalars(select(UsageEvent).where(UsageEvent.task == "summary")).all() == []
+
+    saved = client.get("/api/summaries/weekly")
+    preview_after_save = client.get("/api/summaries/weekly/current")
+
+    assert saved.status_code == 200
+    assert preview_after_save.status_code == 200
+    assert preview_after_save.json()["persisted"] is True
+    assert len(db.scalars(select(WeeklySummary)).all()) == 1
+    assert len(db.scalars(select(UsageEvent).where(UsageEvent.task == "summary")).all()) == 1
 
 
 def make_client(tmp_path) -> TestClient:

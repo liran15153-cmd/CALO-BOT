@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
@@ -30,6 +31,14 @@ def test_settings_export_and_reset_local_data(tmp_path):
     profile = valid_payload()
     assert client.post("/api/onboarding", json=profile).status_code == 200
     assert client.post("/api/meals/manual", json={"text": "2 eggs and toast"}).status_code == 200
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Lunch photo"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    )
+    assert upload.status_code == 200
+    uploaded_path = tmp_path / "uploads" / upload.json()["image_path"]
+    assert uploaded_path.exists()
 
     exported = client.get("/api/settings/export")
 
@@ -42,6 +51,7 @@ def test_settings_export_and_reset_local_data(tmp_path):
 
     assert reset.status_code == 200
     assert reset.json()["deleted_records"] > 0
+    assert not uploaded_path.exists()
     assert client.get("/api/onboarding").json() == {"completed": False, "profile": None}
     assert client.get("/api/settings/export").json()["meals"] == []
 
@@ -59,6 +69,7 @@ def make_client(tmp_path) -> TestClient:
             db.close()
 
     app.dependency_overrides[get_db] = override_db
+    app.state.upload_root = tmp_path / "uploads"
     return TestClient(app)
 
 

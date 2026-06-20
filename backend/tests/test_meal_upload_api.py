@@ -27,8 +27,9 @@ def test_meal_upload_stores_file_and_database_record(tmp_path):
     body = response.json()
     assert body["note"] == "This is lunch"
     assert body["image_path"].endswith(".jpg")
+    assert not Path(body["image_path"]).is_absolute()
     assert ".." not in body["image_path"]
-    assert Path(body["image_path"]).exists()
+    assert (tmp_path / "uploads" / body["image_path"]).exists()
     saved = db.scalar(select(Meal))
     assert saved is not None
     assert saved.image_path == body["image_path"]
@@ -83,6 +84,21 @@ def test_meal_image_analysis_no_key_does_not_fake_detection(tmp_path):
     assert saved.provider_status == "not_configured"
 
 
+def test_meal_image_analysis_returns_404_when_uploaded_file_is_missing(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "This is lunch"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    (tmp_path / "uploads" / upload["image_path"]).unlink()
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 404
+    assert "תמונת הארוחה לא נמצאה" in response.json()["detail"]
+
+
 def test_meal_image_analysis_updates_meal_ranges_and_items(tmp_path, monkeypatch):
     client, db = make_client_and_db(tmp_path)
     upload = client.post(
@@ -132,7 +148,7 @@ def test_meal_image_analysis_replaces_non_hebrew_provider_text(tmp_path, monkeyp
     assert "English" not in str(body)
 
 
-def test_meal_image_analysis_keeps_hebrew_message_with_short_english_term(tmp_path, monkeypatch):
+def test_meal_image_analysis_replaces_generic_english_terms_in_hebrew_message(tmp_path, monkeypatch):
     client, _db = make_client_and_db(tmp_path)
     upload = client.post(
         "/api/meals/upload",
@@ -148,8 +164,8 @@ def test_meal_image_analysis_keeps_hebrew_message_with_short_english_term(tmp_pa
 
     assert response.status_code == 200
     body = response.json()
-    assert "protein timing" in body["message"]
-    assert "טקסט שרובו לא בעברית" not in body["message"]
+    assert "protein timing" not in body["message"]
+    assert "טקסט שרובו לא בעברית" in body["message"]
 
 
 def test_meal_image_analysis_replaces_mixed_english_user_visible_text(tmp_path, monkeypatch):

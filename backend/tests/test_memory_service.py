@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.db import init_db, make_engine
-from backend.app.models import UserMemory
+from backend.app.models import User, UserMemory
 from backend.app.services.memory_service import MemoryService
 
 
@@ -79,4 +79,7 @@ def test_memory_service_ignores_non_durable_chat(tmp_path):
 def make_session(tmp_path):
     engine = make_engine(f"sqlite:///{tmp_path / 'memory.db'}")
     init_db(engine)
-    return sessionmaker(bind=engine, expire_on_commit=False)()
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    db.add(User(name="משתמש בדיקה"))
+    db.commit()
+    return db

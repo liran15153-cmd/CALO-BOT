@@ -88,29 +88,28 @@ class AnthropicProvider:
     def analyze_image(self, image_path: Path, note: str | None = None) -> AIResult:
         mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
         encoded_image = base64.b64encode(image_path.read_bytes()).decode("ascii")
-        try:
-            response = self.client.messages.create(
-                model=self.model,
-                system="הערך תזונת ארוחה מתמונה. החזר JSON עם טווחים, אי-ודאות, וכל טקסט למשתמש בעברית בלבד.",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": mime_type,
-                                    "data": encoded_image,
-                                },
+        response = self._call_messages_api(
+            model=self.model,
+            system="הערך תזונת ארוחה מתמונה. החזר JSON עם טווחים, אי-ודאות, וכל טקסט למשתמש בעברית בלבד.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": mime_type,
+                                "data": encoded_image,
                             },
-                            {"type": "text", "text": f"הערת משתמש: {note or ''}"},
-                        ],
-                    }
-                ],
-                max_tokens=700,
-            )
-        except Exception:
+                        },
+                        {"type": "text", "text": f"הערת משתמש: {note or ''}"},
+                    ],
+                }
+            ],
+            max_tokens=700,
+        )
+        if response is None:
             return self._provider_error()
         text = _extract_anthropic_text(response)
         usage = getattr(response, "usage", None)
@@ -123,14 +122,13 @@ class AnthropicProvider:
         )
 
     def _responses_text(self, request: AIRequest) -> AIResult:
-        try:
-            response = self.client.messages.create(
-                model=self.model,
-                system=request.instructions,
-                messages=[{"role": "user", "content": request.input_text}],
-                max_tokens=request.max_output_tokens,
-            )
-        except Exception:
+        response = self._call_messages_api(
+            model=self.model,
+            system=request.instructions,
+            messages=[{"role": "user", "content": request.input_text}],
+            max_tokens=request.max_output_tokens,
+        )
+        if response is None:
             return self._provider_error()
         text = _extract_anthropic_text(response)
         usage = getattr(response, "usage", None)
@@ -142,6 +140,12 @@ class AnthropicProvider:
             or _rough_token_count(request.instructions + "\n" + request.input_text),
             estimated_tokens_out=getattr(usage, "output_tokens", None) or _rough_token_count(text),
         )
+
+    def _call_messages_api(self, **kwargs: Any) -> Any | None:
+        try:
+            return self.client.messages.create(**kwargs)
+        except Exception:
+            return None
 
     def _provider_error(self) -> AIResult:
         return AIResult(

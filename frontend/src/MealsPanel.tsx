@@ -1,7 +1,7 @@
 import { ImageUp, ScanSearch } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { analyzeMealImage, saveManualMeal, uploadMealImage, type Meal, type MealAnalysis } from './api';
+import { analyzeMealImage, fetchRecentMeals, saveManualMeal, uploadMealImage, type Meal, type MealAnalysis } from './api';
 import { formatProviderStatus } from './formatters';
 
 export function MealsPanel() {
@@ -10,8 +10,37 @@ export function MealsPanel() {
   const [manualText, setManualText] = useState('');
   const [meal, setMeal] = useState<Meal | null>(null);
   const [manualMeal, setManualMeal] = useState<Meal | null>(null);
+  const [recentMeals, setRecentMeals] = useState<Meal[]>([]);
+  const [recentMealsStatus, setRecentMealsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'analyzing' | 'error'>('idle');
+
+  const loadRecentMeals = useCallback(async () => {
+    try {
+      const meals = await fetchRecentMeals();
+      setRecentMeals(Array.isArray(meals) ? meals : []);
+      setRecentMealsStatus('ready');
+    } catch {
+      setRecentMealsStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchRecentMeals()
+      .then((meals) => {
+        if (!active) return;
+        setRecentMeals(Array.isArray(meals) ? meals : []);
+        setRecentMealsStatus('ready');
+      })
+      .catch(() => {
+        if (!active) return;
+        setRecentMealsStatus('error');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,6 +53,7 @@ export function MealsPanel() {
       const saved = await uploadMealImage(note, file);
       setMeal(saved);
       setAnalysis(null);
+      await loadRecentMeals();
       setStatus('idle');
     } catch {
       setStatus('error');
@@ -36,6 +66,7 @@ export function MealsPanel() {
     try {
       const result = await analyzeMealImage(meal.id);
       setAnalysis(result);
+      await loadRecentMeals();
       setStatus('idle');
     } catch {
       setStatus('error');
@@ -51,6 +82,7 @@ export function MealsPanel() {
       const saved = await saveManualMeal(trimmed);
       setManualMeal(saved);
       setManualText('');
+      await loadRecentMeals();
       setStatus('idle');
     } catch {
       setStatus('error');
@@ -89,7 +121,7 @@ export function MealsPanel() {
       {meal && (
         <div className="inline-section">
           <h4>ארוחה שהועלתה</h4>
-          <p>{meal.note || 'ללא הערה'} נשמרה. ההפניה לתמונה נשמרת מקומית.</p>
+          <p>הארוחה נשמרה. {meal.note ? `הערה: ${meal.note}. ` : ''}ההפניה לתמונה נשמרת מקומית.</p>
           <button className="ghost-button" type="button" onClick={handleAnalyze} disabled={status === 'analyzing'}>
             <ScanSearch size={16} aria-hidden="true" />
             ניתוח תמונה
@@ -134,18 +166,67 @@ export function MealsPanel() {
         {manualMeal && (
           <div className="log-result">
             <strong>{formatConfidence(manualMeal.confidence)}</strong>
-            <span>
-              {manualMeal.calories_min}-{manualMeal.calories_max} קלוריות
-            </span>
-            <span>
-              {manualMeal.protein_min}-{manualMeal.protein_max} גרם חלבון
-            </span>
+            {formatRange([manualMeal.calories_min ?? null, manualMeal.calories_max ?? null], 'קלוריות')}
+            {formatRange([manualMeal.protein_min ?? null, manualMeal.protein_max ?? null], 'גרם חלבון')}
           </div>
+        )}
+      </section>
+
+      <section className="inline-section meal-history-section">
+        <h4>ארוחות אחרונות</h4>
+        {recentMealsStatus === 'loading' ? (
+          <p className="plan-note">טוען ארוחות אחרונות...</p>
+        ) : recentMealsStatus === 'error' ? (
+          <p className="error-text">לא הצלחתי לטעון את הארוחות האחרונות.</p>
+        ) : recentMeals.length > 0 ? (
+          <div className="meal-history-list">
+            {recentMeals.map((recentMeal) => (
+              <article className="meal-history-item" key={recentMeal.id}>
+                <div className="meal-history-heading">
+                  <strong>{recentMeal.note || formatMealType(recentMeal.meal_type)}</strong>
+                  <span>{formatMealDate(recentMeal.eaten_on)}</span>
+                  <span>{formatConfidence(recentMeal.confidence)}</span>
+                </div>
+                <div className="meal-history-ranges">
+                  {formatRange([recentMeal.calories_min ?? null, recentMeal.calories_max ?? null], 'קלוריות')}
+                  {formatRange([recentMeal.protein_min ?? null, recentMeal.protein_max ?? null], 'גרם חלבון')}
+                </div>
+                {recentMeal.items?.length ? (
+                  <div className="meal-history-items">
+                    {recentMeal.items.map((item) => (
+                      <span key={item.id ?? `${recentMeal.id}-${item.name}`}>
+                        {item.name}
+                        {item.quantity ? `, ${item.quantity}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="plan-note">אין עדיין ארוחות שמורות להצגה.</p>
         )}
       </section>
 
       {status === 'error' && <p className="error-text">בקשת הארוחה נכשלה.</p>}
     </section>
+  );
+}
+
+function formatMealDate(value: string | null | undefined): string {
+  if (!value) return 'תאריך לא ידוע';
+  return value;
+}
+
+function formatMealType(value: string | null | undefined): string {
+  return (
+    {
+      breakfast: 'ארוחת בוקר',
+      lunch: 'ארוחת צהריים',
+      dinner: 'ארוחת ערב',
+      snack: 'נשנוש'
+    }[value ?? ''] ?? 'ארוחה'
   );
 }
 

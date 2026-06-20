@@ -1,3 +1,4 @@
+import re
 from collections.abc import Generator
 
 from fastapi.testclient import TestClient
@@ -20,6 +21,8 @@ def test_workout_plan_api_generates_and_saves_structured_plan(tmp_path):
     assert response.status_code == 200
     body = response.json()
     assert body["days_per_week"] == 3
+    assert "full_body" not in body["name"]
+    assert "גוף מלא" in body["name"]
     assert body["days"][0]["exercises"]
     saved = db.scalar(select(WorkoutPlan))
     assert saved is not None
@@ -39,7 +42,10 @@ def test_workout_plan_api_returns_current_plan(tmp_path):
     response = client.get("/api/workout-plans/current")
 
     assert response.status_code == 200
-    assert response.json()["is_current"] is True
+    body = response.json()
+    assert body["is_current"] is True
+    assert body["days"][0]["workout_id"] is not None
+    assert body["days"][0]["exercises"][0]["exercise_id"] is not None
 
 
 def test_workout_plan_uses_saved_profile_when_request_is_open_ended(tmp_path):
@@ -178,8 +184,9 @@ def test_single_session_plan_is_saved_without_replacing_current_multi_week_plan(
     assert body["days_per_week"] == 1
     assert len(body["days"]) == 1
     assert body["days"][0]["estimated_duration_minutes"] <= 20
-    assert "single session" in body["decision_inputs"]["plan_type"]
-    assert any("recovery" in note.lower() or "reduce" in note.lower() for note in body["safety_notes"])
+    assert body["decision_inputs"]["plan_type"] == "אימון יחיד"
+    assert any("התאוששות" in note or "הורד" in note for note in body["safety_notes"])
+    assert_no_english_workout_guidance(body)
 
     current_after = db.get(WorkoutPlan, current_id)
     assert current_after is not None
@@ -187,6 +194,36 @@ def test_single_session_plan_is_saved_without_replacing_current_multi_week_plan(
     one_off = db.scalar(select(WorkoutPlan).where(WorkoutPlan.id != current_id))
     assert one_off is not None
     assert one_off.is_current is False
+
+
+def test_single_session_plan_infers_hebrew_gym_and_duration_from_prompt_before_profile_defaults(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    payload = valid_payload()
+    payload["training_location"] = "home"
+    payload["available_equipment"] = ["resistance bands"]
+    payload["session_length_minutes"] = 45
+    client.post("/api/onboarding", json=payload)
+
+    response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "תן לי אימון אחד להיום בחדר כושר, 30 דקות, בלי לפנות אליי בלשון זכר או נקבה."},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["plan_type"] == "single_session"
+    assert body["session_length_minutes"] == 30
+    assert body["days"][0]["estimated_duration_minutes"] == 30
+    assert "חדר כושר" in body["equipment_needed"]
+    assert "bodyweight" not in body["equipment_needed"]
+    assert body["decision_inputs"]["session_length_minutes"] == 30
+    assert "חדר כושר" in body["decision_inputs"]["equipment"]
+    exercise_names = [exercise["name"] for exercise in body["days"][0]["exercises"]]
+    assert any("מכונה" in name or "משקולות" in name for name in exercise_names)
+    assert_no_direct_gendered_hebrew_workout_guidance(body)
+    saved = db.scalar(select(WorkoutPlan))
+    assert saved is not None
+    assert saved.plan_json["session_length_minutes"] == 30
 
 
 def test_single_session_plan_uses_recent_training_status_to_reduce_load(tmp_path):
@@ -225,7 +262,8 @@ def test_single_session_plan_uses_recent_training_status_to_reduce_load(tmp_path
     assert response.status_code == 200
     body = response.json()
     assert body["decision_inputs"]["training_status"]["load_signal"] == "recovery_needed"
-    assert any("Reduce" in note or "recovery" in note.lower() for note in body["safety_notes"])
+    assert any("התאוששות" in note or "הורד" in note for note in body["safety_notes"])
+    assert_no_english_workout_guidance(body)
     assert body["days"][0]["exercises"][0]["sets"] == "2"
 
 
@@ -240,6 +278,86 @@ def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app), db
+
+
+def assert_no_english_workout_guidance(plan: dict) -> None:
+    guidance_texts = [
+        plan.get("progression_model", ""),
+        plan.get("recovery_note", ""),
+        *plan.get("safety_notes", []),
+    ]
+    for day in plan.get("days", []):
+        guidance_texts.extend(day.get("warmup", []))
+        guidance_texts.extend(day.get("cooldown", []))
+        guidance_texts.append(day.get("notes", ""))
+        for exercise in day.get("exercises", []):
+            guidance_texts.extend(
+                [
+                    exercise.get("notes", ""),
+                    exercise.get("progression", ""),
+                    exercise.get("regression", ""),
+                    *exercise.get("safety_notes", []),
+                ]
+            )
+
+    text = "\n".join(str(item) for item in guidance_texts)
+    forbidden = ["Stop ", "Use ", "Reduce ", "Do not ", "Add ", "single session", "multi week", "recovery"]
+    for fragment in forbidden:
+        assert fragment.lower() not in text.lower()
+
+
+def assert_no_direct_gendered_hebrew_workout_guidance(plan: dict) -> None:
+    guidance_texts = [
+        plan.get("progression_rule", ""),
+        plan.get("progression_model", ""),
+        plan.get("recovery_note", ""),
+        *plan.get("safety_notes", []),
+    ]
+    for day in plan.get("days", []):
+        guidance_texts.extend(day.get("warmup", []))
+        guidance_texts.append(day.get("notes", ""))
+        for exercise in day.get("exercises", []):
+            guidance_texts.extend(
+                [
+                    exercise.get("notes", ""),
+                    exercise.get("progression", ""),
+                    exercise.get("regression", ""),
+                    *exercise.get("safety_notes", []),
+                ]
+            )
+
+    text = "\n".join(str(item) for item in guidance_texts)
+    forbidden_tokens = [
+        "הוסף",
+        "העלה",
+        "שמור",
+        "עצור",
+        "עבוד",
+        "בחר",
+        "בצע",
+        "הורד",
+        "הפחת",
+        "קח",
+        "חזור",
+        "התקדם",
+        "עבור",
+        "השתמש",
+        "התאם",
+        "אסוף",
+        "כבד",
+        "השאר",
+        "משוך",
+        "הקטן",
+    ]
+    forbidden_fragments = [
+        "אתה",
+        "עצמך",
+        "אל ת",
+    ]
+    for fragment in forbidden_tokens:
+        assert not re.search(rf"(?<![\u0590-\u05ff])ו?{re.escape(fragment)}(?![\u0590-\u05ff])", text)
+    for fragment in forbidden_fragments:
+        assert fragment not in text
 
 
 def valid_payload():

@@ -28,12 +28,13 @@ class FileStorageService:
         if _detect_image_extension(content) != extension:
             raise ValueError("קובץ התמונה לא תואם לסוג JPEG, PNG או WEBP")
 
+        root = self.upload_root.resolve()
         today = date.today().isoformat()
-        target_dir = self.upload_root / "meals" / str(user_id) / today
+        target_dir = root / "meals" / str(user_id) / today
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / f"{uuid4().hex}{extension}"
         target.write_bytes(content)
-        return target.resolve()
+        return target.relative_to(root)
 
 
 def _detect_image_extension(content: bytes) -> str | None:

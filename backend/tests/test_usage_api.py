@@ -52,6 +52,14 @@ def test_usage_tracks_image_analysis_attempts(tmp_path):
     assert usage.json()["image_analysis_count"] == 1
 
 
+def test_usage_today_alias_is_not_exposed(tmp_path):
+    client = make_client(tmp_path)
+
+    response = client.get("/api/usage/today")
+
+    assert response.status_code == 404
+
+
 def make_client(tmp_path) -> TestClient:
     engine = make_engine(f"sqlite:///{tmp_path / 'usage.db'}")
     init_db(engine)

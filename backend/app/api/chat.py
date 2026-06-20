@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
-from backend.app.schemas import ChatMessageCreate, ChatRequest, ChatResponse, ChatSessionCreate
+from backend.app.schemas import ChatRequest, ChatResponse, ChatSessionCreate
 from backend.app.services.chat_service import ChatService
 from backend.app.services.coach_engine import CoachEngine
 from backend.app.services.profile_service import ProfileService
@@ -26,28 +26,21 @@ def create_session(payload: ChatSessionCreate, db: Session = Depends(get_db)) ->
 
 @router.post("/sessions/{session_id}/reset")
 def reset_session(session_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    user = ProfileService(db).get_default_user()
     try:
-        session = ChatService(db).reset_session(session_id)
+        session = ChatService(db).reset_session(user_id=user.id, session_id=session_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"id": session.id, "title": session.title, "is_active": session.is_active}
 
 
-@router.post("/messages")
-def add_message(payload: ChatMessageCreate, db: Session = Depends(get_db)) -> dict[str, Any]:
-    user = ProfileService(db).get_default_user()
-    message = ChatService(db).add_message(
-        user_id=user.id,
-        session_id=payload.session_id,
-        role=payload.role,
-        content=payload.content,
-    )
-    return {"id": message.id, "session_id": message.session_id, "role": message.role, "content": message.content}
-
-
 @router.get("/messages")
 def list_messages(session_id: int, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
-    messages = ChatService(db).list_messages(session_id)
+    user = ProfileService(db).get_default_user()
+    try:
+        messages = ChatService(db).list_messages(user_id=user.id, session_id=session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return [
         {
             "id": message.id,

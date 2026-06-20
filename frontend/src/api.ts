@@ -49,29 +49,26 @@ export type ChatSession = {
   is_active: boolean;
 };
 
-export type ChatMessage = {
-  id: number;
-  session_id: number;
-  role: 'user' | 'coach' | 'system';
-  content: string;
-  provider_status?: string | null;
-  safety_flagged?: boolean;
-  created_at?: string | null;
-};
-
 export type WorkoutPlan = {
   id: number;
   is_current: boolean;
   name: string;
   goal: string;
+  plan_type?: string | null;
+  duration_weeks?: number | null;
+  training_split?: string | null;
   days_per_week: number;
+  session_length_minutes?: number | null;
   equipment_needed: string[];
   days: Array<{
+    workout_id?: number | null;
     name: string;
+    estimated_duration_minutes?: number | null;
     warmup: string[];
     difficulty: string;
     notes?: string | null;
     exercises: Array<{
+      exercise_id?: number | null;
       name: string;
       sets: string;
       reps_or_duration: string;
@@ -83,22 +80,125 @@ export type WorkoutPlan = {
   recovery_note?: string | null;
 };
 
+export type TrainingAdaptation = {
+  completed_recent?: number;
+  skipped_recent?: number;
+  pain_flags_recent?: number;
+  load_signal: string;
+  signals?: string[];
+  next_adjustment: string;
+  exercise_adjustments?: Array<{
+    exercise_id?: number | null;
+    exercise_name?: string | null;
+    adjustment: string;
+    reason: string;
+    next_action: string;
+  }>;
+};
+
+export type ExecutionPlanExercise = {
+  exercise_id?: number | null;
+  source_exercise_id?: number | null;
+  name: string;
+  sets: string;
+  reps_or_duration: string;
+  rest: string;
+  notes?: string | null;
+  alternatives?: string[];
+  adjustment?: string | null;
+  reason?: string | null;
+  execution_note?: string | null;
+};
+
+export type ExecutionPlan = {
+  source: string;
+  base_workout_id?: number | null;
+  workout_name?: string | null;
+  load_signal: string;
+  summary: string;
+  adjusted_exercises: ExecutionPlanExercise[];
+};
+
+export type NextWorkout = {
+  id: number;
+  plan_id: number | null;
+  name: string;
+  scheduled_day?: string | null;
+  difficulty?: string | null;
+  warmup: string[];
+  notes?: string | null;
+  exercises: Array<{
+    exercise_id: number;
+    name: string;
+    sets: string;
+    reps_or_duration: string;
+    rest: string;
+    notes?: string | null;
+    alternatives?: string[];
+  }>;
+  adaptation: TrainingAdaptation;
+  execution_plan?: ExecutionPlan | null;
+  plan?: { id: number; name: string };
+};
+
+export type WorkoutSetLogInput = {
+  set_index: number;
+  reps?: number | null;
+  weight?: string | null;
+  duration_seconds?: number | null;
+  completed: boolean;
+};
+
+export type WorkoutExerciseLogInput = {
+  exercise_id?: number | null;
+  exercise_name: string;
+  status: 'completed' | 'partial' | 'skipped' | 'modified';
+  sets: WorkoutSetLogInput[];
+  rpe?: number | null;
+  rir?: number | null;
+  notes?: string | null;
+};
+
+export type WorkoutLogInput = {
+  text?: string | null;
+  workout_id?: number | null;
+  logged_on?: string | null;
+  status?: 'completed' | 'partial' | 'skipped' | 'modified';
+  exercises?: WorkoutExerciseLogInput[];
+  rpe?: number | null;
+  rir?: number | null;
+  pain_flag?: boolean;
+  notes?: string | null;
+};
+
 export type WorkoutLog = {
   id: number;
+  workout_id?: number | null;
   logged_on: string;
   status: string;
   exercise_results: Array<{
-    exercise: string;
-    sets?: number;
+    exercise?: string;
+    exercise_id?: number | null;
+    exercise_name?: string;
+    status?: string;
+    sets?: number | WorkoutSetLogInput[];
+    rpe?: number | null;
+    rir?: number | null;
+    notes?: string | null;
     reps?: number[];
     weight?: string;
   }>;
+  rpe?: number | null;
+  notes?: string | null;
   pain_flag: boolean;
   parse_confidence: string;
+  adaptation?: TrainingAdaptation;
 };
 
 export type Meal = {
   id: number;
+  eaten_on?: string | null;
+  meal_type?: string | null;
   note: string | null;
   image_path: string | null;
   calories_min?: number | null;
@@ -106,6 +206,16 @@ export type Meal = {
   protein_min?: number | null;
   protein_max?: number | null;
   confidence: string | null;
+  items?: Array<{
+    id?: number;
+    name: string;
+    quantity?: string | null;
+    calories_min?: number | null;
+    calories_max?: number | null;
+    protein_min?: number | null;
+    protein_max?: number | null;
+    confidence?: string | null;
+  }>;
 };
 
 export type MealAnalysis = {
@@ -133,13 +243,33 @@ export type MealAnalysis = {
 export type DashboardState = {
   current_goal: string | null;
   current_workout_plan: { name: string } | null;
+  next_workout: {
+    id?: number | null;
+    name?: string | null;
+    plan_id?: number | null;
+    plan_name?: string | null;
+    load_signal?: string | null;
+    next_adjustment?: string | null;
+  } | null;
   completed_workouts_this_week: number;
   meals_logged_this_week: number;
+  meals_logged_today: number;
   estimated_nutrition_range: [number | null, number | null] | null;
+  estimated_protein_range_today: [number | null, number | null] | null;
+  nutrition_action: string;
   recent_coach_notes: string[];
   current_streak: number;
   missed_workouts: number;
   next_recommended_action: string;
+};
+
+export type SummaryResponse = {
+  summary?: string | null;
+  metrics?: Record<string, number | string | null | undefined>;
+  next_action?: string | null;
+  week_start?: string | null;
+  week_end?: string | null;
+  persisted?: boolean;
 };
 
 export type SettingsState = {
@@ -229,14 +359,6 @@ export async function resetChatSession(sessionId: number): Promise<ChatSession> 
   return response.json();
 }
 
-export async function fetchChatMessages(sessionId: number): Promise<ChatMessage[]> {
-  const response = await fetch(`${API_BASE}/api/chat/messages?session_id=${sessionId}`);
-  if (!response.ok) {
-    throw new Error(`טעינת הודעות הצ'אט נכשלה: ${response.status}`);
-  }
-  return response.json();
-}
-
 export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> {
   const response = await fetch(`${API_BASE}/api/workout-plans`, {
     method: 'POST',
@@ -260,14 +382,34 @@ export async function fetchCurrentWorkoutPlan(): Promise<WorkoutPlan | null> {
   return response.json();
 }
 
-export async function saveWorkoutLog(text: string): Promise<WorkoutLog> {
+export async function fetchNextWorkout(): Promise<NextWorkout | null> {
+  const response = await fetch(`${API_BASE}/api/workouts/next`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`טעינת האימון הבא נכשלה: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function saveWorkoutLog(input: string | WorkoutLogInput): Promise<WorkoutLog> {
+  const body = typeof input === 'string' ? { text: input } : input;
   const response = await fetch(`${API_BASE}/api/workout-logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(body)
   });
   if (!response.ok) {
     throw new Error(`שמירת תיעוד האימון נכשלה: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchRecentWorkoutLogs(): Promise<WorkoutLog[]> {
+  const response = await fetch(`${API_BASE}/api/workout-logs/recent`);
+  if (!response.ok) {
+    throw new Error(`טעינת תיעודי האימון האחרונים נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -282,6 +424,14 @@ export async function uploadMealImage(note: string, file: File): Promise<Meal> {
   });
   if (!response.ok) {
     throw new Error(`העלאת הארוחה נכשלה: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchRecentMeals(): Promise<Meal[]> {
+  const response = await fetch(`${API_BASE}/api/meals/recent`);
+  if (!response.ok) {
+    throw new Error(`טעינת הארוחות האחרונות נכשלה: ${response.status}`);
   }
   return response.json();
 }
@@ -312,6 +462,14 @@ export async function fetchDashboard(): Promise<DashboardState> {
   const response = await fetch(`${API_BASE}/api/dashboard`);
   if (!response.ok) {
     throw new Error(`טעינת לוח הבקרה נכשלה: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchCurrentWeeklySummary(): Promise<SummaryResponse> {
+  const response = await fetch(`${API_BASE}/api/summaries/weekly/current`);
+  if (!response.ok) {
+    throw new Error(`טעינת הסקירה השבועית נכשלה: ${response.status}`);
   }
   return response.json();
 }

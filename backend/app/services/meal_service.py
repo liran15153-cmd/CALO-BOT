@@ -1,8 +1,8 @@
-from datetime import date
+﻿from datetime import date
 import json
 from pathlib import Path
 
-from sqlalchemy import delete
+from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
@@ -11,6 +11,33 @@ from backend.app.schemas import MealTextRequest
 from backend.app.services.ai_provider import build_ai_provider
 from backend.app.services.language_guard import contains_hebrew, has_disallowed_latin_text
 from backend.app.services.usage_service import UsageService, rough_token_count
+
+
+_MEAL_NOT_FOUND_MESSAGE = "תמונת הארוחה לא נמצאה"
+_MEAL_NOT_CONFIGURED_MESSAGE = (
+    "ניתוח תמונות לא זמין כרגע. בדוק את הגדרת ANTHROPIC_API_KEY."
+)
+_MEAL_BUDGET_EXCEEDED_MESSAGE = (
+    "ניתוח תמונות חרג את התקציב היומי. בדוק שוב בעתיד."
+)
+_ANALYSIS_PARSE_ERROR_MESSAGE = (
+    "לא הצלחתי להציג תוכן בעברית כעת. אנא נסה שוב עם ניסוח קצר וברור."
+)
+_ANALYSIS_REPLACEMENT_MESSAGE = (
+    "טקסט שרובו לא בעברית. אנא נסה שוב עם ניסוח קצר וברור."
+)
+_ANALYSIS_FALLBACK_QUESTION = "מה הכמות המשוערת ומה שיטת ההכנה?"
+_DETECTED_ITEM_FALLBACK_NAME = "פריט מזון שזוהה"
+_DETECTED_ITEM_UNKNOWN_QUANTITY = "לא ידוע"
+
+_MANUAL_PROTEIN_SHAKE_NAME = "שייק חלבון"
+_MANUAL_GREEK_YOGURT_NAME = "יווגורט יווני"
+_MANUAL_BANANA_NAME = "בננה"
+_MANUAL_EGG_NAME = "ביצה"
+_MANUAL_PIZZA_NAME = "פיצה"
+_MANUAL_UNKNOWN_MEAL_NAME = "ארוחה לא ברורה"
+
+_MEAL_PARTIAL_QUANTITY = "כמות לא ידועה"
 
 
 class MealService:
@@ -31,10 +58,13 @@ class MealService:
         self.db.refresh(meal)
         return meal
 
-    def analyze_image(self, meal_id: int) -> MealImageAnalysis:
+    def analyze_image(self, meal_id: int, upload_root: Path | None = None) -> MealImageAnalysis:
         meal = self.db.get(Meal, meal_id)
         if meal is None or meal.image_path is None:
-            raise ValueError("תמונת הארוחה לא נמצאה")
+            raise ValueError(_MEAL_NOT_FOUND_MESSAGE)
+        image_path = self._resolve_meal_image_path(meal.image_path, upload_root or Path("data/uploads"))
+        if not image_path.is_file():
+            raise ValueError(_MEAL_NOT_FOUND_MESSAGE)
 
         settings = get_settings()
         usage_service = UsageService(self.db)
@@ -48,9 +78,7 @@ class MealService:
                 estimated_tokens_out=0,
             )
             payload = {
-                "message": (
-                    "תקציב הבינה המלאכותית היומי נוצל. ניתוח תמונת הארוחה לא נשלח לספק הבינה המלאכותית."
-                ),
+                "message": _MEAL_BUDGET_EXCEEDED_MESSAGE,
                 "detected_items": [],
                 "calorie_range": [None, None],
                 "macro_ranges": {},
@@ -69,7 +97,7 @@ class MealService:
             return analysis
 
         provider = build_ai_provider(settings.anthropic_api_key, settings.anthropic_model)
-        result = provider.analyze_image(Path(meal.image_path), note=meal.note)
+        result = provider.analyze_image(image_path, note=meal.note)
         usage_service.record(
             user_id=meal.user_id,
             task="image_analysis",
@@ -81,7 +109,7 @@ class MealService:
 
         if result.provider_status == "not_configured":
             payload = {
-                "message": "ניתוח תמונת ארוחה לא זמין עד שמוגדר ספק בינה מלאכותית.",
+                "message": _MEAL_NOT_CONFIGURED_MESSAGE,
                 "detected_items": [],
                 "calorie_range": [None, None],
                 "macro_ranges": {},
@@ -148,10 +176,33 @@ class MealService:
         self.db.refresh(meal)
         return meal
 
+    def recent_meals(self, user_id: int, limit: int = 10) -> list[Meal]:
+        bounded_limit = max(1, min(limit, 30))
+        return list(
+            self.db.scalars(
+                select(Meal)
+                .where(Meal.user_id == user_id)
+                .order_by(desc(Meal.eaten_on), desc(Meal.id))
+                .limit(bounded_limit)
+            ).all()
+        )
+
+    def serialize_meal_with_items(self, meal: Meal) -> dict:
+        payload = self.serialize_meal(meal)
+        payload["items"] = [
+            self.serialize_item(item)
+            for item in self.db.scalars(
+                select(MealItem).where(MealItem.meal_id == meal.id).order_by(MealItem.id)
+            ).all()
+        ]
+        return payload
+
     @staticmethod
     def serialize_meal(meal: Meal) -> dict:
-        return {
+        payload = {
             "id": meal.id,
+            "eaten_on": meal.eaten_on.isoformat(),
+            "meal_type": meal.meal_type,
             "note": meal.note,
             "image_path": meal.image_path,
             "calories_min": meal.calories_min,
@@ -163,6 +214,27 @@ class MealService:
             "fat_min": meal.fat_min,
             "fat_max": meal.fat_max,
             "confidence": meal.confidence,
+        }
+        return payload
+
+    @staticmethod
+    def _resolve_meal_image_path(image_path: str, upload_root: Path) -> Path:
+        path = Path(image_path)
+        if path.is_absolute():
+            return path
+        return upload_root.resolve() / path
+
+    @staticmethod
+    def serialize_item(item: MealItem) -> dict:
+        return {
+            "id": item.id,
+            "name": item.name,
+            "quantity": item.quantity,
+            "calories_min": item.calories_min,
+            "calories_max": item.calories_max,
+            "protein_min": item.protein_min,
+            "protein_max": item.protein_max,
+            "confidence": item.confidence,
         }
 
     @staticmethod
@@ -181,17 +253,17 @@ class MealService:
     @staticmethod
     def _parse_analysis_json(text: str) -> dict:
         try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return MealService._ensure_hebrew_analysis_payload(parsed)
+            loaded = json.loads(text)
         except json.JSONDecodeError:
-            pass
+            loaded = None
+        if isinstance(loaded, dict):
+            return MealService._ensure_hebrew_analysis_payload(loaded)
         return MealService._ensure_hebrew_analysis_payload(
             {
-            "message": text,
-            "detected_items": [],
-            "follow_up_questions": ["כתוב לי כמויות משוערות כדי לשפר את הדיוק."],
-            "confidence": "low",
+                "message": text,
+                "detected_items": [],
+                "follow_up_questions": [_ANALYSIS_FALLBACK_QUESTION],
+                "confidence": "low",
             }
         )
 
@@ -202,7 +274,7 @@ class MealService:
         if isinstance(message, str) and message.strip() and (
             not contains_hebrew(message) or has_disallowed_latin_text(message)
         ):
-            normalized["message"] = "ניתוח התמונה חזר עם טקסט שרובו לא בעברית, ולכן מוצגת הערכה שמרנית בלבד."
+            normalized["message"] = _ANALYSIS_REPLACEMENT_MESSAGE
 
         normalized["detected_items"] = [
             MealService._ensure_hebrew_detected_item(item)
@@ -216,7 +288,7 @@ class MealService:
             if isinstance(question, str) and contains_hebrew(question) and not has_disallowed_latin_text(question)
         ]
         if normalized.get("follow_up_questions") and not questions:
-            questions = ["מה הכמות המשוערת ומה שיטת ההכנה?"]
+            questions = [_ANALYSIS_FALLBACK_QUESTION]
         normalized["follow_up_questions"] = questions
         return normalized
 
@@ -226,9 +298,9 @@ class MealService:
         name = str(normalized.get("name") or "").strip()
         quantity = str(normalized.get("quantity") or "").strip()
         if name and (not contains_hebrew(name) or has_disallowed_latin_text(name)):
-            normalized["name"] = "פריט מזון שזוהה"
+            normalized["name"] = _DETECTED_ITEM_FALLBACK_NAME
         if quantity and (not contains_hebrew(quantity) or has_disallowed_latin_text(quantity)):
-            normalized["quantity"] = "כמות לא ודאית"
+            normalized["quantity"] = _DETECTED_ITEM_UNKNOWN_QUANTITY
         return normalized
 
     def _apply_image_estimate(self, meal: Meal, payload: dict) -> None:
@@ -313,11 +385,11 @@ class MealService:
     def _estimate_manual_meal(text: str) -> dict:
         normalized = text.lower()
         items = []
-        if "protein shake" in normalized or "שייק חלבון" in normalized or "אבקת חלבון" in normalized:
+        if "protein shake" in normalized or _MANUAL_PROTEIN_SHAKE_NAME in normalized:
             items.append(
                 {
-                    "name": "שייק חלבון",
-                    "quantity": "מנה משוערת",
+                    "name": _MANUAL_PROTEIN_SHAKE_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
                     "calories_min": 120,
                     "calories_max": 220,
                     "protein_min": 25,
@@ -328,11 +400,11 @@ class MealService:
                     "fat_max": 8,
                 }
             )
-        if "greek yogurt" in normalized or "yogurt" in normalized or "יוגורט" in normalized:
+        if "greek yogurt" in normalized or "yogurt" in normalized or _MANUAL_GREEK_YOGURT_NAME in normalized:
             items.append(
                 {
-                    "name": "יוגורט יווני",
-                    "quantity": "מנה משוערת",
+                    "name": _MANUAL_GREEK_YOGURT_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
                     "calories_min": 90,
                     "calories_max": 160,
                     "protein_min": 10,
@@ -343,11 +415,11 @@ class MealService:
                     "fat_max": 8,
                 }
             )
-        if "banana" in normalized or "בננה" in normalized:
+        if "banana" in normalized or _MANUAL_BANANA_NAME in normalized:
             items.append(
                 {
-                    "name": "בננה",
-                    "quantity": "יחידה משוערת",
+                    "name": _MANUAL_BANANA_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
                     "calories_min": 80,
                     "calories_max": 130,
                     "protein_min": 1,
@@ -371,29 +443,7 @@ class MealService:
                 "confidence": "medium",
                 "items": items,
             }
-        if "protein shake" in normalized or "שייק חלבון" in normalized or "אבקת חלבון" in normalized:
-            return {
-                "calories_min": 120,
-                "calories_max": 220,
-                "protein_min": 25,
-                "protein_max": 35,
-                "carbs_min": 2,
-                "carbs_max": 15,
-                "fat_min": 1,
-                "fat_max": 8,
-                "confidence": "medium",
-                "items": [
-                    {
-                        "name": "שייק חלבון",
-                        "quantity": "מנה משוערת",
-                        "calories_min": 120,
-                        "calories_max": 220,
-                        "protein_min": 25,
-                        "protein_max": 35,
-                    }
-                ],
-            }
-        if "egg" in normalized or "ביצה" in normalized or "ביצים" in normalized:
+        if "egg" in normalized or _MANUAL_EGG_NAME in normalized:
             return {
                 "calories_min": 140,
                 "calories_max": 260,
@@ -404,9 +454,9 @@ class MealService:
                 "fat_min": 8,
                 "fat_max": 18,
                 "confidence": "medium",
-                "items": [{"name": "ביצים", "quantity": "מנה משוערת"}],
+                "items": [{"name": _MANUAL_EGG_NAME, "quantity": _MEAL_PARTIAL_QUANTITY}],
             }
-        if "pizza" in normalized or "פיצה" in normalized:
+        if "pizza" in normalized or _MANUAL_PIZZA_NAME in normalized:
             return {
                 "calories_min": 500,
                 "calories_max": 1000,
@@ -417,7 +467,7 @@ class MealService:
                 "fat_min": 18,
                 "fat_max": 55,
                 "confidence": "low",
-                "items": [{"name": "פיצה", "quantity": "כמות לא ידועה"}],
+                "items": [{"name": _MANUAL_PIZZA_NAME, "quantity": _MEAL_PARTIAL_QUANTITY}],
             }
         return {
             "calories_min": 300,
@@ -429,5 +479,5 @@ class MealService:
             "fat_min": 8,
             "fat_max": 35,
             "confidence": "low",
-            "items": [{"name": "ארוחה ידנית", "quantity": "כמות לא ידועה"}],
+            "items": [{"name": _MANUAL_UNKNOWN_MEAL_NAME, "quantity": _MEAL_PARTIAL_QUANTITY}],
         }

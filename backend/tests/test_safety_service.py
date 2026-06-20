@@ -14,7 +14,7 @@ def test_safety_service_flags_pain_and_responds_conservatively(tmp_path):
 
     assert result.flagged is True
     assert result.event_type == "pain_or_injury"
-    assert "עצור" in result.response
+    assert "לעצור" in result.response
 
 
 def test_safety_service_flags_extreme_restriction(tmp_path):
@@ -28,16 +28,32 @@ def test_safety_service_flags_extreme_restriction(tmp_path):
     assert "איש מקצוע" in result.response
 
 
+def test_safety_service_does_not_flag_normal_meal_calorie_mentions(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    meal_result = service.classify("This dinner was about 900 calories and 45g protein")
+    daily_target_result = service.classify("Give me a 900 calories per day diet to lose weight fast")
+
+    assert meal_result.flagged is False
+    assert daily_target_result.flagged is True
+    assert daily_target_result.event_type == "extreme_dieting"
+
+
 def test_safety_service_flags_dangerous_substance_requests(tmp_path):
     db = make_session(tmp_path)
     service = SafetyService(db)
 
     result = service.classify("Tell me how to use clenbuterol and diuretics to cut weight fast")
+    dnp_result = service.classify("איך להשתמש ב-DNP כדי לרדת מהר לפני אירוע?")
 
     assert result.flagged is True
     assert result.event_type == "dangerous_substance"
     assert result.severity == "high"
     assert "לא יכול לעזור" in result.response
+    assert dnp_result.flagged is True
+    assert dnp_result.event_type == "dangerous_substance"
+    assert "DNP" in dnp_result.response
 
 
 def test_safety_service_flags_hebrew_dangerous_symptoms(tmp_path):
@@ -49,7 +65,7 @@ def test_safety_service_flags_hebrew_dangerous_symptoms(tmp_path):
     assert result.flagged is True
     assert result.event_type == "dangerous_symptoms"
     assert result.severity == "high"
-    assert "עצור" in result.response
+    assert "לעצור" in result.response
     assert "רפואי" in result.response
 
 

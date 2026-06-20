@@ -29,7 +29,7 @@ Preparticipation screening rules are included in provider context: red flags sto
 
 ## Upload Safety
 
-Meal uploads are local-only in v1. The backend accepts JPEG, PNG, and WEBP, checks file signatures against the declared content type, stores randomized filenames, and rejects files over 5 MB.
+Meal uploads are local-only in v1. The backend accepts JPEG, PNG, and WEBP, checks file signatures against the declared content type, stores randomized filenames, rejects files over 5 MB, and returns upload-root-relative image references instead of absolute local filesystem paths.
 
 Remaining production gaps:
 
@@ -37,7 +37,6 @@ Remaining production gaps:
 - Strip EXIF and metadata
 - Add malware scanning if uploads become public
 - Add retention and cleanup policies
-- Avoid returning absolute local paths in public APIs
 
 Safety gaps before public release:
 

@@ -12,20 +12,36 @@ class CoachIntentService:
         normalized = text.lower().strip()
         payload_text = self._strip_command_prefix(text)
 
+        # Logging actions outrank guidance/summary: a message that records something
+        # the user did should always be treated as a log, not as a question about it.
+        if self._is_workout_log(normalized):
+            return CoachIntent(name="workout_log", payload_text=payload_text)
+        if self._is_meal_log(normalized):
+            return CoachIntent(name="meal_log", payload_text=payload_text)
+        if self._is_missed_workout_guidance(normalized):
+            return CoachIntent(name="missed_workout_guidance", payload_text=payload_text)
         if self._is_weekly_summary(normalized):
             return CoachIntent(name="weekly_summary", payload_text=payload_text)
         if self._is_daily_summary(normalized):
             return CoachIntent(name="daily_summary", payload_text=payload_text)
-        if self._is_meal_log(normalized):
-            return CoachIntent(name="meal_log", payload_text=payload_text)
+        if self._is_supplement_safety_guidance(normalized):
+            return CoachIntent(name="supplement_safety_guidance", payload_text=payload_text)
+        if self._is_weekly_action_plan_guidance(normalized):
+            return CoachIntent(name="weekly_action_plan_guidance", payload_text=payload_text)
+        if self._is_low_energy_action_guidance(normalized):
+            return CoachIntent(name="low_energy_action_guidance", payload_text=payload_text)
+        if self._is_nutrition_guidance(normalized):
+            return CoachIntent(name="nutrition_guidance", payload_text=payload_text)
         if self._is_workout_plan(normalized):
             return CoachIntent(name="workout_plan", payload_text=payload_text)
-        if self._is_workout_log(normalized):
-            return CoachIntent(name="workout_log", payload_text=payload_text)
         if self._is_knee_squat_substitution(normalized):
             return CoachIntent(name="knee_squat_substitution", payload_text=payload_text)
         if self._is_creatine_guidance(normalized):
             return CoachIntent(name="creatine_guidance", payload_text=payload_text)
+        if self._is_equipment_substitution_guidance(normalized):
+            return CoachIntent(name="equipment_substitution_guidance", payload_text=payload_text)
+        if self._is_fitness_term_guidance(normalized):
+            return CoachIntent(name="fitness_term_guidance", payload_text=payload_text)
         return CoachIntent(name="general_chat", payload_text=text)
 
     @staticmethod
@@ -112,23 +128,179 @@ class CoachIntentService:
         return any(phrase in text for phrase in ["daily summary", "today's summary", "סיכום יומי", "סיכום היום"])
 
     @staticmethod
-    def _is_workout_log(text: str) -> bool:
-        return (
-            "log workout" in text
-            or "skipped workout" in text
-            or text.startswith("i did ")
-            or ("sets of" in text and any(token.isdigit() for token in text.split()))
-            or "תיעדתי אימון" in text
-            or "תעד אימון" in text
-            or "לוג אימון" in text
-            or "עשיתי אימון" in text
-            or "פספסתי אימון" in text
-            or ("סטים" in text and "של" in text)
+    def _is_nutrition_guidance(text: str) -> bool:
+        asks_food_choice = any(phrase in text for phrase in ["מה לאכול", "מה כדאי לאכול", "סביב אימון", "לפני אימון", "אחרי אימון"])
+        has_nutrition_goal = any(
+            phrase in text
+            for phrase in ["קלוריות", "אחוזי שומן", "ירידה בשומן", "חלבון", "תזונה", "אימון ערב", "לספור קלוריות"]
         )
+        asks_image_accuracy = "תמונה" in text and any(phrase in text for phrase in ["מדויק", "להעריך", "קלוריות"])
+        return (asks_food_choice and has_nutrition_goal) or asks_image_accuracy
+
+    @staticmethod
+    def _is_workout_log(text: str) -> bool:
+        # Unambiguous logging statements: past tense or explicit command prefixes.
+        explicit_phrases = (
+            "log workout",
+            "skipped workout",
+            "תיעדתי אימון",
+            "תעד אימון",
+            "לוג אימון",
+            "עשיתי אימון",
+            "סיימתי אימון",
+        )
+        if any(phrase in text for phrase in explicit_phrases):
+            return True
+        if text.startswith("i did "):
+            return True
+        # Question framing pushes "סטים של" mentions to general chat / guidance routes:
+        # "תסביר לי על סטים של 5 חזרות" must NOT be persisted as a workout log.
+        has_question_framing = "?" in text or any(
+            marker in text
+            for marker in [
+                "תסביר",
+                "הסבר",
+                "מה זה",
+                "מה ה",
+                "מה ההבדל",
+                "כמה",
+                "what is",
+                "how do",
+                "explain",
+            ]
+        )
+        has_digit = any(token.isdigit() for token in text.split())
+        if has_digit and not has_question_framing and ("sets of" in text or "סטים של" in text):
+            return True
+        # "פספסתי אימון" alone is ambiguous. Treat it as a log only when the user
+        # explicitly asks to record it (e.g. "פספסתי אימון אתמול, איך לתעד?").
+        # Otherwise it falls through to missed_workout_guidance.
+        if "פספסתי אימון" in text and any(
+            verb in text for verb in ["לתעד", "תעד אותו", "תעד את", "לוג", "log it"]
+        ):
+            return True
+        return False
 
     @staticmethod
     def _is_creatine_guidance(text: str) -> bool:
-        return "creatine" in text or "קריאטין" in text or "קראטין" in text
+        if not ("creatine" in text or "קריאטין" in text or "קראטין" in text):
+            return False
+        # Bare mentions ("אני שונא קריאטין") fall through to general chat.
+        # The intent fires only when the user asks a question about creatine.
+        return any(
+            marker in text
+            for marker in [
+                "?",
+                "בטוח",
+                "מסוכן",
+                "כמה",
+                "מינון",
+                "לוותר",
+                "כדאי",
+                "מתי",
+                "איך",
+                "מה זה",
+                "צריך",
+                "תסביר",
+                "safe",
+                "dangerous",
+                "should",
+                "dose",
+                "dosage",
+                "when",
+                "how much",
+                "necessary",
+            ]
+        )
+
+    @staticmethod
+    def _is_supplement_safety_guidance(text: str) -> bool:
+        has_stimulant_or_supplement = any(
+            term in text
+            for term in [
+                "pre-workout",
+                "pre workout",
+                "פרה-וורקאאוט",
+                "פרי וורקאאוט",
+                "קפאין",
+                "caffeine",
+                "yohimbine",
+                "יוהימבין",
+                "fat burner",
+                "fat burners",
+                "שורף שומן",
+                "שורפי שומן",
+                "ממריץ",
+                "ממריצים",
+                "תוסף",
+                "תוספים",
+            ]
+        )
+        asks_safety_or_timing = any(
+            phrase in text
+            for phrase in [
+                "בטוח",
+                "מסוכן",
+                "לוותר",
+                "כדאי",
+                "רעיון טוב",
+                "לפני אימון",
+                "אימון ערב",
+                "safe",
+                "dangerous",
+                "skip",
+                "should",
+            ]
+        )
+        return has_stimulant_or_supplement and asks_safety_or_timing
+
+    @staticmethod
+    def _is_weekly_action_plan_guidance(text: str) -> bool:
+        asks_action_plan = any(
+            phrase in text
+            for phrase in [
+                "action plan",
+                "תוכנית שבוע",
+                "תכנית שבוע",
+                "תוכנית קצרה לשבוע",
+                "תכנית קצרה לשבוע",
+            ]
+        )
+        has_strength_and_walking = any(phrase in text for phrase in ["אימוני כוח", "אימון כוח"]) and any(
+            phrase in text for phrase in ["הליכה", "הליכות", "צעדים"]
+        )
+        return asks_action_plan and has_strength_and_walking
+
+    @staticmethod
+    def _is_low_energy_action_guidance(text: str) -> bool:
+        has_low_energy = any(
+            phrase in text
+            for phrase in [
+                "אין לי כוח",
+                "אין אנרגיה",
+                "עייף",
+                "עייפה",
+                "יום עמוס",
+                "low energy",
+                "tired",
+                "exhausted",
+            ]
+        )
+        asks_small_action = any(
+            phrase in text
+            for phrase in [
+                "פעולה אחת",
+                "משהו קטן",
+                "מינימום",
+                "מה לעשות",
+                "תן לי",
+                "תני לי",
+                "one action",
+                "minimum action",
+                "small action",
+            ]
+        )
+        return has_low_energy and asks_small_action
 
     @staticmethod
     def _is_knee_squat_substitution(text: str) -> bool:
@@ -139,6 +311,84 @@ class CoachIntentService:
             for phrase in ["replace", "alternative", "substitute", "להחליף", "תחליף", "חלופה", "במקום"]
         )
         return has_squat and has_knee and asks_for_substitution
+
+    @staticmethod
+    def _is_equipment_substitution_guidance(text: str) -> bool:
+        has_substitution = any(
+            phrase in text
+            for phrase in ["replace", "alternative", "substitute", "instead of", "במקום", "להחליף", "תחליף", "חלופה", "אין לי"]
+        )
+        has_equipment_or_exercise = any(
+            term in text
+            for term in [
+                "גומייה",
+                "גומיות",
+                "משקולת",
+                "משקולות",
+                "מכונה",
+                "ספסל",
+                "חתירה",
+                "לחיצה",
+                "תרגיל גב",
+                "band",
+                "dumbbell",
+                "machine",
+                "bench",
+                "row",
+            ]
+        )
+        return has_substitution and has_equipment_or_exercise
+
+    @staticmethod
+    def _is_missed_workout_guidance(text: str) -> bool:
+        has_missed = any(phrase in text for phrase in ["פספסתי", "החמצתי", "missed workout", "skipped workout"])
+        # Explicit guidance verbs only. A bare "?" used to qualify here, which let
+        # logging questions like "פספסתי אימון אתמול, איך לתעד?" leak into guidance.
+        asks_for_guidance = any(
+            phrase in text
+            for phrase in ["לחזור", "מה לעשות", "איך", "דרך", "תן לי", "תני לי", "להמשיך", "בלי להרגיש"]
+        )
+        return has_missed and asks_for_guidance
+
+    @staticmethod
+    def _is_fitness_term_guidance(text: str) -> bool:
+        term_markers = [
+            "rpe",
+            "rir",
+            "doms",
+            "zone 2",
+            "זון 2",
+            "deload",
+            "progression",
+            "progressive overload",
+            "full-body",
+            "full body",
+            "push/pull/legs",
+            "ppl",
+            "warmup",
+            "warm-up",
+            "cooldown",
+            "cool-down",
+            "mobility",
+            "חימום",
+            "קירור",
+            "מתיחות",
+            "מוביליטי",
+            "היפרטרופיה",
+            "חזרות ברזרבה",
+            "סטים קשים",
+            "דילואד",
+            "פרוגרסיה",
+            "התקדמות",
+            "להתקדם",
+            "שרירים תפוסים",
+            "כאבי שרירים",
+        ]
+        if not any(marker in text for marker in term_markers):
+            return False
+
+        guidance_markers = ["מה", "איך", "תסביר", "הסבר", "עדיף", "צריך", "?", "what", "how", "explain", "should"]
+        return any(marker in text for marker in guidance_markers)
 
     @staticmethod
     def _strip_command_prefix(text: str) -> str:
