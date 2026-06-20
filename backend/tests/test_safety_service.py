@@ -6,15 +6,31 @@ from backend.app.models import SafetyEvent
 from backend.app.services.safety_service import SafetyService
 
 
-def test_safety_service_flags_pain_and_responds_conservatively(tmp_path):
+def test_safety_service_emits_pain_signal_without_blocking(tmp_path):
     db = make_session(tmp_path)
     service = SafetyService(db)
 
     result = service.classify("My knee hurts when I squat")
 
-    assert result.flagged is True
-    assert result.event_type == "pain_or_injury"
-    assert "לעצור" in result.response
+    # Soft pain mentions are an advisory signal, not a hard block. The engine
+    # still records the event for audit; downstream code adapts the plan.
+    assert result.flagged is False
+    assert result.event_type == "pain_signal"
+    assert result.severity == "advisory"
+    assert result.response == ""
+
+
+def test_safety_service_records_pain_signal_event(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+    result = service.classify("My knee hurts when I squat")
+
+    event = service.record_event(user_id=None, source_text="My knee hurts when I squat", result=result)
+
+    saved = db.scalar(select(SafetyEvent).where(SafetyEvent.id == event.id))
+    assert saved is not None
+    assert saved.event_type == "pain_signal"
+    assert saved.severity == "advisory"
 
 
 def test_safety_service_flags_extreme_restriction(tmp_path):
@@ -69,17 +85,40 @@ def test_safety_service_flags_hebrew_dangerous_symptoms(tmp_path):
     assert "רפואי" in result.response
 
 
-def test_safety_service_flags_hebrew_pain_and_disordered_eating(tmp_path):
+def test_safety_service_distinguishes_hebrew_soft_pain_from_disordered_eating(tmp_path):
     db = make_session(tmp_path)
     service = SafetyService(db)
 
     pain_result = service.classify("יש לי כאב חד בברך כשאני עושה סקוואט")
     eating_result = service.classify("אני רוצה לדלג על כל הארוחות כדי לרדת מהר")
 
-    assert pain_result.flagged is True
-    assert pain_result.event_type == "pain_or_injury"
+    assert pain_result.flagged is False
+    assert pain_result.event_type == "pain_signal"
     assert eating_result.flagged is True
     assert eating_result.event_type == "eating_disorder_risk"
+
+
+def test_safety_service_keeps_red_flag_symptoms_hard_blocked(tmp_path):
+    """Chest pain, fainting, dizziness, shortness of breath, palpitations stay hard-blocked
+    even after the pain-aware-planning change. Pain in a limb is not a red flag; these are."""
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    for message in [
+        "I get chest pain when running",
+        "I feel dizzy during workouts",
+        "I passed out at the gym",
+        "shortness of breath while lifting",
+        "יש לי כאב בחזה בזמן אימון",
+        "יש לי סחרחורת אחרי סקוואט",
+        "התעלפתי באימון",
+        "קוצר נשימה כשאני מרים",
+        "דפיקות לב לא רגילות",
+    ]:
+        result = service.classify(message)
+        assert result.flagged is True, message
+        assert result.event_type == "dangerous_symptoms", message
+        assert result.severity == "high", message
 
 
 def test_safety_service_allows_negated_pain_in_workout_log(tmp_path):

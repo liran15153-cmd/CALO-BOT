@@ -25,20 +25,84 @@ def test_chat_endpoint_persists_user_and_no_key_coach_messages(tmp_path):
     assert [message.role for message in messages] == ["user", "coach"]
 
 
-def test_chat_endpoint_uses_safety_response_for_pain(tmp_path):
+def test_chat_endpoint_does_not_block_soft_pain_messages(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
     response = client.post("/api/chat", json={"message": "My knee hurts when I squat"})
 
     assert response.status_code == 200
     body = response.json()
+    # Soft pain is no longer a hard block: the engine acknowledges/adapts instead.
+    assert body["safety_flagged"] is False
+    assert body["provider_status"] != "safety_override"
+    # The audit event is still recorded.
+    event = db.scalar(select(SafetyEvent))
+    assert event is not None
+    assert event.event_type == "pain_signal"
+    assert event.severity == "advisory"
+    # No safety_override usage event for soft pain.
+    assert db.scalar(select(UsageEvent).where(UsageEvent.provider == "safety_override")) is None
+
+
+def test_chat_endpoint_still_blocks_red_flag_symptoms(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "יש לי כאב בחזה וסחרחורת בזמן אימון"})
+
+    assert response.status_code == 200
+    body = response.json()
     assert body["safety_flagged"] is True
+    assert body["provider_status"] == "safety_override"
     assert "לעצור" in body["response"]
     event = db.scalar(select(SafetyEvent))
     assert event is not None
-    assert event.event_type == "pain_or_injury"
-    usage = db.scalar(select(UsageEvent).where(UsageEvent.provider == "safety_override"))
-    assert usage is not None
+    assert event.event_type == "dangerous_symptoms"
+    # No workout plan saved when red-flag safety fires.
+    assert db.scalar(select(WorkoutPlan)) is None
+
+
+def test_chat_endpoint_pain_plus_plan_request_builds_modified_plan(tmp_path):
+    """Knee pain + plan request → plan is saved with knee limitations, response
+    acknowledges pain and stops the user from pushing through it."""
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "יש לי כאב ברך שמאל, תבנה לי תוכנית כוח של 2 ימים בלי ציוד"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["safety_flagged"] is False
+    assert body["provider_status"] == "local_tool"
+    # Pain acknowledged.
+    assert "כאב" in body["response"]
+    assert "ברך" in body["response"]
+    assert "לעצור" in body["response"] or "לא לדחוף" in body["response"]
+    # Plan was actually saved.
+    saved = db.scalar(select(WorkoutPlan))
+    assert saved is not None
+    # Plan's safety notes and limitations carry the knee context forward.
+    safety_notes = saved.plan_json.get("safety_notes") or []
+    decision_inputs = saved.plan_json.get("decision_inputs") or {}
+    assert "ברך" in (decision_inputs.get("limitations") or "") or any(
+        "ברך" in note for note in safety_notes
+    )
+
+
+def test_chat_endpoint_red_flag_blocks_plan_even_with_plan_request(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "יש לי כאב בחזה, תבנה לי תוכנית כוח של 3 ימים"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["safety_flagged"] is True
+    assert "לעצור" in body["response"]
+    assert db.scalar(select(WorkoutPlan)) is None
 
 
 def test_chat_endpoint_uses_safety_response_for_extreme_diet_request(tmp_path):

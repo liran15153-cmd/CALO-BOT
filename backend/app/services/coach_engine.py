@@ -18,6 +18,7 @@ from backend.app.services.language_guard import (
 )
 from backend.app.services.meal_service import MealService
 from backend.app.services.memory_service import MemoryService
+from backend.app.services.pain_text import extract_pain_area
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.safety_service import SafetyService
 from backend.app.services.summary_service import SummaryService
@@ -72,8 +73,21 @@ class CoachEngine:
                 provider_status="safety_override",
             )
 
+        # Soft pain ("יש לי כאב ברך") is NOT a block. Record the audit event and
+        # carry the pain area forward so downstream paths (plan generation, response
+        # wrappers) can acknowledge it and adapt rather than refusing.
+        pain_area: str | None = None
+        if safety_result.event_type == "pain_signal":
+            safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
+            pain_area = extract_pain_area(payload.message)
+
         intent = CoachIntentService().classify(payload.message)
-        tool_response = self._handle_tool_intent(user_id=user.id, intent_name=intent.name, payload_text=intent.payload_text)
+        tool_response = self._handle_tool_intent(
+            user_id=user.id,
+            intent_name=intent.name,
+            payload_text=intent.payload_text,
+            pain_area=pain_area,
+        )
         if tool_response is not None:
             UsageService(self.db).record(
                 user_id=user.id,
@@ -258,14 +272,21 @@ class CoachEngine:
             provider_status="local_tool",
         )
 
-    def _handle_tool_intent(self, user_id: int, intent_name: str, payload_text: str) -> str | None:
+    def _handle_tool_intent(
+        self,
+        user_id: int,
+        intent_name: str,
+        payload_text: str,
+        pain_area: str | None = None,
+    ) -> str | None:
         if intent_name == "workout_plan":
+            limitations = f"רגישות ב{pain_area}" if pain_area else None
             plan = WorkoutService(self.db).generate_plan(
                 user_id=user_id,
-                request=WorkoutPlanRequest(prompt=payload_text),
+                request=WorkoutPlanRequest(prompt=payload_text, limitations=limitations),
             )
             serialized = WorkoutService.serialize_plan(plan)
-            return _workout_plan_saved_response(serialized)
+            return _workout_plan_saved_response(serialized, pain_area=pain_area)
 
         if intent_name == "workout_log":
             log = WorkoutService(self.db).parse_log(user_id=user_id, request=WorkoutLogRequest(text=payload_text))
@@ -295,14 +316,26 @@ def _hebrew_confidence(value: str | None) -> str:
     return {"low": "נמוכה", "medium": "בינונית", "high": "גבוהה"}.get(value or "", value or "לא ידועה")
 
 
-def _workout_plan_saved_response(serialized: dict) -> str:
+def _workout_plan_saved_response(serialized: dict, pain_area: str | None = None) -> str:
     name = _natural_plan_name(str(serialized.get("name") or "תוכנית אימון"))
     if serialized.get("plan_type") == "single_session":
-        return f"שמרתי אימון יחיד: {name}. זה אימון חד-פעמי שנשמר ולא מחליף את התוכנית הפעילה."
+        body = f"שמרתי אימון יחיד: {name}. זה אימון חד-פעמי שנשמר ולא מחליף את התוכנית הפעילה."
+    else:
+        days_per_week = serialized.get("days_per_week")
+        days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
+        body = (
+            f"שמרתי תוכנית אימון: {name} עם {days_text}. "
+            "אפשר לפתוח את מסך האימונים כדי לעבור על המבנה המלא."
+        )
 
-    days_per_week = serialized.get("days_per_week")
-    days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
-    return f"שמרתי תוכנית אימון: {name} עם {days_text}. אפשר לפתוח את מסך האימונים כדי לעבור על המבנה המלא."
+    if pain_area:
+        ack = (
+            f"שמתי לב שציינת כאב ב{pain_area}. בניתי את התוכנית סביב זה, עם תרגילים שמכבדים את הטווח. "
+            "אם הכאב חוזר, מחמיר או חד — לעצור, ולא לדחוף דרך כאב. אם יש סימן רציני, לפנות לאיש מקצוע מוסמך."
+        )
+        return f"{ack} {body}"
+
+    return body
 
 
 def _natural_plan_name(name: str) -> str:

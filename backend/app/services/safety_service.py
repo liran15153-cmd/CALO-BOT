@@ -52,14 +52,15 @@ class SafetyService:
             )
 
         if has_pain_or_injury_signal(normalized):
+            # Soft pain mentions (knee, shoulder, low back, generic "כאב") are NOT a hard block.
+            # The engine records the event for audit, acknowledges the pain in the response,
+            # and continues to build a modified plan. Red-flag symptoms (chest pain, dizziness,
+            # fainting, shortness of breath, heart palpitations) are handled above and still block.
             return SafetyResult(
-                flagged=True,
-                event_type="pain_or_injury",
-                severity="medium",
-                response=(
-                    "לעצור כל תנועה שגורמת לכאב. אני לא יכול לאבחן פציעה, אבל אפשר לעבור לתנועה קלה ללא כאב "
-                    "ולהתייעץ עם איש מקצוע מוסמך אם הכאב חד או נמשך."
-                ),
+                flagged=False,
+                event_type="pain_signal",
+                severity="advisory",
+                response="",
             )
 
         if any(
