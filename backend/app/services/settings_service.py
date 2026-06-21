@@ -9,9 +9,12 @@ from backend.app.config import Settings
 from backend.app.models import (
     ChatMessage,
     ChatSession,
+    BodyMetric,
     Meal,
     MealImageAnalysis,
     MealItem,
+    MemorySummary,
+    PendingAction,
     SafetyEvent,
     UsageEvent,
     User,
@@ -43,21 +46,29 @@ class SettingsService:
         return {
             "ai_provider": settings.ai_provider_status,
             "model": settings.anthropic_model,
+            "chat_model": settings.chat_model,
             "database": "configured" if settings.database_url else "not_configured",
             "api_key_present": bool(settings.anthropic_api_key),
+            "supabase": settings.supabase_auth_status,
+            "supabase_storage": settings.supabase_storage_status,
             "disclaimer": DISCLAIMER,
         }
 
-    def export_local_data(self) -> dict[str, Any]:
-        user = ProfileService(self.db).get_default_user()
-        profile = ProfileService(self.db).get_profile()
+    def export_local_data(self, user_id: int | None = None) -> dict[str, Any]:
+        user = ProfileService(self.db).get_default_user() if user_id is None else self.db.get(User, user_id)
+        if user is None:
+            raise ValueError("User not found")
+        profile = ProfileService(self.db).get_profile_for_user(user.id)
         plans = self.db.scalars(select(WorkoutPlan).where(WorkoutPlan.user_id == user.id)).all()
         workouts = self.db.scalars(select(Workout).where(Workout.user_id == user.id)).all()
         logs = self.db.scalars(select(WorkoutLog).where(WorkoutLog.user_id == user.id)).all()
         meals = self.db.scalars(select(Meal).where(Meal.user_id == user.id)).all()
         memories = self.db.scalars(select(UserMemory).where(UserMemory.user_id == user.id)).all()
+        memory_summaries = self.db.scalars(select(MemorySummary).where(MemorySummary.user_id == user.id)).all()
+        body_metrics = self.db.scalars(select(BodyMetric).where(BodyMetric.user_id == user.id)).all()
         summaries = self.db.scalars(select(WeeklySummary).where(WeeklySummary.user_id == user.id)).all()
         safety_events = self.db.scalars(select(SafetyEvent).where(SafetyEvent.user_id == user.id)).all()
+        pending_actions = self.db.scalars(select(PendingAction).where(PendingAction.user_id == user.id)).all()
 
         return {
             "exported_at": datetime.now(UTC).isoformat(),
@@ -99,6 +110,28 @@ class SettingsService:
                 }
                 for memory in memories
             ],
+            "memory_summaries": [
+                {
+                    "id": summary.id,
+                    "summary_type": summary.summary_type,
+                    "content": summary.content,
+                    "source_range": summary.source_range_json or {},
+                }
+                for summary in memory_summaries
+            ],
+            "body_metrics": [
+                {
+                    "id": metric.id,
+                    "measured_on": metric.measured_on.isoformat(),
+                    "weight_kg": metric.weight_kg,
+                    "body_fat_percent": metric.body_fat_percent,
+                    "waist_cm": metric.waist_cm,
+                    "measurements": metric.measurements_json or {},
+                    "source": metric.source,
+                    "note": metric.note,
+                }
+                for metric in body_metrics
+            ],
             "weekly_summaries": [
                 {
                     "id": summary.id,
@@ -120,34 +153,59 @@ class SettingsService:
                 }
                 for event in safety_events
             ],
+            "pending_actions": [
+                {
+                    "id": action.id,
+                    "action_type": action.action_type,
+                    "status": action.status,
+                    "subject_type": action.subject_type,
+                    "subject_id": action.subject_id,
+                    "payload": action.payload_json or {},
+                    "resolution": action.resolution,
+                }
+                for action in pending_actions
+            ],
         }
 
-    def reset_local_data(self, upload_root: Path | None = None) -> int:
+    def reset_local_data(self, upload_root: Path | None = None, user_id: int | None = None) -> int:
+        user = ProfileService(self.db).get_default_user() if user_id is None else self.db.get(User, user_id)
+        if user is None:
+            return 0
         image_paths = [
             meal.image_path
-            for meal in self.db.scalars(select(Meal).where(Meal.image_path.is_not(None))).all()
+            for meal in self.db.scalars(select(Meal).where(Meal.user_id == user.id, Meal.image_path.is_not(None))).all()
             if meal.image_path
         ]
         deleted = 0
+        meal_ids = [meal.id for meal in self.db.scalars(select(Meal).where(Meal.user_id == user.id)).all()]
+        workout_ids = [workout.id for workout in self.db.scalars(select(Workout).where(Workout.user_id == user.id)).all()]
+        if meal_ids:
+            for model in (MealImageAnalysis, MealItem):
+                result = self.db.execute(delete(model).where(getattr(model, "meal_id").in_(meal_ids)))
+                deleted += result.rowcount or 0
+        if workout_ids:
+            result = self.db.execute(delete(WorkoutExercise).where(WorkoutExercise.workout_id.in_(workout_ids)))
+            deleted += result.rowcount or 0
         for model in (
             UsageEvent,
             SafetyEvent,
             WeeklySummary,
+            MemorySummary,
             UserMemory,
-            MealImageAnalysis,
-            MealItem,
+            BodyMetric,
             Meal,
             WorkoutLog,
-            WorkoutExercise,
+            PendingAction,
             Workout,
             WorkoutPlan,
             ChatMessage,
             ChatSession,
             UserProfile,
-            User,
         ):
-            result = self.db.execute(delete(model))
+            result = self.db.execute(delete(model).where(model.user_id == user.id))
             deleted += result.rowcount or 0
+        self.db.delete(user)
+        deleted += 1
         self.db.commit()
         self._delete_meal_image_files(image_paths=image_paths, upload_root=upload_root or Path("data/uploads"))
         return deleted

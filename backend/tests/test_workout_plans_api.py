@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import Workout, WorkoutExercise, WorkoutLog, WorkoutPlan
+from backend.app.models import PendingAction, Workout, WorkoutExercise, WorkoutLog, WorkoutPlan
 
 
 def test_workout_plan_api_generates_and_saves_structured_plan(tmp_path):
@@ -46,6 +46,155 @@ def test_workout_plan_api_returns_current_plan(tmp_path):
     assert body["is_current"] is True
     assert body["days"][0]["workout_id"] is not None
     assert body["days"][0]["exercises"][0]["exercise_id"] is not None
+
+
+def test_workout_plan_api_creates_candidate_when_current_plan_exists(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    current_response = client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    current_id = current_response.json()["id"]
+
+    response = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_current"] is False
+    current = db.get(WorkoutPlan, current_id)
+    assert current is not None
+    assert current.is_current is True
+    pending = db.scalar(select(PendingAction).where(PendingAction.status == "pending"))
+    assert pending is not None
+    assert body["pending_action"]["id"] == pending.id
+    assert pending.action_type == "activate_workout_plan"
+    assert pending.subject_type == "workout_plan"
+    assert pending.subject_id == body["id"]
+    assert pending.payload_json["current_plan_id"] == current_id
+
+
+def test_pending_action_api_returns_and_resolves_current_plan_candidate(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    current_response = client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    current_id = current_response.json()["id"]
+    candidate_response = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    candidate_id = candidate_response.json()["id"]
+
+    current_pending = client.get("/api/pending-actions/current", params={"action_type": "activate_workout_plan"})
+
+    assert current_pending.status_code == 200
+    pending_body = current_pending.json()
+    assert pending_body["status"] == "pending"
+    assert pending_body["subject_id"] == candidate_id
+    assert pending_body["candidate_plan"]["id"] == candidate_id
+    assert pending_body["candidate_plan"]["is_current"] is False
+
+    resolve = client.post(f"/api/pending-actions/{pending_body['id']}/resolve", json={"decision": "confirm"})
+
+    assert resolve.status_code == 200
+    body = resolve.json()
+    assert body["pending_action"]["status"] == "resolved"
+    assert body["pending_action"]["resolution"] == "confirmed"
+    assert body["workout_plan"]["id"] == candidate_id
+    assert body["workout_plan"]["is_current"] is True
+    assert db.get(WorkoutPlan, current_id) is None
+    assert db.get(PendingAction, pending_body["id"]).status == "resolved"
+
+
+def test_pending_action_api_declines_candidate_and_keeps_current_plan(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    current_response = client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    current_id = current_response.json()["id"]
+    candidate_response = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    candidate_id = candidate_response.json()["id"]
+    pending_id = candidate_response.json()["pending_action"]["id"]
+
+    resolve = client.post(f"/api/pending-actions/{pending_id}/resolve", json={"decision": "decline"})
+
+    assert resolve.status_code == 200
+    body = resolve.json()
+    assert body["pending_action"]["status"] == "resolved"
+    assert body["pending_action"]["resolution"] == "declined"
+    assert body["workout_plan"]["id"] == current_id
+    assert db.get(WorkoutPlan, current_id).is_current is True
+    assert db.get(WorkoutPlan, candidate_id) is None
+
+
+def test_new_candidate_replaces_existing_pending_action_and_removes_old_candidate(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    first_candidate = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    first_candidate_id = first_candidate.json()["id"]
+    first_pending_id = first_candidate.json()["pending_action"]["id"]
+
+    second_candidate = client.post("/api/workout-plans", json={"prompt": "Create a new 5-day strength plan", "days_per_week": 5})
+
+    second_body = second_candidate.json()
+    assert db.get(WorkoutPlan, first_candidate_id) is None
+    replaced = db.get(PendingAction, first_pending_id)
+    assert replaced.status == "cancelled"
+    assert replaced.resolution == "replaced"
+    current_pending = db.scalar(select(PendingAction).where(PendingAction.status == "pending"))
+    assert current_pending is not None
+    assert current_pending.id == second_body["pending_action"]["id"]
+    assert current_pending.subject_id == second_body["id"]
+
+
+def test_pending_action_api_returns_404_when_no_pending_action(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.get("/api/pending-actions/current", params={"action_type": "activate_workout_plan"})
+
+    assert response.status_code == 404
+
+
+def test_pending_action_api_rejects_resolving_non_pending_action(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+    client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    candidate = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    pending_id = candidate.json()["pending_action"]["id"]
+    assert client.post(f"/api/pending-actions/{pending_id}/resolve", json={"decision": "decline"}).status_code == 200
+
+    response = client.post(f"/api/pending-actions/{pending_id}/resolve", json={"decision": "confirm"})
+
+    assert response.status_code == 400
+
+
+def test_activate_workout_plan_deletes_previous_plan_and_preserves_log_history(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    current_response = client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    current_body = current_response.json()
+    current_id = current_body["id"]
+    workout_id = current_body["days"][0]["workout_id"]
+    log_response = client.post("/api/workout-logs", json={"workout_id": workout_id, "status": "completed"})
+    log_id = log_response.json()["id"]
+    candidate_response = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    candidate_id = candidate_response.json()["id"]
+
+    response = client.post(f"/api/workout-plans/{candidate_id}/activate", json={"delete_previous": True})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == candidate_id
+    assert body["is_current"] is True
+    assert db.get(WorkoutPlan, current_id) is None
+    assert db.get(Workout, workout_id) is None
+    saved_log = db.get(WorkoutLog, log_id)
+    assert saved_log is not None
+    assert saved_log.workout_id is None
+
+
+def test_delete_workout_plan_removes_inactive_candidate_only(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    current_response = client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2})
+    current_id = current_response.json()["id"]
+    candidate_response = client.post("/api/workout-plans", json={"prompt": "Create a new 4-day muscle plan", "days_per_week": 4})
+    candidate_id = candidate_response.json()["id"]
+
+    response = client.delete(f"/api/workout-plans/{candidate_id}")
+
+    assert response.status_code == 204
+    assert db.get(WorkoutPlan, candidate_id) is None
+    current = db.get(WorkoutPlan, current_id)
+    assert current is not None
+    assert current.is_current is True
 
 
 def test_workout_plan_uses_saved_profile_when_request_is_open_ended(tmp_path):

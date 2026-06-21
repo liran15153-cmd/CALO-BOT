@@ -40,6 +40,9 @@ describe('Workout plan UI', () => {
             }
           ]);
         }
+        if (url.includes('/api/pending-actions/current')) {
+          return jsonResponse({}, 404);
+        }
         if (url.endsWith('/api/workout-plans') && init?.method === 'POST') {
           return jsonResponse({
             id: 1,
@@ -87,6 +90,148 @@ describe('Workout plan UI', () => {
     expect(await screen.findByText(/תוכנית 3 ימים לבניית שריר/i)).toBeInTheDocument();
     expect(screen.getByText(/סקוואט גביע/i)).toBeInTheDocument();
     expect(screen.getByText(/ימים בשבוע/i)).toBeInTheDocument();
+  });
+
+  it('keeps the current next workout until an inactive generated plan is activated', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse(currentPlanFixture());
+        }
+        if (url.endsWith('/api/workouts/next')) {
+          return jsonResponse(nextWorkoutFixture());
+        }
+        if (url.endsWith('/api/workout-logs/recent')) {
+          return jsonResponse([]);
+        }
+        if (url.includes('/api/pending-actions/current')) {
+          return jsonResponse({}, 404);
+        }
+        if (url.endsWith('/api/workout-plans') && init?.method === 'POST') {
+          return jsonResponse(candidatePlanFixture());
+        }
+        if (url.endsWith('/api/pending-actions/77/resolve') && init?.method === 'POST') {
+          return jsonResponse({
+            pending_action: { ...pendingActionFixture(), status: 'resolved', resolution: 'confirmed' },
+            workout_plan: { ...candidatePlanFixture(), is_current: true, name: 'Candidate active plan', pending_action: undefined },
+            message: 'activated'
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+    expect(await screen.findAllByText(/Next workout A/i)).not.toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText(/בקשת תוכנית/i), { target: { value: 'Build a new 4-day plan' } });
+    fireEvent.click(screen.getByRole('button', { name: /יצירת תוכנית/i }));
+
+    expect(await screen.findByText(/Candidate muscle plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/זו תוכנית חדשה שלא פעילה עדיין/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Next workout A/i)).not.toHaveLength(0);
+    expect(calls.filter((call) => call.endsWith('/api/workouts/next'))).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /החלף לתוכנית החדשה/i }));
+
+    await waitFor(() => expect(calls.some((call) => call.endsWith('/api/pending-actions/77/resolve'))).toBe(true));
+    expect(calls.some((call) => call.endsWith('/api/workout-plans/2/activate'))).toBe(false);
+    expect(await screen.findByText(/Candidate active plan/i)).toBeInTheDocument();
+    expect(calls.filter((call) => call.endsWith('/api/workouts/next'))).toHaveLength(2);
+  });
+
+  it('restores a pending generated plan after refresh', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse(currentPlanFixture());
+        }
+        if (url.endsWith('/api/workouts/next')) {
+          return jsonResponse(nextWorkoutFixture());
+        }
+        if (url.endsWith('/api/workout-logs/recent')) {
+          return jsonResponse([]);
+        }
+        if (url.includes('/api/pending-actions/current')) {
+          return jsonResponse({ ...pendingActionFixture(), candidate_plan: candidatePlanFixture() });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+
+    expect(await screen.findByText(/Candidate muscle plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/זו תוכנית חדשה שלא פעילה עדיין/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Next workout A/i)).not.toHaveLength(0);
+  });
+
+  it('discards an inactive generated plan when the user keeps the current plan', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse(currentPlanFixture());
+        }
+        if (url.endsWith('/api/workouts/next')) {
+          return jsonResponse(nextWorkoutFixture());
+        }
+        if (url.endsWith('/api/workout-logs/recent')) {
+          return jsonResponse([]);
+        }
+        if (url.includes('/api/pending-actions/current')) {
+          return jsonResponse({}, 404);
+        }
+        if (url.endsWith('/api/workout-plans') && init?.method === 'POST') {
+          return jsonResponse(candidatePlanFixture());
+        }
+        if (url.endsWith('/api/pending-actions/77/resolve') && init?.method === 'POST') {
+          return jsonResponse({
+            pending_action: { ...pendingActionFixture(), status: 'resolved', resolution: 'declined' },
+            workout_plan: currentPlanFixture(),
+            message: 'declined'
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+    expect(await screen.findByText(/Current strength plan/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/בקשת תוכנית/i), { target: { value: 'Build a new 4-day plan' } });
+    fireEvent.click(screen.getByRole('button', { name: /יצירת תוכנית/i }));
+
+    expect(await screen.findByText(/Candidate muscle plan/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /השאר את הקיימת/i }));
+
+    await waitFor(() => expect(calls.some((call) => call.endsWith('/api/pending-actions/77/resolve'))).toBe(true));
+    expect(calls.some((call) => call.endsWith('/api/workout-plans/2') && call.startsWith('DELETE'))).toBe(false);
+    expect(await screen.findByText(/Current strength plan/i)).toBeInTheDocument();
+    expect(screen.queryByText(/זו תוכנית חדשה שלא פעילה עדיין/i)).not.toBeInTheDocument();
   });
 
   it('loads and displays the current persisted workout plan', async () => {
@@ -356,6 +501,10 @@ describe('Workout plan UI', () => {
     expect(await screen.findByText(/גרסת ביצוע להיום/i)).toBeInTheDocument();
     expect(screen.getByText(/2 סטים/i)).toBeInTheDocument();
     expect(screen.getByText(/לבצע גרסת מינימום נקייה/i)).toBeInTheDocument();
+    // Per-exercise causality: the natural Hebrew explanation tied to the reason code
+    // shows up next to the adjusted exercise, and the raw code never leaks to the DOM.
+    expect(screen.getByText(/Goblet squat: גרסת מינימום כי האימון הקודם לא הושלם/i)).toBeInTheDocument();
+    expect(screen.queryByText(/missed_or_partial/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/adherence_risk/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/חזרות לפי סט.*Goblet squat/i), { target: { value: '10,8' } });
@@ -407,6 +556,49 @@ describe('Workout plan UI', () => {
 
     expect(await screen.findByText(/RPE כללי חייב להיות בין 1 ל-10/i)).toBeInTheDocument();
     expect(logPayloads).toHaveLength(0);
+  });
+
+  it('renders per-exercise Hebrew adjustment explanations and never leaks raw reason codes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse(currentPlanFixture());
+        }
+        if (url.endsWith('/api/workouts/next')) {
+          return jsonResponse(highRpeNextWorkoutFixture());
+        }
+        if (url.endsWith('/api/workout-logs/recent')) {
+          return jsonResponse([]);
+        }
+        if (url.endsWith('/api/workout-logs') && init?.method === 'POST') {
+          return jsonResponse({});
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+
+    expect(
+      await screen.findByText(/Goblet squat: הורדנו סט אחד כי האימון הקודם נסגר ב-RPE גבוה/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Dumbbell row: שומרים על אותו עומס כי סימנת כאב באימון האחרון/i)
+    ).toBeInTheDocument();
+
+    // Raw reason codes must never reach the DOM, even in attributes or tooltips.
+    expect(screen.queryByText(/high_rpe/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pain_reported/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/missed_or_partial/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/insufficient_pattern/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/base_plan/i)).not.toBeInTheDocument();
   });
 
   it('does not leak unknown internal workout status identifiers', async () => {
@@ -481,6 +673,51 @@ function currentPlanFixture() {
   };
 }
 
+function candidatePlanFixture() {
+  return {
+    id: 2,
+    is_current: false,
+    pending_action: pendingActionFixture(),
+    name: 'Candidate muscle plan',
+    goal: 'build_muscle',
+    plan_type: 'multi_week',
+    duration_weeks: 4,
+    days_per_week: 4,
+    equipment_needed: ['dumbbells'],
+    days: [
+      {
+        workout_id: 202,
+        name: 'Candidate day',
+        warmup: ['5 minutes easy cardio'],
+        difficulty: 'moderate',
+        exercises: [
+          {
+            exercise_id: 301,
+            name: 'Dumbbell bench press',
+            sets: '3',
+            reps_or_duration: '8-12 reps',
+            rest: '90 sec'
+          }
+        ]
+      }
+    ],
+    progression_rule: 'Add one rep before adding load.',
+    recovery_note: 'Keep one easy day between sessions.'
+  };
+}
+
+function pendingActionFixture() {
+  return {
+    id: 77,
+    action_type: 'activate_workout_plan',
+    status: 'pending',
+    subject_type: 'workout_plan',
+    subject_id: 2,
+    payload: { current_plan_id: 1, delete_previous: true },
+    resolution: null
+  };
+}
+
 function nextWorkoutFixture() {
   return {
     id: 101,
@@ -511,6 +748,52 @@ function nextWorkoutFixture() {
       load_signal: 'maintain',
       next_adjustment: 'לשמור על התוכנית הנוכחית.',
       exercise_adjustments: []
+    }
+  };
+}
+
+function highRpeNextWorkoutFixture() {
+  return {
+    ...nextWorkoutFixture(),
+    adaptation: {
+      load_signal: 'recovery_needed',
+      next_adjustment: 'לבצע אימון התאוששות יחסי.',
+      exercise_adjustments: []
+    },
+    execution_plan: {
+      source: 'derived_from_base_workout',
+      base_workout_id: 101,
+      workout_name: 'Next workout A',
+      load_signal: 'recovery_needed',
+      summary: 'לבצע אימון התאוששות יחסי.',
+      adjusted_exercises: [
+        {
+          exercise_id: 201,
+          source_exercise_id: 201,
+          name: 'Goblet squat',
+          sets: '2',
+          reps_or_duration: '8-12 reps',
+          rest: '90 sec',
+          notes: 'Controlled tempo',
+          alternatives: ['Box squat'],
+          adjustment: 'reduce_or_hold',
+          reason: 'high_rpe',
+          execution_note: 'להוריד מעט נפח או עומס.'
+        },
+        {
+          exercise_id: 202,
+          source_exercise_id: 202,
+          name: 'Dumbbell row',
+          sets: '3',
+          reps_or_duration: '10-12 reps',
+          rest: '75 sec',
+          notes: 'Pause at the top',
+          alternatives: [],
+          adjustment: 'maintain',
+          reason: 'pain_reported',
+          execution_note: 'לעבוד בטווח ללא כאב.'
+        }
+      ]
     }
   };
 }

@@ -2,7 +2,7 @@ import { Download, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { exportSettingsData, fetchSettings, fetchUsage, resetLocalData, type SettingsState, type UsageState } from './api';
-import { formatDatabaseStatus, formatProviderStatus } from './formatters';
+import { formatDatabaseStatus, formatProviderStatus, formatSupabaseStatus } from './formatters';
 
 export function SettingsPanel() {
   const [settings, setSettings] = useState<SettingsState | null>(null);
@@ -120,13 +120,29 @@ export function SettingsPanel() {
           <strong>{formatProviderStatus(settings.ai_provider)}</strong>
         </div>
         <div className="settings-row">
-          <span>מודל</span>
+          <span>מודל כללי</span>
           <strong>{settings.model}</strong>
+        </div>
+        <div className="settings-row">
+          <span>מודל צ'אט</span>
+          <strong>{settings.chat_model}</strong>
         </div>
         <div className="settings-row">
           <span>מסד נתונים</span>
           <strong>{formatDatabaseStatus(settings.database)}</strong>
         </div>
+        {settings.supabase ? (
+          <div className="settings-row">
+            <span>Supabase auth</span>
+            <strong>{formatSupabaseStatus(settings.supabase)}</strong>
+          </div>
+        ) : null}
+        {settings.supabase_storage ? (
+          <div className="settings-row">
+            <span>Supabase storage</span>
+            <strong>{formatSupabaseStatus(settings.supabase_storage)}</strong>
+          </div>
+        ) : null}
         <div className="settings-row">
           <span>מפתח API</span>
           <strong>{settings.api_key_present ? 'מוגדר מחוץ לדפדפן' : 'לא קיים'}</strong>

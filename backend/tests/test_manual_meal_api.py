@@ -40,6 +40,24 @@ def test_manual_meal_logging_sums_multiple_recognized_items(tmp_path):
     assert len(items) == 3
 
 
+def test_manual_meal_logging_estimates_shakshuka_bread_and_salad_as_itemized_ranges(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/meals/manual",
+        json={"text": "אכלתי שקשוקה עם לחם וסלט"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["confidence"] == "medium"
+    assert body["calories_min"] >= 370
+    assert body["calories_max"] <= 920
+    assert body["protein_min"] >= 16
+    items = db.scalars(select(MealItem).order_by(MealItem.id)).all()
+    assert [item.name for item in items] == ["שקשוקה", "לחם", "סלט ירקות"]
+
+
 def test_manual_meal_logging_estimates_pizza_as_low_confidence(tmp_path):
     client, _db = make_client_and_db(tmp_path)
 

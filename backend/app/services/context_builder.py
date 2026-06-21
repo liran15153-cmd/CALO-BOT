@@ -1,7 +1,7 @@
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import ChatMessage, Meal, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
+from backend.app.models import BodyMetric, ChatMessage, Meal, MemorySummary, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
 from backend.app.services.coaching_knowledge import CoachingKnowledgeService
 from backend.app.services.training_adaptation_service import TrainingAdaptationService
 
@@ -40,6 +40,18 @@ class ContextBuilder:
             .order_by(desc(UserMemory.created_at))
             .limit(4)
         ).all()
+        memory_summaries = self.db.scalars(
+            select(MemorySummary)
+            .where(MemorySummary.user_id == user_id)
+            .order_by(desc(MemorySummary.updated_at), desc(MemorySummary.id))
+            .limit(2)
+        ).all()
+        body_metrics = self.db.scalars(
+            select(BodyMetric)
+            .where(BodyMetric.user_id == user_id)
+            .order_by(desc(BodyMetric.measured_on), desc(BodyMetric.id))
+            .limit(5)
+        ).all()
 
         recent_chat = []
         if session_id is not None:
@@ -74,7 +86,9 @@ class ContextBuilder:
                 for meal in meals
             ],
             "memories": [memory.content for memory in memories],
+            "memory_summaries": [summary.content for summary in memory_summaries],
             "caution_notes": [memory.content for memory in caution_notes],
+            "body_metrics": [self._body_metric(metric) for metric in body_metrics],
             "recent_chat": recent_chat,
             "coaching_knowledge": CoachingKnowledgeService().for_provider_context(intent, query=user_message),
         }
@@ -122,4 +136,18 @@ class ContextBuilder:
             "recovery_note": plan.recovery_note,
             "source_refs": plan_json.get("source_refs", []),
             "decision_inputs": plan_json.get("decision_inputs", {}),
+        }
+
+    @staticmethod
+    def _body_metric(metric: BodyMetric) -> dict:
+        measurements = dict(metric.measurements_json or {})
+        if metric.waist_cm is not None and "waist_cm" not in measurements:
+            measurements["waist_cm"] = metric.waist_cm
+        return {
+            "measured_on": metric.measured_on.isoformat(),
+            "weight_kg": metric.weight_kg,
+            "body_fat_percent": metric.body_fat_percent,
+            "measurements": measurements,
+            "source": metric.source,
+            "note": metric.note,
         }

@@ -9,6 +9,7 @@ from backend.app.config import get_settings
 from backend.app.models import Meal, MealImageAnalysis, MealItem
 from backend.app.schemas import MealTextRequest
 from backend.app.services.ai_provider import build_ai_provider
+from backend.app.services.file_storage_service import FileStorageService
 from backend.app.services.language_guard import contains_hebrew, has_disallowed_latin_text
 from backend.app.services.usage_service import UsageService, rough_token_count
 
@@ -33,6 +34,11 @@ _DETECTED_ITEM_UNKNOWN_QUANTITY = "לא ידוע"
 _MANUAL_PROTEIN_SHAKE_NAME = "שייק חלבון"
 _MANUAL_GREEK_YOGURT_NAME = "יווגורט יווני"
 _MANUAL_BANANA_NAME = "בננה"
+_MANUAL_SHAKSHUKA_NAME = "שקשוקה"
+_MANUAL_BREAD_NAME = "לחם"
+_MANUAL_SALAD_NAME = "סלט ירקות"
+_MANUAL_CHICKEN_NAME = "עוף"
+_MANUAL_RICE_NAME = "אורז"
 _MANUAL_EGG_NAME = "ביצה"
 _MANUAL_PIZZA_NAME = "פיצה"
 _MANUAL_UNKNOWN_MEAL_NAME = "ארוחה לא ברורה"
@@ -58,17 +64,24 @@ class MealService:
         self.db.refresh(meal)
         return meal
 
-    def analyze_image(self, meal_id: int, upload_root: Path | None = None) -> MealImageAnalysis:
+    def analyze_image(
+        self,
+        meal_id: int,
+        upload_root: Path | None = None,
+        *,
+        user_id: int | None = None,
+        access_token: str | None = None,
+    ) -> MealImageAnalysis:
         meal = self.db.get(Meal, meal_id)
-        if meal is None or meal.image_path is None:
+        if meal is None or meal.image_path is None or (user_id is not None and meal.user_id != user_id):
             raise ValueError(_MEAL_NOT_FOUND_MESSAGE)
-        image_path = self._resolve_meal_image_path(meal.image_path, upload_root or Path("data/uploads"))
+        image_path = FileStorageService(upload_root or Path("data/uploads"), access_token=access_token).download_meal_image(meal.image_path)
         if not image_path.is_file():
             raise ValueError(_MEAL_NOT_FOUND_MESSAGE)
 
         settings = get_settings()
         usage_service = UsageService(self.db)
-        if settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded():
+        if settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded(user_id=meal.user_id):
             usage_service.record(
                 user_id=meal.user_id,
                 task="image_analysis",
@@ -105,6 +118,7 @@ class MealService:
             model=result.used_model,
             estimated_tokens_in=result.estimated_tokens_in or rough_token_count(meal.note or ""),
             estimated_tokens_out=result.estimated_tokens_out,
+            token_breakdown=result.token_breakdown,
         )
 
         if result.provider_status == "not_configured":
@@ -428,6 +442,81 @@ class MealService:
                     "carbs_max": 32,
                     "fat_min": 0,
                     "fat_max": 1,
+                }
+            )
+        if "shakshuka" in normalized or _MANUAL_SHAKSHUKA_NAME in normalized:
+            items.append(
+                {
+                    "name": _MANUAL_SHAKSHUKA_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": 250,
+                    "calories_max": 480,
+                    "protein_min": 12,
+                    "protein_max": 28,
+                    "carbs_min": 10,
+                    "carbs_max": 35,
+                    "fat_min": 12,
+                    "fat_max": 32,
+                }
+            )
+        if any(term in normalized for term in ["bread", "pita", "toast", _MANUAL_BREAD_NAME, "פיתה"]):
+            items.append(
+                {
+                    "name": _MANUAL_BREAD_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": 80,
+                    "calories_max": 260,
+                    "protein_min": 3,
+                    "protein_max": 10,
+                    "carbs_min": 15,
+                    "carbs_max": 55,
+                    "fat_min": 0,
+                    "fat_max": 6,
+                }
+            )
+        if "salad" in normalized or "סלט" in normalized:
+            items.append(
+                {
+                    "name": _MANUAL_SALAD_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": 40,
+                    "calories_max": 180,
+                    "protein_min": 1,
+                    "protein_max": 5,
+                    "carbs_min": 5,
+                    "carbs_max": 25,
+                    "fat_min": 0,
+                    "fat_max": 14,
+                }
+            )
+        if "chicken" in normalized or _MANUAL_CHICKEN_NAME in normalized:
+            items.append(
+                {
+                    "name": _MANUAL_CHICKEN_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": 180,
+                    "calories_max": 380,
+                    "protein_min": 25,
+                    "protein_max": 55,
+                    "carbs_min": 0,
+                    "carbs_max": 10,
+                    "fat_min": 4,
+                    "fat_max": 22,
+                }
+            )
+        if "rice" in normalized or _MANUAL_RICE_NAME in normalized:
+            items.append(
+                {
+                    "name": _MANUAL_RICE_NAME,
+                    "quantity": _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": 150,
+                    "calories_max": 380,
+                    "protein_min": 3,
+                    "protein_max": 8,
+                    "carbs_min": 30,
+                    "carbs_max": 85,
+                    "fat_min": 0,
+                    "fat_max": 5,
                 }
             )
         if items:

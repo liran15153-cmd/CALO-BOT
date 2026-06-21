@@ -28,7 +28,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -121,7 +121,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -214,7 +214,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -307,7 +307,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -400,7 +400,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -493,7 +493,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -586,7 +586,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -679,7 +679,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -772,7 +772,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -865,7 +865,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -958,7 +958,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 
@@ -1051,7 +1051,7 @@ Copy `.env.example` to `.env.local` or set environment variables directly.
 - `DATABASE_URL`: defaults to `sqlite:///./data/app.db`
 - `BACKEND_CORS_ORIGINS`: defaults to local Vite ports `5173` and `5174`
 - `ANTHROPIC_API_KEY`: optional. If missing, the app runs with honest provider-not-configured states.
-- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5`
+- `ANTHROPIC_MODEL`: defaults to `claude-haiku-4-5` for non-chat AI tasks; `ANTHROPIC_CHAT_MODEL` defaults to `claude-sonnet-4-6` for Hebrew chat quality
 - `DAILY_AI_TOKEN_LIMIT`: defaults to `50000`; configured AI chat and image analysis are blocked after this daily token budget is spent.
 - `VITE_API_BASE_URL`: optional frontend setting for a non-default backend URL.
 

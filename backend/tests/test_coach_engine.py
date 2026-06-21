@@ -9,20 +9,24 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import ChatMessage, Meal, SafetyEvent, UsageEvent, WeeklySummary, WorkoutLog, WorkoutPlan
+from backend.app.models import ChatMessage, Meal, PendingAction, SafetyEvent, UsageEvent, WeeklySummary, Workout, WorkoutLog, WorkoutPlan
+from backend.app.services.workout_service import WorkoutService
 
 
-def test_chat_endpoint_persists_user_and_no_key_coach_messages(tmp_path):
+def test_chat_endpoint_generates_beginner_workout_without_provider_key(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
     response = client.post("/api/chat", json={"message": "Build me a beginner workout"})
 
     assert response.status_code == 200
     body = response.json()
-    assert body["provider_status"] == "not_configured"
-    assert "ספק הבינה המלאכותית לא מוגדר" in body["response"]
+    assert body["provider_status"] == "local_tool"
+    assert "תוכנית" in body["response"] or "אימון" in body["response"]
     messages = db.scalars(select(ChatMessage).order_by(ChatMessage.id)).all()
     assert [message.role for message in messages] == ["user", "coach"]
+    saved_plan = db.scalar(select(WorkoutPlan))
+    assert saved_plan is not None
+    assert saved_plan.is_current is True
 
 
 def test_chat_endpoint_does_not_block_soft_pain_messages(tmp_path):
@@ -141,6 +145,175 @@ def test_chat_endpoint_dispatches_workout_plan_intent_to_module(tmp_path):
     assert saved.days_per_week == 2
     usage = db.scalar(select(UsageEvent).where(UsageEvent.provider == "local_tool"))
     assert usage is not None
+    assert_no_storage_confirmation(body["response"])
+
+
+def test_chat_new_multi_week_plan_with_current_creates_candidate_and_asks_for_replacement(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    current_response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a 3-day workout plan", "days_per_week": 3, "duration_weeks": 4},
+    )
+    current_id = current_response.json()["id"]
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "Create a new 4-day workout plan for muscle with dumbbells"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "רוצה למחוק את הישנה" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    current = db.get(WorkoutPlan, current_id)
+    assert current is not None
+    assert current.is_current is True
+    candidate = db.scalar(select(WorkoutPlan).where(WorkoutPlan.id != current_id))
+    assert candidate is not None
+    assert candidate.is_current is False
+    coach_message = db.get(ChatMessage, body["coach_message_id"])
+    assert coach_message is not None
+    pending = db.scalar(select(PendingAction).where(PendingAction.status == "pending"))
+    assert pending is not None
+    assert pending.action_type == "activate_workout_plan"
+    assert pending.subject_id == candidate.id
+    assert pending.payload_json["current_plan_id"] == current_id
+    assert coach_message.metadata_json["pending_action_id"] == pending.id
+    assert "candidate_plan_id" not in coach_message.metadata_json
+    assert "current_plan_id" not in coach_message.metadata_json
+
+
+def test_chat_confirms_plan_replacement_deletes_old_plan_and_keeps_log_history(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    current_response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a 3-day workout plan", "days_per_week": 3, "duration_weeks": 4},
+    )
+    current_body = current_response.json()
+    current_id = current_body["id"]
+    workout_id = current_body["days"][0]["workout_id"]
+    log_response = client.post("/api/workout-logs", json={"workout_id": workout_id, "status": "completed"})
+    log_id = log_response.json()["id"]
+    candidate_response = client.post(
+        "/api/chat",
+        json={"message": "Create a new 4-day workout plan for muscle with dumbbells"},
+    )
+    candidate_body = candidate_response.json()
+    session_id = candidate_body["session_id"]
+    candidate = db.scalar(select(WorkoutPlan).where(WorkoutPlan.id != current_id))
+    assert candidate is not None
+
+    response = client.post("/api/chat", json={"session_id": session_id, "message": "כן, תחליף ותמחק את הישנה"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "התוכנית החדשה פעילה" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    assert db.get(WorkoutPlan, current_id) is None
+    activated = db.get(WorkoutPlan, candidate.id)
+    assert activated is not None
+    assert activated.is_current is True
+    old_workout = db.get(Workout, workout_id)
+    assert old_workout is None
+    preserved_log = db.get(WorkoutLog, log_id)
+    assert preserved_log is not None
+    assert preserved_log.workout_id is None
+    resolved = db.scalar(select(PendingAction).where(PendingAction.subject_id == candidate.id))
+    assert resolved is not None
+    assert resolved.status == "resolved"
+    assert resolved.resolution == "confirmed"
+
+
+def test_chat_declines_plan_replacement_keeps_current_and_removes_candidate(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    current_response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a 3-day workout plan", "days_per_week": 3, "duration_weeks": 4},
+    )
+    current_id = current_response.json()["id"]
+    candidate_response = client.post(
+        "/api/chat",
+        json={"message": "Create a new 4-day workout plan for muscle with dumbbells"},
+    )
+    session_id = candidate_response.json()["session_id"]
+    candidate = db.scalar(select(WorkoutPlan).where(WorkoutPlan.id != current_id))
+    assert candidate is not None
+
+    response = client.post("/api/chat", json={"session_id": session_id, "message": "לא, תשאיר את הקיימת"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "התוכנית הפעילה נשארת" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    current = db.get(WorkoutPlan, current_id)
+    assert current is not None
+    assert current.is_current is True
+    assert db.get(WorkoutPlan, candidate.id) is None
+    resolved = db.scalar(select(PendingAction).where(PendingAction.subject_id == candidate.id))
+    assert resolved is not None
+    assert resolved.status == "resolved"
+    assert resolved.resolution == "declined"
+
+
+def test_chat_unrelated_message_does_not_resolve_pending_plan_replacement(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    current_response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a 3-day workout plan", "days_per_week": 3, "duration_weeks": 4},
+    )
+    current_id = current_response.json()["id"]
+    candidate_response = client.post(
+        "/api/chat",
+        json={"message": "Create a new 4-day workout plan for muscle with dumbbells"},
+    )
+    session_id = candidate_response.json()["session_id"]
+    pending = db.scalar(select(PendingAction).where(PendingAction.status == "pending"))
+    assert pending is not None
+
+    response = client.post("/api/chat", json={"session_id": session_id, "message": "What is RPE?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "RPE" in body["response"]
+    db.refresh(pending)
+    assert pending.status == "pending"
+    current = db.get(WorkoutPlan, current_id)
+    assert current is not None
+    assert current.is_current is True
+
+
+def test_chat_pending_plan_resolution_handles_missing_candidate(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+    client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a 3-day workout plan", "days_per_week": 3, "duration_weeks": 4},
+    )
+    candidate_response = client.post(
+        "/api/chat",
+        json={"message": "Create a new 4-day workout plan for muscle with dumbbells"},
+    )
+    session_id = candidate_response.json()["session_id"]
+    pending = db.scalar(select(PendingAction).where(PendingAction.status == "pending"))
+    assert pending is not None
+    WorkoutService(db).delete_plan(user_id=pending.user_id, plan_id=pending.subject_id)
+
+    response = client.post("/api/chat", json={"session_id": session_id, "message": "yes replace"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "כבר לא זמינה" in body["response"]
+    db.refresh(pending)
+    assert pending.status == "cancelled"
+    assert pending.resolution == "candidate_missing"
 
 
 def test_chat_endpoint_dispatches_single_session_workout_plan_without_replacing_current(tmp_path):
@@ -216,6 +389,57 @@ def test_chat_endpoint_dispatches_manual_meal_log_intent_to_module(tmp_path):
     saved = db.scalar(select(Meal))
     assert saved is not None
     assert saved.calories_min is not None
+    assert_no_storage_confirmation(body["response"])
+
+
+def test_chat_endpoint_logs_workout_with_coaching_response_not_save_confirmation(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "Log workout: I did 3 sets of 10 goblet squats, RPE 7, no pain."},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "RPE 7" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    saved_log = db.scalar(select(WorkoutLog))
+    assert saved_log is not None
+    assert saved_log.status == "completed"
+
+
+def test_chat_endpoint_logs_meal_with_coaching_response_not_save_confirmation(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "I ate rice, chicken breast, salad and tahini for lunch."})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "קלוריות" in body["response"]
+    assert "חלבון" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    saved_meal = db.scalar(select(Meal))
+    assert saved_meal is not None
+
+
+def test_chat_endpoint_acknowledges_memory_update_locally(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    get_settings.cache_clear()
+    client, _db = make_client_and_db(tmp_path)
+    provider = CapturingProvider()
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post("/api/chat", json={"message": "זכור שאני שונא ריצה ומעדיף אופניים או הליכה."})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "אתחשב" in body["response"]
+    assert_no_storage_confirmation(body["response"])
+    assert provider.last_request is None
 
 
 def test_chat_endpoint_logs_workout_with_negated_pain_without_safety_override(tmp_path):
@@ -248,6 +472,7 @@ def test_chat_endpoint_answers_weekly_summary_with_local_summary_service(tmp_pat
     body = response.json()
     assert body["provider_status"] == "local_tool"
     assert "סיכום שבועי" in body["response"]
+    assert "לפי הנתונים השמורים" in body["response"]
     assert "אימון אחד" in body["response"]
     assert "1 אימונים" not in body["response"]
     saved_summary = db.scalar(select(WeeklySummary))
@@ -286,6 +511,7 @@ def test_chat_endpoint_blocks_provider_when_daily_token_budget_is_spent(tmp_path
 
 def test_chat_endpoint_replaces_non_hebrew_provider_response(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: EnglishOnlyProvider())
@@ -304,6 +530,7 @@ def test_chat_endpoint_replaces_non_hebrew_provider_response(tmp_path, monkeypat
 
 def test_chat_endpoint_replaces_mixed_english_provider_response(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: MixedEnglishProvider())
@@ -343,6 +570,7 @@ def test_chat_endpoint_keeps_hebrew_provider_response_with_short_english_terms(t
 
 def test_chat_endpoint_replaces_provider_response_with_generic_echoed_english_phrase(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr(
@@ -363,6 +591,7 @@ def test_chat_endpoint_replaces_provider_response_with_generic_echoed_english_ph
 
 def test_chat_endpoint_strips_markdown_markers_from_provider_response(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: MarkdownProvider())
@@ -381,6 +610,26 @@ def test_chat_endpoint_strips_markdown_markers_from_provider_response(tmp_path, 
     saved = db.scalars(select(ChatMessage).order_by(ChatMessage.id)).all()
     assert "**" not in saved[-1].content
     assert "שליחות מלאות" not in saved[-1].content
+
+
+def test_chat_endpoint_repairs_provider_quality_artifacts_before_saving(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: BrowserArtifactProvider())
+
+    response = client.post("/api/chat", json={"message": "שלום, תן לי פעולה אחת קטנה להיום"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "configured"
+    assert "서" not in body["response"]
+    assert "reserve in reserve" not in body["response"]
+    assert "even" not in body["response"]
+    assert "חזרות ברזרבה" in body["response"]
+    saved = db.scalars(select(ChatMessage).order_by(ChatMessage.id)).all()
+    assert saved[-1].metadata_json["quality_repair_applied"] is True
+    assert saved[-1].metadata_json["quality_issues"] == []
 
 
 def test_chat_endpoint_answers_creatine_question_locally(tmp_path):
@@ -484,6 +733,36 @@ def test_chat_endpoint_answers_fitness_term_guidance_locally(tmp_path):
     assert "גדילת שריר" in hypertrophy_body["response"]
     usage = db.scalar(select(UsageEvent).where(UsageEvent.provider == "local_tool"))
     assert usage is not None
+
+
+def test_chat_endpoint_answers_explicit_rpe_rir_values_without_swapping_numbers(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "מה ההבדל בין RPE 9 לבין RIR 1?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "RPE 9" in body["response"]
+    assert "RIR 1" in body["response"]
+    assert "חזרה נקייה אחת" in body["response"]
+    assert "1 חזרות" not in body["response"]
+    assert "RPE 8" not in body["response"]
+    assert "RIR 2" not in body["response"]
+
+
+def test_chat_endpoint_answers_generic_rpe_question_without_assuming_values(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "What is RPE?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "RPE" in body["response"]
+    assert "סולם" in body["response"] or "דירוג" in body["response"]
+    assert "RPE 8" not in body["response"]
+    assert "RIR 2" not in body["response"]
 
 
 def test_chat_endpoint_answers_mixed_rpe_rir_prompt_without_overwriting_user_value(tmp_path):
@@ -662,13 +941,37 @@ def test_chat_endpoint_answers_nutrition_guidance_locally_in_natural_hebrew(tmp_
     assert "חלבון" in workout_nutrition.json()["response"]
     assert "טווח" in image_uncertainty.json()["response"]
     assert "לא מספר מדויק" in image_uncertainty.json()["response"]
+    assert "מסך הארוחות" in image_uncertainty.json()["response"]
     assert "לרדידת" not in image_uncertainty.json()["response"]
+
+
+def test_chat_endpoint_keeps_meal_image_guidance_local_even_with_provider_configured(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    get_settings.cache_clear()
+    client, _db = make_client_and_db(tmp_path)
+
+    def fail_if_called(_api_key, _model):
+        raise AssertionError("text provider should not handle meal image guidance")
+
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", fail_if_called)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "אם אעלה תמונה של שקשוקה, תוכל לתת לי קלוריות מדויקות?"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "טווח" in body["response"]
+    assert "לא מספר" in body["response"]
+    assert "מסך הארוחות" in body["response"]
 
 
 def test_chat_endpoint_sends_coaching_knowledge_to_configured_provider(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
-    client, _db = make_client_and_db(tmp_path)
+    client, db = make_client_and_db(tmp_path)
     provider = CapturingProvider()
     monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
 
@@ -689,6 +992,41 @@ def test_chat_endpoint_sends_coaching_knowledge_to_configured_provider(tmp_path,
     assert "עברית בלבד" in provider.last_request.instructions
     assert "עברית ישראלית טבעית" in provider.last_request.instructions
     assert "אל תתרגם מילולית מונחי כושר" in provider.last_request.instructions
+    assert provider.last_request.max_output_tokens <= 320
+    usage = db.scalar(select(UsageEvent).where(UsageEvent.provider == "configured"))
+    assert usage is not None
+    assert usage.token_breakdown_json["system_prompt"] > 0
+    assert usage.token_breakdown_json["history"] >= 0
+    assert usage.token_breakdown_json["memory"] >= 0
+    assert usage.token_breakdown_json["tools"] > 0
+    assert usage.token_breakdown_json["message"] > 0
+    assert usage.token_breakdown_json["output"] == 12
+    saved = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
+    assert saved is not None
+    token_metadata = saved.metadata_json["token_breakdown"]
+    assert token_metadata["total"] == usage.token_breakdown_json["total"]
+    assert token_metadata["conversation_total"] == usage.token_breakdown_json["total"]
+
+
+def test_chat_endpoint_uses_haiku_chat_model_by_default_for_configured_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.delenv("ANTHROPIC_CHAT_MODEL", raising=False)
+    get_settings.cache_clear()
+    client, _db = make_client_and_db(tmp_path)
+    provider = CapturingProvider()
+    selected_models: list[str] = []
+
+    def capture_model(_api_key, model):
+        selected_models.append(model)
+        return provider
+
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", capture_model)
+
+    response = client.post("/api/chat", json={"message": "איך לבנות שבוע אימונים מאוזן?"})
+
+    assert response.status_code == 200
+    assert selected_models == ["claude-haiku-4-5"]
+    assert provider.last_request is not None
 
 
 def test_chat_endpoint_sends_query_retrieved_knowledge_to_configured_provider(tmp_path, monkeypatch):
@@ -709,7 +1047,7 @@ def test_chat_endpoint_sends_query_retrieved_knowledge_to_configured_provider(tm
     assert len(str(knowledge)) < 7000
 
 
-def test_migrated_knowledge_intent_uses_provider_with_retrieval_when_configured(tmp_path, monkeypatch):
+def test_fitness_term_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
@@ -723,17 +1061,14 @@ def test_migrated_knowledge_intent_uses_provider_with_retrieval_when_configured(
 
     assert response.status_code == 200
     body = response.json()
-    # A formerly canned (local_tool) intent now answers from the provider...
-    assert body["provider_status"] == "configured"
-    assert body["response"] == "בנה שבוע פשוט: שני אימוני כוח, הליכה קלה ויום התאוששות."
-    # ...grounded in the now-reachable deload knowledge.
-    assert provider.last_request is not None
-    knowledge = json.loads(provider.last_request.input_text)["context"]["coaching_knowledge"]
-    assert any("deload" in hit["topic"] for hit in knowledge.get("retrieved_knowledge", []))
+    assert body["provider_status"] == "local_tool"
+    assert "דילואד" in body["response"]
+    assert provider.last_request is None
 
 
-def test_migrated_knowledge_intent_falls_back_to_local_when_provider_hebrew_is_bad(tmp_path, monkeypatch):
+def test_fitness_term_intent_does_not_call_bad_provider_when_local_answer_exists(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr(
@@ -748,18 +1083,17 @@ def test_migrated_knowledge_intent_falls_back_to_local_when_provider_hebrew_is_b
 
     assert response.status_code == 200
     body = response.json()
-    # Provider returned non-Hebrew, so we serve the vetted local answer instead (no regression).
     assert body["provider_status"] == "local_tool"
     assert "דילואד" in body["response"]
-    # The provider was still attempted (usage recorded), we just rejected its output.
     attempted = db.scalar(select(UsageEvent).where(UsageEvent.provider == "configured"))
-    assert attempted is not None
+    assert attempted is None
 
 
-def test_migrated_knowledge_intent_falls_back_when_provider_violates_neutral_address_request(
+def test_migrated_knowledge_intent_repairs_neutral_address_request_before_fallback(
     tmp_path, monkeypatch
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr(
@@ -770,24 +1104,29 @@ def test_migrated_knowledge_intent_falls_back_when_provider_violates_neutral_add
     response = client.post(
         "/api/chat",
         json={
-            "message": "מה זה progressive overload ואיך להתקדם אם כל הסטים קלים? בלי לפנות אליי בלשון זכר או נקבה."
+            "message": "איך לבנות הרגל אימון עקבי בשבוע עמוס? בלי לפנות אליי בלשון זכר או נקבה."
         },
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["provider_status"] == "local_tool"
-    assert "להוסיף 1-2 חזרות" in body["response"]
+    assert body["provider_status"] == "configured"
+    assert "להוסיף צעד אחד" in body["response"]
     for broken_phrase in ["אתה", "הוסף", "תוסיף", "תתקדם", "הגעת"]:
         assert broken_phrase not in body["response"]
+    saved = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
+    assert saved is not None
+    assert saved.metadata_json["quality_repair_applied"] is True
+    assert saved.metadata_json["quality_issues"] == []
     attempted = db.scalar(select(UsageEvent).where(UsageEvent.provider == "configured"))
     assert attempted is not None
 
 
-def test_provider_neutral_address_violation_without_local_fallback_returns_neutral_rejection(
+def test_provider_neutral_address_violation_without_local_fallback_repairs_when_possible(
     tmp_path, monkeypatch
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
     get_settings.cache_clear()
     client, db = make_client_and_db(tmp_path)
     monkeypatch.setattr(
@@ -803,12 +1142,42 @@ def test_provider_neutral_address_violation_without_local_fallback_returns_neutr
     assert response.status_code == 200
     body = response.json()
     assert body["provider_status"] == "configured"
-    assert "לא עמדה בבקשת ניסוח ניטרלי" in body["response"]
+    assert "לא עמדה בבקשת ניסוח ניטרלי" not in body["response"]
+    assert "להוסיף צעד אחד" in body["response"]
     for original_phrase in ["כמה חזרות אתה", "הוסף צעד", "תוסיף חזרות"]:
         assert original_phrase not in body["response"]
     saved = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
     assert saved is not None
     assert saved.content == body["response"]
+    assert saved.metadata_json["quality_repair_applied"] is True
+    assert saved.metadata_json["quality_issues"] == []
+
+
+def test_provider_neutral_address_violation_returns_rejection_when_repair_cannot_clear_it(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    enable_language_guard(monkeypatch)
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    monkeypatch.setattr(
+        "backend.app.services.coach_engine.build_ai_provider",
+        lambda _api_key, _model: UnrepairableGenderedHebrewProvider(),
+    )
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "איך לחשוב על עקביות באימון? בלי לפנות אליי בלשון זכר או נקבה."},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "configured"
+    assert "לא עמדה בבקשת ניסוח ניטרלי" in body["response"]
+    assert "מתאמן" not in body["response"]
+    saved = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
+    assert saved is not None
+    assert saved.metadata_json["quality_issues"] == ["neutral_address"]
 
 
 def test_provider_hebrew_command_is_allowed_when_neutral_address_was_not_requested(tmp_path, monkeypatch):
@@ -822,7 +1191,7 @@ def test_provider_hebrew_command_is_allowed_when_neutral_address_was_not_request
 
     response = client.post(
         "/api/chat",
-        json={"message": "מה זה progressive overload ואיך להתקדם אם כל הסטים קלים?"},
+        json={"message": "איך לבנות הרגל אימון עקבי בשבוע עמוס?"},
     )
 
     assert response.status_code == 200
@@ -852,7 +1221,7 @@ def test_nutrition_guidance_is_routed_with_meal_context(tmp_path, monkeypatch):
     assert "practical_nutrition_summary" in knowledge
 
 
-def test_creatine_intent_uses_provider_with_knowledge_when_configured(tmp_path, monkeypatch):
+def test_creatine_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
@@ -863,15 +1232,12 @@ def test_creatine_intent_uses_provider_with_knowledge_when_configured(tmp_path, 
 
     assert response.status_code == 200
     body = response.json()
-    # With an API key, creatine questions go to the LLM with retrieval-augmented
-    # coaching knowledge instead of returning the canned local paragraph.
-    assert body["provider_status"] == "configured"
-    assert provider.last_request is not None
-    knowledge = json.loads(provider.last_request.input_text)["context"]["coaching_knowledge"]
-    assert knowledge
+    assert body["provider_status"] == "local_tool"
+    assert "קריאטין" in body["response"]
+    assert provider.last_request is None
 
 
-def test_knee_squat_intent_uses_provider_with_workout_plan_context_when_configured(tmp_path, monkeypatch):
+def test_knee_squat_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
@@ -885,13 +1251,12 @@ def test_knee_squat_intent_uses_provider_with_workout_plan_context_when_configur
 
     assert response.status_code == 200
     body = response.json()
-    assert body["provider_status"] == "configured"
-    assert provider.last_request is not None
-    knowledge = json.loads(provider.last_request.input_text)["context"]["coaching_knowledge"]
-    assert knowledge
+    assert body["provider_status"] == "local_tool"
+    assert provider.last_request is None
+    assert "אל תדחוף" in body["response"]
 
 
-def test_supplement_safety_intent_uses_provider_when_configured(tmp_path, monkeypatch):
+def test_supplement_safety_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
@@ -905,11 +1270,12 @@ def test_supplement_safety_intent_uses_provider_when_configured(tmp_path, monkey
 
     assert response.status_code == 200
     body = response.json()
-    assert body["provider_status"] == "configured"
-    assert provider.last_request is not None
+    assert body["provider_status"] == "local_tool"
+    assert provider.last_request is None
+    assert "קפאין" in body["response"]
 
 
-def test_low_energy_intent_uses_provider_when_configured(tmp_path, monkeypatch):
+def test_low_energy_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
@@ -923,8 +1289,9 @@ def test_low_energy_intent_uses_provider_when_configured(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["provider_status"] == "configured"
-    assert provider.last_request is not None
+    assert body["provider_status"] == "local_tool"
+    assert provider.last_request is None
+    assert "פעולה אחת" in body["response"]
 
 
 def test_kept_local_intents_use_canned_response_without_api_key(tmp_path):
@@ -988,6 +1355,37 @@ def test_chat_endpoint_dispatches_hebrew_workout_plan_intent_to_module(tmp_path)
     assert saved.days_per_week == 2
 
 
+def test_chat_endpoint_dispatches_hebrew_training_week_creation_to_saved_workout_plan(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+
+    response = client.post("/api/chat", json={"message": "בנה לי שבוע אימונים קצר בלי ריצה לפי מה שאתה זוכר"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "תוכנית אימון" in body["response"]
+    saved = db.scalar(select(WorkoutPlan))
+    assert saved is not None
+    assert saved.plan_json["plan_type"] == "multi_week"
+    assert saved.days_per_week >= 1
+
+
+def test_chat_endpoint_saves_hebrew_short_week_plan_request_without_explicit_workout_word(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    client.post("/api/onboarding", json=valid_payload())
+
+    response = client.post("/api/chat", json={"message": "תבנה לי תוכנית קצרה לשבוע הקרוב, 20 דקות ביום"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "תוכנית אימון" in body["response"]
+    saved = db.scalar(select(WorkoutPlan))
+    assert saved is not None
+    assert saved.plan_json["plan_type"] == "multi_week"
+
+
 def test_chat_endpoint_dispatches_feminine_hebrew_workout_plan_intent_to_module(tmp_path):
     client, db = make_client_and_db(tmp_path)
     client.post("/api/onboarding", json=valid_payload())
@@ -1016,6 +1414,16 @@ def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app), db
+
+
+def enable_language_guard(monkeypatch) -> None:
+    monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "true")
+
+
+def assert_no_storage_confirmation(text: str) -> None:
+    forbidden = ["נשמר", "שמרתי", "תיעוד האימון", "תיעוד הארוחה", "זכרתי"]
+    for phrase in forbidden:
+        assert phrase not in text
 
 
 def valid_payload():
@@ -1088,6 +1496,19 @@ class GenderedHebrewProvider:
         )
 
 
+class UnrepairableGenderedHebrewProvider:
+    def chat(self, _request):
+        from backend.app.services.ai_provider import AIResult
+
+        return AIResult(
+            text="אם אתה מתאמן עייף, תוכל לבחור יום קל יותר ולשמור על רצף.",
+            provider_status="configured",
+            used_model="fake-model",
+            estimated_tokens_in=10,
+            estimated_tokens_out=8,
+        )
+
+
 class EchoedGenericEnglishProvider:
     def chat(self, _request):
         from backend.app.services.ai_provider import AIResult
@@ -1110,6 +1531,19 @@ class MarkdownProvider:
                 "• היום תעשה **full body קצר** עם 2 סטים לכל תרגיל.\n"
                 "המטרה היא להישאר תחת 10 שליחות מלאות ואז נחת את הגוף בסדר."
             ),
+            provider_status="configured",
+            used_model="fake-model",
+            estimated_tokens_in=10,
+            estimated_tokens_out=8,
+        )
+
+
+class BrowserArtifactProvider:
+    def chat(self, _request):
+        from backend.app.services.ai_provider import AIResult
+
+        return AIResult(
+            text="פעולה אחת: 10 דקות הליכה ללא서בר. RIR הוא לא reserve in reserve, even אם הסט קשה.",
             provider_status="configured",
             used_model="fake-model",
             estimated_tokens_in=10,

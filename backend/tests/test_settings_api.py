@@ -31,6 +31,13 @@ def test_settings_export_and_reset_local_data(tmp_path):
     profile = valid_payload()
     assert client.post("/api/onboarding", json=profile).status_code == 200
     assert client.post("/api/meals/manual", json={"text": "2 eggs and toast"}).status_code == 200
+    assert client.post("/api/workout-plans", json={"prompt": "Create a 2-day plan", "days_per_week": 2}).status_code == 200
+    pending_candidate = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Create a new 4-day plan", "days_per_week": 4},
+    )
+    assert pending_candidate.status_code == 200
+    assert pending_candidate.json()["pending_action"]["status"] == "pending"
     upload = client.post(
         "/api/meals/upload",
         data={"note": "Lunch photo"},
@@ -46,6 +53,8 @@ def test_settings_export_and_reset_local_data(tmp_path):
     body = exported.json()
     assert body["profile"]["name"] == "Lior"
     assert body["meals"][0]["note"] == "2 eggs and toast"
+    assert body["pending_actions"][0]["status"] == "pending"
+    assert body["pending_actions"][0]["action_type"] == "activate_workout_plan"
 
     reset = client.post("/api/settings/reset")
 
@@ -54,6 +63,7 @@ def test_settings_export_and_reset_local_data(tmp_path):
     assert not uploaded_path.exists()
     assert client.get("/api/onboarding").json() == {"completed": False, "profile": None}
     assert client.get("/api/settings/export").json()["meals"] == []
+    assert client.get("/api/settings/export").json()["pending_actions"] == []
 
 
 def make_client(tmp_path) -> TestClient:

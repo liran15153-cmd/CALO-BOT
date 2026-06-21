@@ -15,20 +15,23 @@ def test_init_db_creates_core_tables(tmp_path):
     tables = set(inspect(engine).get_table_names())
     assert {
         "users",
-        "user_profile",
+        "fitness_profiles",
         "chat_sessions",
         "chat_messages",
         "workout_plans",
         "workouts",
         "workout_exercises",
         "workout_logs",
-        "meals",
+        "meal_logs",
         "meal_items",
-        "meal_image_analysis",
-        "user_memories",
+        "meal_image_analyses",
+        "coaching_memories",
+        "body_metrics",
+        "memory_summaries",
         "weekly_summaries",
         "safety_events",
         "usage_events",
+        "pending_actions",
     }.issubset(tables)
 
 
@@ -46,6 +49,17 @@ def test_sqlite_engine_enforces_foreign_keys(tmp_path):
                 text(
                     "INSERT INTO chat_messages (session_id, user_id, role, content) "
                     "VALUES (999, 999, 'user', 'orphan')"
+                )
+            )
+            session.commit()
+
+    with pytest.raises(IntegrityError):
+        with Session(engine) as session:
+            session.execute(
+                text(
+                    "INSERT INTO pending_actions "
+                    "(user_id, action_type, status, subject_type, subject_id, payload_json) "
+                    "VALUES (999, 'activate_workout_plan', 'pending', 'workout_plan', 1, '{}')"
                 )
             )
             session.commit()

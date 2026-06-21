@@ -1,29 +1,34 @@
-import json
 import re
+from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
-from backend.app.prompts import coach_chat_prompt
+from backend.app.models import ChatMessage, User
 from backend.app.schemas import ChatRequest, ChatResponse, MealTextRequest, WorkoutLogRequest, WorkoutPlanRequest
-from backend.app.services.ai_provider import AIRequest, build_ai_provider
+from backend.app.services.ai_provider import build_ai_provider
 from backend.app.services.chat_service import ChatService
 from backend.app.services.context_builder import ContextBuilder
 from backend.app.services.coach_intent_service import CoachIntentService
 from backend.app.services.language_guard import (
-    contains_hebrew,
-    has_disallowed_latin_text,
-    polish_hebrew_coach_response,
-    violates_requested_neutral_address,
+    assess_hebrew_response_quality,
+    repair_hebrew_coach_response,
 )
 from backend.app.services.meal_service import MealService
 from backend.app.services.memory_service import MemoryService
+from backend.app.services.pending_action_service import PendingActionService
 from backend.app.services.pain_text import extract_pain_area
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.safety_service import SafetyService
 from backend.app.services.summary_service import SummaryService
+from backend.app.services.token_budgeting import build_optimized_chat_request
 from backend.app.services.usage_service import UsageService
 from backend.app.services.workout_service import WorkoutService
+
+
+COACH_CHAT_MAX_OUTPUT_TOKENS = 320
+ToolResult = str | tuple[str, dict[str, Any]]
 
 
 class CoachEngine:
@@ -31,9 +36,11 @@ class CoachEngine:
         self.db = db
         self.settings = get_settings()
 
-    def respond(self, payload: ChatRequest) -> ChatResponse:
+    def respond(self, payload: ChatRequest, user_id: int | None = None) -> ChatResponse:
         profile_service = ProfileService(self.db)
-        user = profile_service.get_default_user()
+        user = self.db.get(User, user_id) if user_id is not None else profile_service.get_default_user()
+        if user is None:
+            raise ValueError("User not found")
         chat_service = ChatService(self.db)
         session = chat_service.get_or_create_session(user_id=user.id, session_id=payload.session_id)
 
@@ -64,6 +71,7 @@ class CoachEngine:
                 content=safety_result.response,
                 metadata={"safety": True},
             )
+            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
@@ -81,14 +89,34 @@ class CoachEngine:
             safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
             pain_area = extract_pain_area(payload.message)
 
+        pending_tool_response = self._handle_pending_plan_action(
+            user_id=user.id,
+            payload_text=payload.message,
+            resolved_by_message_id=user_message.id,
+        )
+        if pending_tool_response is not None:
+            response_text, response_metadata = _unpack_tool_result(pending_tool_response)
+            return self._respond_local_tool(
+                chat_service=chat_service,
+                user=user,
+                session=session,
+                user_message=user_message,
+                response_text=response_text,
+                intent_name="plan_replacement_confirmation",
+                metadata=response_metadata,
+            )
+
         intent = CoachIntentService().classify(payload.message)
         tool_response = self._handle_tool_intent(
             user_id=user.id,
+            session_id=session.id,
+            user_message_id=user_message.id,
             intent_name=intent.name,
             payload_text=intent.payload_text,
             pain_area=pain_area,
         )
         if tool_response is not None:
+            response_text, response_metadata = _unpack_tool_result(tool_response)
             UsageService(self.db).record(
                 user_id=user.id,
                 task="chat",
@@ -101,14 +129,15 @@ class CoachEngine:
                 user_id=user.id,
                 session_id=session.id,
                 role="coach",
-                content=tool_response,
-                metadata={"provider_status": "local_tool", "intent": intent.name},
+                content=response_text,
+                metadata={"provider_status": "local_tool", "intent": intent.name, **response_metadata},
             )
+            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
                 coach_message_id=coach_message.id,
-                response=tool_response,
+                response=response_text,
                 safety_flagged=False,
                 provider_status="local_tool",
             )
@@ -129,7 +158,7 @@ class CoachEngine:
                 intent_name=intent.name,
             )
 
-        if self.settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded():
+        if self.settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded(user_id=user.id):
             if fallback_text is not None:
                 return self._respond_local_tool(
                     chat_service=chat_service,
@@ -140,7 +169,7 @@ class CoachEngine:
                     intent_name=intent.name,
                 )
             budget_response = (
-                "תקציב הבינה המלאכותית היומי נוצל. שמרתי את ההודעה שלך אבל לא שלחתי בקשה לספק הבינה המלאכותית. "
+                "תקציב הבינה המלאכותית היומי נוצל. לא שלחתי בקשה לספק הבינה המלאכותית. "
                 "אפשר להגדיל את DAILY_AI_TOKEN_LIMIT או להמתין לחלון היומי הבא."
             )
             usage_service.record(
@@ -158,6 +187,7 @@ class CoachEngine:
                 content=budget_response,
                 metadata={"provider_status": "budget_exceeded"},
             )
+            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
@@ -173,28 +203,34 @@ class CoachEngine:
             intent=_PROVIDER_CONTEXT_INTENT_FOR.get(intent.name, intent.name),
             user_message=payload.message,
         )
-        provider = build_ai_provider(self.settings.anthropic_api_key, self.settings.anthropic_model)
-        ai_request = AIRequest(
-            instructions=coach_chat_prompt(),
-            input_text=json.dumps({"context": context, "user_message": payload.message}, ensure_ascii=False),
-            max_output_tokens=600,
+        provider = build_ai_provider(self.settings.anthropic_api_key, self.settings.chat_model)
+        ai_request = build_optimized_chat_request(
+            context=context,
+            user_message=payload.message,
+            max_output_tokens=COACH_CHAT_MAX_OUTPUT_TOKENS,
         )
         ai_result = provider.chat(ai_request)
-        UsageService(self.db).record_ai_result(user_id=user.id, task="chat", request=ai_request, result=ai_result)
-        response_text = polish_hebrew_coach_response(ai_result.text)
-        neutral_address_violation = violates_requested_neutral_address(payload.message, response_text)
-        hebrew_ok = (
-            contains_hebrew(response_text)
-            and not has_disallowed_latin_text(response_text)
-            and not neutral_address_violation
-        )
+        usage_event = UsageService(self.db).record_ai_result(user_id=user.id, task="chat", request=ai_request, result=ai_result)
+        token_breakdown = usage_event.token_breakdown_json or {}
+        token_metadata = {
+            **token_breakdown,
+            "conversation_total": self._conversation_token_total(session.id) + int(token_breakdown.get("total", 0) or 0),
+        }
+        response_text = repair_hebrew_coach_response(payload.message, ai_result.text)
+        quality = assess_hebrew_response_quality(payload.message, response_text)
+        quality_metadata = {
+            "language_guard_mode": self.settings.language_guard_mode,
+            "quality_repair_applied": response_text != ai_result.text,
+            "quality_issues": list(quality.issues),
+        }
 
-        if ai_result.provider_status == "configured" and hebrew_ok:
+        if ai_result.provider_status == "configured" and quality.ok:
             provider_status = "configured"
         elif fallback_text is not None:
             # Provider unusable (broken Hebrew, error, or not configured): fall back to the
             # vetted local answer so migrated knowledge intents never regress. The provider
             # call was already recorded above, so do not double-count usage here.
+            quality_metadata["quality_fallback_reason"] = ",".join(quality.issues) or ai_result.provider_status
             return self._respond_local_tool(
                 chat_service=chat_service,
                 user=user,
@@ -203,9 +239,10 @@ class CoachEngine:
                 response_text=fallback_text,
                 intent_name=intent.name,
                 record_usage=False,
+                metadata=quality_metadata,
             )
         elif ai_result.provider_status == "configured":
-            if neutral_address_violation:
+            if "neutral_address" in quality.issues:
                 response_text = (
                     "קיבלתי מספק הבינה המלאכותית תשובה שלא עמדה בבקשת ניסוח ניטרלי, ולכן לא אציג אותה. "
                     "אפשר לשלוח שוב את הבקשה, והמאמן יחזיר תשובה בעברית ניטרלית וברורה."
@@ -224,8 +261,15 @@ class CoachEngine:
             session_id=session.id,
             role="coach",
             content=response_text,
-            metadata={"provider_status": provider_status, "model": ai_result.used_model, "intent": intent.name},
+            metadata={
+                "provider_status": provider_status,
+                "model": ai_result.used_model,
+                "intent": intent.name,
+                "token_breakdown": token_metadata,
+                **quality_metadata,
+            },
         )
+        MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
 
         return ChatResponse(
             session_id=session.id,
@@ -246,6 +290,7 @@ class CoachEngine:
         response_text: str,
         intent_name: str,
         record_usage: bool = True,
+        metadata: dict | None = None,
     ) -> ChatResponse:
         if record_usage:
             UsageService(self.db).record(
@@ -261,8 +306,9 @@ class CoachEngine:
             session_id=session.id,
             role="coach",
             content=response_text,
-            metadata={"provider_status": "local_tool", "intent": intent_name},
+            metadata={"provider_status": "local_tool", "intent": intent_name, **(metadata or {})},
         )
+        MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
         return ChatResponse(
             session_id=session.id,
             user_message_id=user_message.id,
@@ -272,34 +318,143 @@ class CoachEngine:
             provider_status="local_tool",
         )
 
+    def _conversation_token_total(self, session_id: int) -> int:
+        messages = self.db.scalars(
+            select(ChatMessage).where(ChatMessage.session_id == session_id, ChatMessage.role == "coach")
+        ).all()
+        total = 0
+        for message in messages:
+            breakdown = (message.metadata_json or {}).get("token_breakdown") or {}
+            value = breakdown.get("total")
+            if isinstance(value, int):
+                total += value
+        return total
+
+    def _handle_pending_plan_action(
+        self,
+        *,
+        user_id: int,
+        payload_text: str,
+        resolved_by_message_id: int,
+    ) -> ToolResult | None:
+        pending = PendingActionService(self.db).current(user_id=user_id)
+        if pending is None:
+            return None
+
+        if _declines_plan_replacement(payload_text):
+            result = PendingActionService(self.db).resolve(
+                user_id=user_id,
+                action_id=pending.id,
+                decision="decline",
+                resolved_by_message_id=resolved_by_message_id,
+            )
+            return (
+                f"{result['message']} הפעולה הבאה: להמשיך לפי האימון הבא בתוכנית הקיימת, או לבקש שינוי נקודתי אם משהו לא מתאים.",
+                {
+                    "resolved_pending_action_id": pending.id,
+                    "pending_action_resolution": result["pending_action"]["resolution"],
+                },
+            )
+
+        if _confirms_plan_replacement(payload_text):
+            result = PendingActionService(self.db).resolve(
+                user_id=user_id,
+                action_id=pending.id,
+                decision="confirm",
+                resolved_by_message_id=resolved_by_message_id,
+            )
+            workout_plan = result.get("workout_plan")
+            resolution = result["pending_action"]["resolution"]
+            return (
+                _activated_plan_response(workout_plan) if workout_plan and resolution == "confirmed" else result["message"],
+                {
+                    "resolved_pending_action_id": pending.id,
+                    "pending_action_resolution": resolution,
+                },
+            )
+
+        return None
+
     def _handle_tool_intent(
         self,
         user_id: int,
+        session_id: int,
+        user_message_id: int,
         intent_name: str,
         payload_text: str,
         pain_area: str | None = None,
-    ) -> str | None:
+    ) -> ToolResult | None:
         if intent_name == "workout_plan":
             limitations = f"רגישות ב{pain_area}" if pain_area else None
-            plan = WorkoutService(self.db).generate_plan(
+            workout_service = WorkoutService(self.db)
+            current_before = workout_service.current_plan(user_id=user_id)
+            plan = workout_service.generate_plan(
                 user_id=user_id,
                 request=WorkoutPlanRequest(prompt=payload_text, limitations=limitations),
             )
             serialized = WorkoutService.serialize_plan(plan)
-            return _workout_plan_saved_response(serialized, pain_area=pain_area)
+            is_replacement_candidate = (
+                current_before is not None
+                and current_before.id != plan.id
+                and not plan.is_current
+                and serialized.get("plan_type") == "multi_week"
+            )
+            metadata = {}
+            if is_replacement_candidate:
+                pending = PendingActionService(self.db).create_workout_plan_replacement(
+                    user_id=user_id,
+                    candidate_plan_id=plan.id,
+                    current_plan_id=current_before.id,
+                    session_id=session_id,
+                    created_from_message_id=user_message_id,
+                )
+                metadata = {"pending_action_id": pending.id}
+            return (
+                _workout_plan_saved_response(
+                    serialized,
+                    pain_area=pain_area,
+                    replacement_candidate=is_replacement_candidate,
+                ),
+                metadata,
+            )
 
         if intent_name == "workout_log":
             log = WorkoutService(self.db).parse_log(user_id=user_id, request=WorkoutLogRequest(text=payload_text))
-            status = "נשמר סימון כאב. עצור תנועות כואבות ופעל לפי הנחיות הבטיחות." if log.pain_flag else "תיעוד האימון נשמר."
-            return f"{status} רמת ביטחון: {_hebrew_confidence(log.parse_confidence)}."
+            return _workout_log_coach_response(log)
 
         if intent_name == "meal_log":
             meal = MealService(self.db).log_manual_meal(user_id=user_id, request=MealTextRequest(text=payload_text))
-            return (
-                "תיעוד הארוחה נשמר עם טווח משוער: "
-                f"{meal.calories_min}-{meal.calories_max} קלוריות, "
-                f"{meal.protein_min}-{meal.protein_max} גרם חלבון."
-            )
+            return _meal_log_coach_response(meal)
+
+        if intent_name == "meal_image_guidance":
+            return _meal_image_guidance_response()
+
+        if intent_name == "supplement_safety_guidance":
+            return _supplement_safety_guidance_response(payload_text)
+
+        if intent_name == "knee_squat_substitution":
+            return _knee_squat_substitution_response()
+
+        if intent_name == "low_energy_action_guidance":
+            return _low_energy_action_guidance_response()
+
+        if intent_name == "missed_workout_guidance":
+            return _missed_workout_guidance_response()
+
+        if intent_name == "weekly_action_plan_guidance":
+            return _weekly_action_plan_guidance_response()
+
+        if intent_name == "equipment_substitution_guidance":
+            return _equipment_substitution_guidance_response(payload_text)
+
+        if intent_name == "fitness_term_guidance":
+            return _fitness_term_guidance_response(payload_text)
+
+        if intent_name == "creatine_guidance":
+            return _creatine_guidance_response()
+
+        if intent_name == "memory_ack":
+            return _memory_ack_response()
 
         if intent_name == "weekly_summary":
             summary = SummaryService(self.db).weekly_summary(user_id=user_id)
@@ -316,17 +471,74 @@ def _hebrew_confidence(value: str | None) -> str:
     return {"low": "נמוכה", "medium": "בינונית", "high": "גבוהה"}.get(value or "", value or "לא ידועה")
 
 
-def _workout_plan_saved_response(serialized: dict, pain_area: str | None = None) -> str:
+def _unpack_tool_result(result: ToolResult) -> tuple[str, dict[str, Any]]:
+    if isinstance(result, tuple):
+        return result
+    return result, {}
+
+
+def _confirms_plan_replacement(text: str) -> bool:
+    normalized = text.lower().strip()
+    return any(
+        phrase in normalized
+        for phrase in [
+            "כן",
+            "מאשר",
+            "תחליף",
+            "תמחק",
+            "מחק",
+            "החלף",
+            "להחליף",
+            "החדשה",
+            "yes",
+            "replace",
+            "delete old",
+            "save new",
+            "activate",
+        ]
+    )
+
+
+def _declines_plan_replacement(text: str) -> bool:
+    normalized = text.lower().strip()
+    return any(
+        phrase in normalized
+        for phrase in [
+            "לא",
+            "אל תחליף",
+            "אל תמחק",
+            "עזוב",
+            "תשאיר",
+            "השאר",
+            "תשאיר את הקיימת",
+            "no",
+            "cancel",
+            "keep old",
+            "keep current",
+        ]
+    )
+
+
+def _workout_plan_saved_response(
+    serialized: dict,
+    pain_area: str | None = None,
+    *,
+    replacement_candidate: bool = False,
+) -> str:
     name = _natural_plan_name(str(serialized.get("name") or "תוכנית אימון"))
     if serialized.get("plan_type") == "single_session":
-        body = f"שמרתי אימון יחיד: {name}. זה אימון חד-פעמי שנשמר ולא מחליף את התוכנית הפעילה."
+        body = f"אימון יחיד מוכן: {name}. זה אימון חד-פעמי ולא מחליף את התוכנית הפעילה."
     else:
         days_per_week = serialized.get("days_per_week")
         days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
-        body = (
-            f"שמרתי תוכנית אימון: {name} עם {days_text}. "
-            "אפשר לפתוח את מסך האימונים כדי לעבור על המבנה המלא."
-        )
+        if replacement_candidate:
+            body = (
+                f"בניתי תוכנית חדשה: {name}, {days_text}. "
+                "היא לא מחליפה עדיין את התוכנית הפעילה. "
+                "רוצה למחוק את הישנה ולהפוך את החדשה לתוכנית הפעילה?"
+            )
+        else:
+            body = f"תוכנית אימון מוכנה: {name} עם {days_text}. הפעולה הבאה: לעבור על היום הראשון ולוודא שהעומס מתאים."
 
     if pain_area:
         ack = (
@@ -336,6 +548,47 @@ def _workout_plan_saved_response(serialized: dict, pain_area: str | None = None)
         return f"{ack} {body}"
 
     return body
+
+
+def _activated_plan_response(serialized: dict) -> str:
+    name = _natural_plan_name(str(serialized.get("name") or "תוכנית אימון"))
+    days_per_week = serialized.get("days_per_week")
+    days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
+    return f"התוכנית החדשה פעילה עכשיו: {name}, {days_text}. הפעולה הבאה: להתחיל מהאימון הראשון ולתעד איך הוא הרגיש."
+
+
+def _workout_log_coach_response(log) -> str:
+    if log.pain_flag:
+        return (
+            "הכאב הוא הסימן החשוב כאן. לעצור תנועות שמכאיבות, להוריד עומס או טווח באימון הבא, "
+            "ואם הכאב חד, מחמיר או חוזר - לפנות לאיש מקצוע מתאים."
+        )
+    if log.status == "skipped":
+        return "לא משלימים אימון שפוספס בכוח. הפעולה הבאה: לחזור בגרסה קצרה של 20-30 דקות או לבצע את האימון הבא כרגיל."
+    if log.status in {"partial", "modified"}:
+        return "אימון חלקי עדיין נותן מידע טוב לתכנון. הפעולה הבאה: באימון הבא לשמור על אותו עומס או להוריד סט אחד אם העייפות נשארת."
+    if log.rpe is not None:
+        if log.rpe >= 9:
+            return f"RPE {log.rpe} אומר שהאימון היה קשה מאוד. הפעולה הבאה: באימון הבא לשמור עומס או להוריד מעט נפח, לא להוסיף עוד סטים."
+        return f"RPE {log.rpe} נראה מאמץ בשליטה. הפעולה הבאה: לחזור על אותו מבנה, ואם הטכניקה נשארת נקייה להוסיף חזרה אחת בתרגיל המרכזי."
+    if log.exercise_results:
+        return "האימון נראה ברור מספיק לתכנון הבא. הפעולה הבאה: באימון הבא לתעד גם RPE כללי כדי לדעת אם להעלות או לשמור עומס."
+    return "הכיוון ברור. הפעולה הבאה: באימון הבא להוסיף תרגיל מרכזי, חזרות או RPE כדי שאפשר יהיה להתאים עומס בצורה מדויקת יותר."
+
+
+def _meal_log_coach_response(meal) -> str:
+    calories = _range_text(meal.calories_min, meal.calories_max, "קלוריות")
+    protein = _range_text(meal.protein_min, meal.protein_max, "גרם חלבון")
+    return (
+        f"ההערכה לארוחה הזו היא {calories} ו-{protein}. "
+        "זה טווח, לא מספר מדויק. הפעולה הבאה: בארוחה הבאה לבחור עוגן חלבון אחד ולהשאיר את זה פשוט."
+    )
+
+
+def _range_text(low: int | None, high: int | None, unit: str) -> str:
+    if low is None or high is None:
+        return f"טווח {unit} לא ברור"
+    return f"{low}-{high} {unit}"
 
 
 def _natural_plan_name(name: str) -> str:
@@ -395,13 +648,16 @@ def _fitness_term_guidance_response(text: str) -> str:
         )
 
     if "rpe" in normalized or "rir" in normalized or "חזרות ברזרבה" in normalized:
+        comparison_response = _rpe_rir_comparison_response(normalized)
+        if comparison_response:
+            return comparison_response
         mixed_response = _mixed_rpe_rir_response(normalized)
         if mixed_response:
             return mixed_response
         return (
-            "RPE 8 ו-RIR 2 הם כמעט אותו רעיון: לסיים סט קשה אבל להשאיר בערך 2 חזרות נקיות ברזרבה. "
-            "לרוב המתאמנים קל יותר להתחיל עם RIR, כי פשוט שואלים כמה חזרות עוד היו נשארות בטכניקה טובה. "
-            "הפעולה הבאה: בסטים המרכזיים היום לעצור סביב RIR 2, לא בכשל."
+            "RPE הוא דירוג מאמץ בסולם 1-10: כמה הסט או האימון הרגישו קשה בפועל. "
+            "בכוח, מספר נמוך הוא קל יותר, מספר בינוני הוא מאמץ בשליטה, ומספר גבוה מאוד אומר שכמעט לא נשארו חזרות נקיות. "
+            "הפעולה הבאה: באימון הבא לתעד RPE כללי אחד בסוף, כדי שנוכל להתאים עומס בלי לנחש."
         )
 
     if "doms" in normalized or "שרירים תפוסים" in normalized or "כאבי שרירים" in normalized:
@@ -436,6 +692,32 @@ def _fitness_term_guidance_response(text: str) -> str:
         "הכלל הפשוט: להשאיר את המונח המקצועי כשהוא טבעי, ולתרגם רק את ההחלטה המעשית. "
         "הפעולה הבאה: לכתוב מה המונח או המצב באימון, ואחזיר פירוש קצר ומה עושים איתו."
     )
+
+
+def _rpe_rir_comparison_response(normalized_text: str) -> str | None:
+    rpe_match = re.search(r"rpe\s*[-:]?\s*(10|[1-9])", normalized_text)
+    rir_match = re.search(r"rir\s*[-:]?\s*(\d+)", normalized_text)
+    reserve_match = re.search(r"(\d+)\s+חזרות\s+ברזרבה", normalized_text)
+    if not rpe_match or not (rir_match or reserve_match):
+        return None
+
+    rpe_value = int(rpe_match.group(1))
+    rir_value = int((rir_match or reserve_match).group(1))
+    rir_text = _hebrew_rir_reps(rir_value)
+    return (
+        f"RPE {rpe_value} הוא דירוג מאמץ: כמה הסט הרגיש קשה בסולם 1-10. "
+        f"RIR {rir_value} אומר שנשארו בערך {rir_text} לפני כשל. "
+        f"בפועל RPE {rpe_value} בדרך כלל קרוב ל-RIR {rir_value}, אבל RIR קל יותר למדידה כי סופרים חזרות שנשארו. "
+        f"הפעולה הבאה: בסט כבד לעצור סביב RIR {max(1, rir_value)} אם הטכניקה נשארת נקייה."
+    )
+
+
+def _hebrew_rir_reps(value: int) -> str:
+    if value == 1:
+        return "חזרה נקייה אחת"
+    if value == 2:
+        return "שתי חזרות נקיות"
+    return f"{value} חזרות נקיות"
 
 
 def _mixed_rpe_rir_response(normalized_text: str) -> str | None:
@@ -489,15 +771,19 @@ def _missed_workout_guidance_response() -> str:
 def _nutrition_guidance_response(text: str) -> str:
     normalized = text.lower()
     if "תמונה" in normalized and ("מדויק" in normalized or "להעריך" in normalized):
-        return (
-            "מתמונה אפשר לתת הערכה בטווח, לא מספר מדויק. הדיוק תלוי בגודל מנה, שמן, רוטב ומה שלא רואים בתמונה. "
-            "בניתוח תמונה אציג מזונות שזוהו, טווח קלוריות, רמת ביטחון ושאלה אחת אם חסר מידע."
-        )
+        return _meal_image_guidance_response()
 
     return (
         "בלי לספור קלוריות, סביב אימון ערב כדאי לשמור על פשוט: ארוחה רגילה 2-3 שעות לפני האימון עם חלבון, פחמימה וירק. "
         "אם יש רעב קרוב לאימון, אפשר פרי או יוגורט/כריך קטן. "
         "הפעולה הבאה: היום לבחור מנת חלבון אחת ופחמימה אחת סביב האימון, בלי להפוך את זה לחישוב מדויק."
+    )
+
+
+def _meal_image_guidance_response() -> str:
+    return (
+        "מתמונה אפשר לתת הערכה בטווח בלבד, לא מספר מדויק יחיד. הדיוק תלוי בגודל מנה, שמן, רוטב ומה שלא רואים בתמונה. "
+        "כשיש תמונה, להעלות אותה במסך הארוחות; הניתוח יציג מזונות שזוהו, טווח קלוריות, רמת ביטחון ושאלת הבהרה אחת אם חסר מידע."
     )
 
 
@@ -548,6 +834,10 @@ def _creatine_guidance_response() -> str:
     )
 
 
+def _memory_ack_response() -> str:
+    return "מעכשיו אתחשב בזה בתכנון אימונים, התאמות ופעולה הבאה. אם זה משפיע על האימון הקרוב, כדאי לבחור גרסה שמתאימה לזה כבר היום."
+
+
 def _knee_squat_substitution_response() -> str:
     return (
         "אל תדחוף דרך כאב ברך. החלף היום לאחת משלוש חלופות: סקוואט לקופסה בטווח קצר וללא כאב, "
@@ -556,26 +846,13 @@ def _knee_squat_substitution_response() -> str:
     )
 
 
-# Open knowledge intents: routed to the provider + retrieval when Anthropic is configured,
-# with the vetted local answer kept as a non-regressive fallback. Closed actions
-# (logging, plan/summary generation) stay in _handle_tool_intent.
+# Provider-routed knowledge intents keep a vetted local fallback. Safety-sensitive
+# and deterministic coaching intents stay in _handle_tool_intent.
 _KNOWLEDGE_INTENT_FALLBACKS = {
-    "fitness_term_guidance": _fitness_term_guidance_response,
     "nutrition_guidance": _nutrition_guidance_response,
-    "equipment_substitution_guidance": _equipment_substitution_guidance_response,
-    "missed_workout_guidance": lambda _payload_text: _missed_workout_guidance_response(),
-    "weekly_action_plan_guidance": lambda _payload_text: _weekly_action_plan_guidance_response(),
-    "supplement_safety_guidance": _supplement_safety_guidance_response,
-    "low_energy_action_guidance": lambda _payload_text: _low_energy_action_guidance_response(),
-    "creatine_guidance": lambda _payload_text: _creatine_guidance_response(),
-    "knee_squat_substitution": lambda _payload_text: _knee_squat_substitution_response(),
 }
 
-# Map each migrated intent to the context family that retrieves the most relevant knowledge.
+# Map each provider-routed intent to the context family that retrieves the most relevant knowledge.
 _PROVIDER_CONTEXT_INTENT_FOR = {
     "nutrition_guidance": "meal_log",
-    "equipment_substitution_guidance": "workout_plan",
-    "weekly_action_plan_guidance": "workout_plan",
-    "missed_workout_guidance": "workout_log",
-    "fitness_term_guidance": "general_chat",
 }

@@ -2,7 +2,7 @@ from datetime import date
 import re
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select, update
 from sqlalchemy.orm import Session
 
 from backend.app.models import UserProfile, Workout, WorkoutExercise, WorkoutLog, WorkoutPlan
@@ -73,11 +73,7 @@ class WorkoutService:
                 .order_by(desc(WorkoutPlan.created_at), desc(WorkoutPlan.id))
             ).all()
         )
-        current_plan_type = (current_plans[0].plan_json or {}).get("plan_type") if current_plans else None
-        is_current = plan.plan_type == "multi_week" or not current_plans or current_plan_type == "single_session"
-        if is_current:
-            for current in current_plans:
-                current.is_current = False
+        is_current = not current_plans
 
         record = WorkoutPlan(
             user_id=user_id,
@@ -104,6 +100,47 @@ class WorkoutService:
             .where(WorkoutPlan.user_id == user_id, WorkoutPlan.is_current.is_(True))
             .order_by(desc(WorkoutPlan.created_at))
         )
+
+    def activate_plan(self, user_id: int, plan_id: int, *, delete_previous: bool = True) -> WorkoutPlan:
+        plan = self.db.get(WorkoutPlan, plan_id)
+        if plan is None or plan.user_id != user_id:
+            raise ValueError("Workout plan not found")
+
+        current_plans = list(
+            self.db.scalars(
+                select(WorkoutPlan)
+                .where(WorkoutPlan.user_id == user_id, WorkoutPlan.is_current.is_(True), WorkoutPlan.id != plan_id)
+                .order_by(desc(WorkoutPlan.created_at), desc(WorkoutPlan.id))
+            ).all()
+        )
+        for current in current_plans:
+            if delete_previous:
+                self._delete_plan_record(current)
+            else:
+                current.is_current = False
+
+        plan.is_current = True
+        self.db.commit()
+        self.db.refresh(plan)
+        return plan
+
+    def delete_plan(self, user_id: int, plan_id: int, *, allow_current: bool = False) -> None:
+        plan = self.db.get(WorkoutPlan, plan_id)
+        if plan is None or plan.user_id != user_id:
+            raise ValueError("Workout plan not found")
+        if plan.is_current and not allow_current:
+            raise ValueError("Cannot delete the active workout plan")
+        self._delete_plan_record(plan)
+        self.db.commit()
+
+    def _delete_plan_record(self, plan: WorkoutPlan) -> None:
+        workouts = self._workouts_for_plan(plan.id)
+        workout_ids = [workout.id for workout in workouts]
+        if workout_ids:
+            self.db.execute(update(WorkoutLog).where(WorkoutLog.workout_id.in_(workout_ids)).values(workout_id=None))
+            self.db.execute(delete(WorkoutExercise).where(WorkoutExercise.workout_id.in_(workout_ids)))
+            self.db.execute(delete(Workout).where(Workout.id.in_(workout_ids)))
+        self.db.delete(plan)
 
     @staticmethod
     def serialize_plan(record: WorkoutPlan) -> dict:

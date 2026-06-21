@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -46,7 +46,12 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 def init_db(target_engine: Engine = engine) -> None:
     import backend.app.models  # noqa: F401
 
+    if target_engine.dialect.name != "sqlite":
+        return
     Base.metadata.create_all(bind=target_engine)
+    _ensure_user_auth_schema(target_engine)
+    _ensure_usage_event_schema(target_engine)
+    _ensure_body_metric_schema(target_engine)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -55,3 +60,47 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def _ensure_usage_event_schema(target_engine: Engine) -> None:
+    if target_engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(target_engine)
+    if "usage_events" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("usage_events")}
+    if "token_breakdown_json" in columns:
+        return
+    with target_engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE usage_events ADD COLUMN token_breakdown_json JSON DEFAULT '{}'")
+
+
+def _ensure_user_auth_schema(target_engine: Engine) -> None:
+    if target_engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(target_engine)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    with target_engine.begin() as connection:
+        if "auth_user_id" not in columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN auth_user_id VARCHAR(64)")
+            connection.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_auth_user_id ON users (auth_user_id)")
+        if "email" not in columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN email VARCHAR(255)")
+
+
+def _ensure_body_metric_schema(target_engine: Engine) -> None:
+    if target_engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(target_engine)
+    if "body_metrics" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("body_metrics")}
+    with target_engine.begin() as connection:
+        if "body_fat_percent" not in columns:
+            connection.exec_driver_sql("ALTER TABLE body_metrics ADD COLUMN body_fat_percent FLOAT")
+        if "measurements_json" not in columns:
+            connection.exec_driver_sql("ALTER TABLE body_metrics ADD COLUMN measurements_json JSON DEFAULT '{}'")
+        if "source" not in columns:
+            connection.exec_driver_sql("ALTER TABLE body_metrics ADD COLUMN source VARCHAR(80) DEFAULT 'manual' NOT NULL")

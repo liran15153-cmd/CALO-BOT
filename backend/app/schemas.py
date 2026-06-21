@@ -110,6 +110,14 @@ class WorkoutPlanRequest(BaseModel):
     readiness: ReadinessLevel | None = None
 
 
+class ActivateWorkoutPlanRequest(BaseModel):
+    delete_previous: bool = True
+
+
+class PendingActionResolveRequest(BaseModel):
+    decision: Literal["confirm", "decline"]
+
+
 class StructuredExercise(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     sets: str = Field(min_length=1, max_length=40)
@@ -206,6 +214,45 @@ class MealResponse(BaseModel):
     confidence: str | None
 
 
+class BodyMetricRequest(BaseModel):
+    measured_on: date | None = None
+    weight_kg: float | None = Field(default=None, ge=25, le=350)
+    body_fat_percent: float | None = Field(default=None, ge=2, le=75)
+    measurements: dict[str, float] = Field(default_factory=dict)
+    source: str = Field(default="manual", min_length=1, max_length=80)
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("measurements")
+    @classmethod
+    def validate_measurements(cls, value: dict[str, float]) -> dict[str, float]:
+        normalized: dict[str, float] = {}
+        for key, raw_measurement in value.items():
+            clean_key = key.strip()
+            if not clean_key or len(clean_key) > 60:
+                raise ValueError("measurement names must be 1-60 characters")
+            measurement = float(raw_measurement)
+            if measurement < 0 or measurement > 500:
+                raise ValueError("measurement values must be between 0 and 500")
+            normalized[clean_key] = measurement
+        return normalized
+
+    @model_validator(mode="after")
+    def has_metric_content(self) -> "BodyMetricRequest":
+        if self.weight_kg is not None or self.body_fat_percent is not None or self.measurements:
+            return self
+        raise ValueError("body metric requires weight, body fat, or at least one measurement")
+
+
+class BodyMetricResponse(BaseModel):
+    id: int
+    measured_on: date
+    weight_kg: float | None
+    body_fat_percent: float | None
+    measurements: dict[str, float]
+    source: str
+    note: str | None
+
+
 class SummaryResponse(BaseModel):
     summary: str
     metrics: dict[str, Any]
@@ -215,8 +262,11 @@ class SummaryResponse(BaseModel):
 class SettingsResponse(BaseModel):
     ai_provider: str
     model: str
+    chat_model: str
     database: str
     api_key_present: bool
+    supabase: str = "not_configured"
+    supabase_storage: str = "local"
     disclaimer: str
 
 
@@ -241,5 +291,6 @@ class UsageResponse(BaseModel):
     estimated_tokens_in: int
     estimated_tokens_out: int
     estimated_tokens_total: int
+    token_breakdown: dict[str, int] = Field(default_factory=dict)
     daily_ai_token_limit: int
     tokens_remaining: int

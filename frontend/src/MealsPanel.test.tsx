@@ -74,7 +74,7 @@ describe('Meals UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /העלאת ארוחה/i }));
 
     expect(await screen.findByText(/טרם נותח/i)).toBeInTheDocument();
-    expect(screen.getByText(/הארוחה נשמרה/i)).toBeInTheDocument();
+    expect(screen.getByText(/הארוחה מוכנה לניתוח/i)).toBeInTheDocument();
     expect(screen.getByText(/הערה: Lunch/i)).toBeInTheDocument();
     expect(screen.queryByText(/Lunch נשמרה/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ניתוח תמונה/i }));

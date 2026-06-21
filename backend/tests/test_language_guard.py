@@ -1,9 +1,61 @@
+import pytest
+
+from backend.app.config import get_settings
 from backend.app.services.language_guard import (
+    assess_hebrew_response_quality,
+    contains_hebrew,
+    has_broken_hebrew_artifacts,
     has_disallowed_latin_text,
+    has_suspicious_non_hebrew_script,
     polish_hebrew_coach_response,
+    repair_hebrew_coach_response,
     strip_markdown_markers,
     violates_requested_neutral_address,
 )
+
+
+@pytest.fixture(autouse=True)
+def enable_language_guard_for_existing_expectations(monkeypatch):
+    monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_language_guard_is_enabled_by_default(monkeypatch):
+    monkeypatch.delenv("LANGUAGE_GUARD_ENABLED", raising=False)
+    monkeypatch.delenv("LANGUAGE_GUARD_MODE", raising=False)
+    get_settings.cache_clear()
+
+    assert get_settings().language_guard_enabled is True
+    assert contains_hebrew("Start with goblet squat") is False
+    assert has_disallowed_latin_text("Start with goblet squat and then do a workout.") is True
+
+
+def test_language_guard_can_be_disabled_for_unfiltered_provider_testing(monkeypatch):
+    monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "false")
+    monkeypatch.delenv("LANGUAGE_GUARD_MODE", raising=False)
+    get_settings.cache_clear()
+    original = "Weekly summary\n\nStart with goblet squat and then do a full-body workout today."
+
+    assert get_settings().language_guard_enabled is False
+    assert contains_hebrew(original) is True
+    assert has_disallowed_latin_text(original) is False
+    assert violates_requested_neutral_address(
+        "מה זה progressive overload? בלי לפנות אליי בלשון זכר או נקבה.",
+        "הוסף חזרה אחת. כמה חזרות אתה מקבל כרגע?",
+    ) is False
+    assert polish_hebrew_coach_response(original) == original
+
+
+def test_language_guard_mode_off_disables_guard_while_keeping_enabled_flag(monkeypatch):
+    monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "true")
+    monkeypatch.setenv("LANGUAGE_GUARD_MODE", "off")
+    get_settings.cache_clear()
+
+    assert get_settings().language_guard_enabled is True
+    assert contains_hebrew("Start with goblet squat") is True
+    assert has_disallowed_latin_text("Start with goblet squat and then do a workout.") is False
 
 
 def test_language_guard_allows_common_fitness_terms_inside_hebrew_response():
@@ -40,6 +92,24 @@ def test_language_guard_still_blocks_dominant_english_with_little_hebrew():
     assert has_disallowed_latin_text(text) is True
 
 
+def test_language_guard_flags_suspicious_non_hebrew_scripts_from_provider_artifacts():
+    text = "פעולה אחת: ללכת 10 דקות ללא서בר ואז לעצור."
+
+    assert has_suspicious_non_hebrew_script(text) is True
+    quality = assess_hebrew_response_quality("תן לי פעולה אחת", text)
+    assert quality.ok is False
+    assert "suspicious_script" in quality.issues
+
+
+def test_language_guard_flags_translated_sounding_hebrew_provider_artifacts():
+    text = "בתוכניה שלך אפשר לשלב דחיפת קרקע, אבל אני דאוג אם או זה ירגיש כבד מדי."
+
+    assert has_broken_hebrew_artifacts(text) is True
+    quality = assess_hebrew_response_quality("אני רוצה עברית טבעית", text)
+    assert quality.ok is False
+    assert "broken_hebrew" in quality.issues
+
+
 def test_neutral_address_guard_only_runs_when_user_requested_it():
     user_text = "מה זה progressive overload?"
     response_text = "הוסף חזרה אחת כשכל הסטים קלים, ואז תבדוק שוב."
@@ -69,6 +139,19 @@ def test_neutral_address_guard_uses_hebrew_word_boundaries():
     response_text = "אפשר לבחור טווח חזרות ולהישאר עם שתי חזרות ברזרבה."
 
     assert violates_requested_neutral_address(user_text, response_text) is False
+
+
+def test_repair_hebrew_coach_response_neutralizes_direct_commands_when_requested():
+    user_text = "תן לי פעולה אחת, בלי לפנות אליי בלשון זכר או נקבה."
+    response_text = "הוסף 10 דקות הליכה ואז שמור על RPE 6. כמה זמן אתה פנוי?"
+
+    repaired = repair_hebrew_coach_response(user_text, response_text)
+
+    assert "הוסף" not in repaired
+    assert "אתה" not in repaired
+    assert "להוסיף" in repaired
+    assert "לשמור" in repaired
+    assert assess_hebrew_response_quality(user_text, repaired).ok is True
 
 
 def test_strip_markdown_markers_removes_lists_blockquotes_and_table_syntax():
@@ -146,3 +229,69 @@ def test_polish_hebrew_coach_response_repairs_provider_hebrew_and_generic_englis
     assert "תוכנית שבועית קצרה" in cleaned
     assert "שכיבות סמיכה" in cleaned
     assert "תרגיל משיכה" in cleaned
+
+
+def test_polish_hebrew_coach_response_repairs_qa_artifacts_from_browser_run():
+    text = "פעולה אחת: 10 דקות הליכה ללא서בר. RIR הוא לא reserve in reserve, even אם הסט קשה."
+
+    cleaned = polish_hebrew_coach_response(text)
+
+    assert "서" not in cleaned
+    assert "reserve in reserve" not in cleaned
+    assert "even" not in cleaned
+    assert "חזרות ברזרבה" in cleaned
+
+
+def test_polish_hebrew_coach_response_repairs_live_provider_hebrew_artifacts():
+    text = (
+        "אנחנו נשים את זה בחשבון. בתוכניה שלך יש דחיפת קרקע וגוף בעיקר משקלך. "
+        "אני דאוג אם או זה יהיה קשה, וגם יש אימנים שכותבים מתכננן."
+    )
+
+    cleaned = polish_hebrew_coach_response(text)
+
+    for broken in ["נשים את זה בחשבון", "בתוכניה", "דחיפת קרקע", "גוף בעיקר משקלך", "דאוג", "או זה", "אימנים", "מתכננן"]:
+        assert broken not in cleaned
+    assert "ניקח את זה בחשבון" in cleaned
+    assert "בתוכנית" in cleaned
+    assert "שכיבות סמיכה" in cleaned
+    assert "משקל גוף" in cleaned
+    assert "דואג" in cleaned
+    assert "מתאמנים" in cleaned
+    assert "מתכנן" in cleaned
+
+
+def test_polish_hebrew_coach_response_repairs_second_live_provider_hebrew_artifacts():
+    text = (
+        "כל סט צריך להרגיש כמו שנשאר לך עוד חזרה או שתיים בעזה. "
+        "לא צריך להגיע לקצה המדף. קשיבות לגופך חשובה, אל תתחרות עם הרגע. "
+        "בלי שינה, גופך לא מתוקן. אם יש חדות או נקיטה במהלך, עצור. "
+        "תעשה סקוואט לשלוש סטים, ואז חזקק את הליבה 30 שנייה."
+    )
+
+    cleaned = polish_hebrew_coach_response(text)
+
+    for broken in ["בעזה", "קצה המדף", "קשיבות לגופך", "תתחרות", "גופך לא מתוקן", "נקיטה", "לשלוש סטים", "חזקק", "30 שנייה"]:
+        assert broken not in cleaned
+    assert "ברזרבה" in cleaned
+    assert "לקצה" in cleaned
+    assert "הקשבה לגוף" in cleaned
+    assert "לא להתחרות" in cleaned
+    assert "הגוף לא מתאושש" in cleaned
+    assert "כאב חד" in cleaned
+    assert "לשלושה סטים" in cleaned
+    assert "30 שניות" in cleaned
+
+
+def test_repair_hebrew_coach_response_trims_overlong_provider_answer_to_four_sentences():
+    text = (
+        "משפט ראשון ברור. משפט שני ברור. משפט שלישי ברור. משפט רביעי ברור. "
+        "משפט חמישי כבר ארוך מדי. הכאב שהזכרת"
+    )
+
+    repaired = repair_hebrew_coach_response("איך מתחילים?", text)
+
+    assert "משפט ראשון ברור" in repaired
+    assert "משפט רביעי ברור" in repaired
+    assert "משפט חמישי" not in repaired
+    assert "הכאב שהזכרת" not in repaired

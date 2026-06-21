@@ -7,10 +7,26 @@ def test_intent_service_detects_hebrew_workout_plan_requests():
     assert intent.name == "workout_plan"
 
 
+def test_intent_service_detects_hebrew_strength_plan_with_pain_context():
+    intent = CoachIntentService().classify("יש לי כאב ברך שמאל, תבנה לי תוכנית כוח של 2 ימים בלי ציוד")
+
+    assert intent.name == "workout_plan"
+
+
 def test_intent_service_detects_feminine_hebrew_workout_plan_requests():
     intent = CoachIntentService().classify("תבני לי תוכנית אימון של 4 שבועות, 4 ימים בשבוע")
 
     assert intent.name == "workout_plan"
+
+
+def test_intent_service_detects_hebrew_training_week_creation_as_workout_plan():
+    service = CoachIntentService()
+
+    assert service.classify("בנה לי שבוע אימונים בלי ריצה לפי מה שאתה זוכר").name == "workout_plan"
+    assert service.classify("תן לי שבוע אימונים קצר עם כוח וגומיות").name == "workout_plan"
+    assert service.classify("תבנה לי תוכנית קצרה לשבוע הקרוב, 20 דקות ביום").name == "workout_plan"
+    assert service.classify("Build me a beginner workout").name == "workout_plan"
+    assert service.classify("Give me a short workout for today").name == "workout_plan"
 
 
 def test_intent_service_detects_hebrew_summary_requests():
@@ -18,6 +34,13 @@ def test_intent_service_detects_hebrew_summary_requests():
 
     assert service.classify("תני לי סיכום שבועי לפי מה שתיעדתי").name == "weekly_summary"
     assert service.classify("תני לי סיכום יומי קצר").name == "daily_summary"
+
+
+def test_intent_service_detects_memory_update_acknowledgements():
+    service = CoachIntentService()
+
+    assert service.classify("זכור שאני שונא ריצה ומעדיף אופניים או הליכה").name == "memory_ack"
+    assert service.classify("remember I prefer dumbbells and hate running").name == "memory_ack"
 
 
 def test_intent_service_detects_hebrew_workout_and_meal_logs():
@@ -51,7 +74,7 @@ def test_intent_service_detects_nutrition_guidance_without_logging_meal():
     service = CoachIntentService()
 
     assert service.classify("אני מנסה לרדת קצת באחוזי שומן אבל לא רוצה לספור קלוריות. מה לאכול היום סביב אימון ערב?").name == "nutrition_guidance"
-    assert service.classify("אם אעלה תמונה של קערת אורז, עוף וטחינה, כמה מדויק אפשר להעריך קלוריות?").name == "nutrition_guidance"
+    assert service.classify("אם אעלה תמונה של קערת אורז, עוף וטחינה, כמה מדויק אפשר להעריך קלוריות?").name == "meal_image_guidance"
 
 
 def test_intent_service_prioritizes_supplement_stimulant_safety_over_nutrition_timing():
@@ -78,6 +101,7 @@ def test_intent_service_detects_low_energy_action_guidance():
     service = CoachIntentService()
 
     assert service.classify("אין לי כוח היום, תן לי פעולה אחת קטנה").name == "low_energy_action_guidance"
+    assert service.classify("שלום, תן לי פעולה אחת קטנה להיום כדי לא לשבור רצף.").name == "low_energy_action_guidance"
     assert service.classify("I have low energy today, give me one minimum action").name == "low_energy_action_guidance"
 
 

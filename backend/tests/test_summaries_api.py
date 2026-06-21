@@ -42,6 +42,9 @@ def test_weekly_summary_tracks_consistency_and_persists_summary(tmp_path):
     assert body["metrics"]["workouts_completed"] == 1
     assert body["metrics"]["missed_workouts"] == 1
     assert body["metrics"]["consistency_percentage"] == 50
+    assert "לפי הנתונים השמורים" in body["summary"]
+    assert body["week_start"] in body["summary"]
+    assert body["week_end"] in body["summary"]
     assert "הושלם אימון אחד" in body["summary"]
     assert "אימון אחד פוספס" in body["summary"]
     assert "תועדה ארוחה אחת" in body["summary"]

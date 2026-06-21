@@ -34,6 +34,15 @@ def test_coach_prompt_requires_natural_israeli_fitness_hebrew():
         assert term in prompt
 
 
+def test_coach_prompt_contains_canonical_hebrew_style_examples():
+    prompt = coach_chat_prompt()
+
+    assert "ניקח את זה בחשבון" in prompt
+    assert "מתאמנים" in prompt
+    assert "שכיבות סמיכה" in prompt
+    assert "אל תמציא צירופים" in prompt
+
+
 def test_all_prompt_builders_return_task_specific_text():
     prompts = {
         "workout": workout_generation_prompt(),

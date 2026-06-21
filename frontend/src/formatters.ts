@@ -20,3 +20,44 @@ export function formatDatabaseStatus(status: string | null | undefined): string 
     }[status ?? ''] ?? 'לא ידוע'
   );
 }
+
+export function formatSupabaseStatus(status: string | null | undefined): string {
+  return (
+    {
+      configured: 'configured',
+      configured_optional: 'configured, auth optional',
+      required: 'auth required',
+      local: 'local fallback',
+      not_configured: 'not configured'
+    }[status ?? ''] ?? 'unknown'
+  );
+}
+
+const ADJUSTMENT_EXPLANATIONS: Record<string, (exercise: string) => string> = {
+  pain_reported: (exercise) =>
+    `${exercise}: שומרים על אותו עומס כי סימנת כאב באימון האחרון. אם הכאב חוזר — עוצרים.`,
+  high_rpe: (exercise) =>
+    `${exercise}: הורדנו סט אחד כי האימון הקודם נסגר ב-RPE גבוה. נראה איך זה מרגיש היום.`,
+  high_rpe_recently: (exercise) =>
+    `${exercise}: הורדנו סט אחד כי האימון הקודם נסגר ב-RPE גבוה. נראה איך זה מרגיש היום.`,
+  missed_or_partial: (exercise) =>
+    `${exercise}: גרסת מינימום כי האימון הקודם לא הושלם — חוזרים בשלמות, לא בכוח.`,
+  missed_or_partial_recently: (exercise) =>
+    `${exercise}: גרסת מינימום כי האימון הקודם לא הושלם — חוזרים בשלמות, לא בכוח.`,
+  completed_with_manageable_effort: (exercise) =>
+    `${exercise}: אפשר לשקול תוספת עדינה — האימון הקודם נסגר במאמץ נשלט.`,
+  recent_workout_supported_progression: (exercise) =>
+    `${exercise}: אפשר לשקול תוספת עדינה — האימון הקודם נסגר במאמץ נשלט.`,
+  insufficient_pattern: (exercise) =>
+    `${exercise}: שומרים על המתכון של התוכנית, אין עדיין מספיק לוגים אחרונים להחלטה אחרת.`,
+  base_plan: (exercise) => `${exercise}: ממשיכים לפי התוכנית כפי שהיא נכתבה.`
+};
+
+export function formatAdjustmentExplanation(
+  reason: string | null | undefined,
+  exerciseName: string
+): string | null {
+  if (!reason) return null;
+  const template = ADJUSTMENT_EXPLANATIONS[reason];
+  return template ? template(exerciseName) : null;
+}

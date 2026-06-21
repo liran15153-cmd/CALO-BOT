@@ -229,6 +229,10 @@ def test_next_workout_api_repeats_after_partial_or_modified_log_without_pain(tmp
     client = make_client(tmp_path)
     for status in ["partial", "modified"]:
         plan = create_plan(client, days_per_week=2)
+        if not plan["is_current"]:
+            activate_response = client.post(f"/api/workout-plans/{plan['id']}/activate", json={"delete_previous": True})
+            assert activate_response.status_code == 200
+            plan = activate_response.json()
         first_workout_id = plan["days"][0]["workout_id"]
 
         log_response = client.post(

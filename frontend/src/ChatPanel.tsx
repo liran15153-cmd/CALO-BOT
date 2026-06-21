@@ -60,7 +60,7 @@ export function ChatPanel() {
       setMessages([
         {
           role: 'coach',
-          content: 'צ\'אט חדש התחיל. הפרופיל והזיכרון לטווח ארוך נשמרו.'
+          content: 'צ\'אט חדש התחיל. הפרופיל והזיכרון לטווח ארוך ימשיכו להשפיע על ההמלצות.'
         }
       ]);
       setStatus('idle');
@@ -75,7 +75,7 @@ export function ChatPanel() {
       <div className="panel-heading split-heading">
         <div>
           <h3>צ'אט מאמן</h3>
-          <p>השיחות נשמרות ומשתמשות בפרופיל המצומצם ובהיסטוריה האחרונה שלך.</p>
+          <p>השיחות משתמשות בפרופיל המצומצם ובהיסטוריה האחרונה שלך.</p>
         </div>
         <button
           className="ghost-button"

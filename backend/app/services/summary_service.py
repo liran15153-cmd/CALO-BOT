@@ -103,7 +103,8 @@ class SummaryService:
         consistency = round((completed / max(1, completed + missed)) * 100)
         return {
             "summary": (
-                f"סיכום שבועי: {_completed_workouts_summary(completed)}, "
+                f"סיכום שבועי לפי הנתונים השמורים לשבוע {week_start.isoformat()} עד {week_end.isoformat()}: "
+                f"{_completed_workouts_summary(completed)}, "
                 f"{_missed_workouts_summary(missed)}, {_meals_logged_summary(len(meals))}."
             ),
             "metrics": {

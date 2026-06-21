@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Meal, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
+from backend.app.models import Meal, User, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.workout_service import WorkoutService
 
@@ -13,11 +13,13 @@ class DashboardService:
     def __init__(self, db: Session):
         self.db = db
 
-    def build_dashboard(self) -> dict[str, Any]:
+    def build_dashboard(self, user_id: int | None = None) -> dict[str, Any]:
         profile_service = ProfileService(self.db)
         workout_service = WorkoutService(self.db)
-        user = profile_service.get_default_user()
-        profile = profile_service.get_profile()
+        user = profile_service.get_default_user() if user_id is None else self.db.get(User, user_id)
+        if user is None:
+            raise ValueError("User not found")
+        profile = profile_service.get_profile_for_user(user.id)
         week_start, week_end = self._current_week_range()
         workouts = self._workouts_for_week(user.id, week_start, week_end)
         meals = self._meals_for_week(user.id, week_start, week_end)

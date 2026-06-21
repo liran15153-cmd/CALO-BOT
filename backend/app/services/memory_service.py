@@ -1,7 +1,13 @@
-from sqlalchemy import select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import UserMemory
+from backend.app.models import ChatMessage, MemorySummary, UserMemory, UserProfile
+
+
+MIN_SUMMARY_MEMORIES = 3
+MIN_SUMMARY_MESSAGES = 4
+MAX_SUMMARY_MEMORIES = 12
+MAX_RECENT_USER_MESSAGES = 3
 
 
 class MemoryService:
@@ -32,6 +38,63 @@ class MemoryService:
             for memory in saved:
                 self.db.refresh(memory)
         return saved
+
+    def refresh_long_term_summary(self, user_id: int) -> MemorySummary | None:
+        memories = self.db.scalars(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id)
+            .order_by(desc(UserMemory.created_at), desc(UserMemory.id))
+            .limit(MAX_SUMMARY_MEMORIES)
+        ).all()
+        message_count = int(
+            self.db.scalar(select(func.count(ChatMessage.id)).where(ChatMessage.user_id == user_id)) or 0
+        )
+        if len(memories) < MIN_SUMMARY_MEMORIES and message_count < MIN_SUMMARY_MESSAGES:
+            return None
+
+        profile = self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        recent_user_messages = self.db.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.user_id == user_id, ChatMessage.role == "user")
+            .order_by(desc(ChatMessage.created_at), desc(ChatMessage.id))
+            .limit(MAX_RECENT_USER_MESSAGES)
+        ).all()
+        content = self._build_long_term_summary(
+            profile=profile,
+            memories=list(reversed(memories)),
+            recent_user_messages=list(reversed(recent_user_messages)),
+        )
+        last_message_id = self.db.scalar(
+            select(ChatMessage.id)
+            .where(ChatMessage.user_id == user_id)
+            .order_by(desc(ChatMessage.id))
+            .limit(1)
+        )
+        source_range = {
+            "memory_count": len(memories),
+            "chat_message_count": message_count,
+            "last_chat_message_id": last_message_id,
+        }
+        summary = self.db.scalar(
+            select(MemorySummary).where(
+                MemorySummary.user_id == user_id,
+                MemorySummary.summary_type == "long_term",
+            )
+        )
+        if summary is None:
+            summary = MemorySummary(
+                user_id=user_id,
+                summary_type="long_term",
+                content=content,
+                source_range_json=source_range,
+            )
+            self.db.add(summary)
+        else:
+            summary.content = content
+            summary.source_range_json = source_range
+        self.db.commit()
+        self.db.refresh(summary)
+        return summary
 
     @staticmethod
     def _extract(text: str) -> list[tuple[str, str]]:
@@ -96,6 +159,45 @@ class MemoryService:
 
         return memories
 
+    @staticmethod
+    def _build_long_term_summary(
+        *,
+        profile: UserProfile | None,
+        memories: list[UserMemory],
+        recent_user_messages: list[ChatMessage],
+    ) -> str:
+        parts: list[str] = []
+        if profile is not None:
+            parts.append(
+                "Profile: "
+                f"goal={profile.main_goal}; experience={profile.experience_level}; "
+                f"location={profile.training_location}; availability={profile.weekly_availability}x/week; "
+                f"session_length={profile.session_length_minutes}min"
+            )
+            if profile.available_equipment:
+                parts.append("Equipment: " + ", ".join(profile.available_equipment[:8]))
+            if profile.nutrition_preference:
+                parts.append(f"Nutrition preference: {profile.nutrition_preference}")
+            if profile.injuries_limitations:
+                parts.append(f"Limitations: {profile.injuries_limitations}")
+
+        if memories:
+            facts = "; ".join(memory.content for memory in memories[:MAX_SUMMARY_MEMORIES])
+            parts.append(f"Durable coaching facts: {facts}")
+
+        if recent_user_messages:
+            messages = "; ".join(_compact_text(message.content, limit=180) for message in recent_user_messages)
+            parts.append(f"Recent user context: {messages}")
+
+        return " | ".join(parts)[:3000]
+
 
 def _contains_any(text: str, phrases: list[str]) -> bool:
     return any(phrase in text for phrase in phrases)
+
+
+def _compact_text(text: str, *, limit: int) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 1].rstrip() + "..."

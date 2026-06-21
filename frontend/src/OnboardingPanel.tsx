@@ -183,7 +183,7 @@ export function OnboardingPanel() {
           <button type="submit" className="primary-button" disabled={status === 'saving'}>
             שמירת פרופיל
           </button>
-          {status === 'saved' && <span className="success-text">הפרופיל נשמר</span>}
+          {status === 'saved' && <span className="success-text">הפרופיל מוכן</span>}
           {status === 'error' && <span className="error-text">לא הצלחתי לשמור את הפרופיל</span>}
         </div>
       </form>

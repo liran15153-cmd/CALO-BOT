@@ -35,6 +35,23 @@ def test_meal_upload_stores_file_and_database_record(tmp_path):
     assert saved.image_path == body["image_path"]
 
 
+def test_meal_upload_rejects_local_file_fallback_in_production(tmp_path, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/meals/upload",
+        data={"note": "Production upload"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    )
+
+    assert response.status_code == 400
+    assert "Supabase Storage is required" in response.json()["detail"]
+    assert db.scalar(select(Meal)) is None
+    get_settings.cache_clear()
+
+
 def test_meal_upload_rejects_jpeg_content_type_with_invalid_magic_bytes(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
@@ -125,9 +142,16 @@ def test_meal_image_analysis_updates_meal_ranges_and_items(tmp_path, monkeypatch
     item = db.scalar(select(MealItem))
     assert item is not None
     assert item.name == "קערת עוף ואורז"
+    usage = db.scalar(select(UsageEvent).where(UsageEvent.task == "image_analysis"))
+    assert usage is not None
+    assert usage.token_breakdown_json["message"] == 10
+    assert usage.token_breakdown_json["output"] == 20
+    assert usage.token_breakdown_json["total"] == 30
 
 
 def test_meal_image_analysis_replaces_non_hebrew_provider_text(tmp_path, monkeypatch):
+    enable_language_guard(monkeypatch)
+    get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
     upload = client.post(
         "/api/meals/upload",
@@ -149,6 +173,8 @@ def test_meal_image_analysis_replaces_non_hebrew_provider_text(tmp_path, monkeyp
 
 
 def test_meal_image_analysis_replaces_generic_english_terms_in_hebrew_message(tmp_path, monkeypatch):
+    enable_language_guard(monkeypatch)
+    get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
     upload = client.post(
         "/api/meals/upload",
@@ -169,6 +195,8 @@ def test_meal_image_analysis_replaces_generic_english_terms_in_hebrew_message(tm
 
 
 def test_meal_image_analysis_replaces_mixed_english_user_visible_text(tmp_path, monkeypatch):
+    enable_language_guard(monkeypatch)
+    get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)
     upload = client.post(
         "/api/meals/upload",
@@ -246,6 +274,10 @@ def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
     return TestClient(app), db
 
 
+def enable_language_guard(monkeypatch) -> None:
+    monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "true")
+
+
 class FakeImageProvider:
     def analyze_image(self, _image_path, note=None):
         return AIResult(
@@ -260,6 +292,13 @@ class FakeImageProvider:
             used_model="fake-vision",
             estimated_tokens_in=10,
             estimated_tokens_out=20,
+            token_breakdown={
+                "message": 10,
+                "output": 20,
+                "input_total": 10,
+                "total": 30,
+                "source": "fake_image_provider",
+            },
         )
 
 

@@ -169,6 +169,68 @@ button {
   line-height: 1.45;
 }
 
+.auth-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.auth-workspace {
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-panel {
+  width: min(460px, 100%);
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.auth-form input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.segmented-control button,
+.sidebar-action {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.segmented-control button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 10px;
+}
+
+.segmented-control button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .workspace {
   padding: 32px;
   display: grid;
@@ -681,6 +743,28 @@ button {
   margin-top: 22px;
 }
 
+.plan-replacement-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid rgba(15, 111, 92, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 111, 92, 0.07);
+  padding: 14px;
+}
+
+.plan-replacement-panel p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.plan-replacement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .next-workout-section {
   display: grid;
   gap: 14px;
@@ -854,6 +938,11 @@ button {
 .exercise-row small {
   grid-column: 1 / -1;
   line-height: 1.45;
+}
+
+.exercise-row small.adjustment-explanation {
+  color: var(--accent-strong);
+  font-weight: 500;
 }
 
 .inline-section {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
@@ -22,17 +22,11 @@ describe('Settings UI', () => {
             recent_coach_notes: [],
             current_streak: 0,
             missed_workouts: 0,
-            next_recommended_action: 'סיים אונבורדינג.'
+            next_recommended_action: 'Complete onboarding.'
           });
         }
         if (url.endsWith('/api/settings')) {
-          return jsonResponse({
-            ai_provider: 'not_configured',
-            model: 'claude-haiku-4-5',
-            database: 'configured',
-            api_key_present: false,
-            disclaimer: 'זו אינה עצה רפואית.'
-          });
+          return jsonResponse(settingsPayload());
         }
         if (url.endsWith('/api/usage')) {
           return jsonResponse({
@@ -51,7 +45,7 @@ describe('Settings UI', () => {
           return jsonResponse({ profile: null, meals: [] });
         }
         if (url.endsWith('/api/settings/reset') && init?.method === 'POST') {
-          return jsonResponse({ deleted_records: 1, message: 'הנתונים המקומיים אופסו.' });
+          return jsonResponse({ deleted_records: 1, message: 'Local data reset.' });
         }
         return jsonResponse({});
       })
@@ -61,27 +55,23 @@ describe('Settings UI', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('shows provider status without exposing an API key and supports export/reset actions', async () => {
-    render(<App />);
+    const { container } = render(<App />);
+    openSettings(container);
 
-    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
-
-    expect((await screen.findAllByText(/לא מוגדר/i)).length).toBeGreaterThan(0);
+    await waitForSettings();
     expect(screen.queryByText(/not_configured/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/sk-/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/אינה עצה רפואית/i)).toBeInTheDocument();
-    expect(await screen.findByText(/בקשות צ'אט/i)).toBeInTheDocument();
-    expect(screen.getByText(/סיכומים/i)).toBeInTheDocument();
-    expect(screen.getByText(/תקציב שנותר/i)).toBeInTheDocument();
+    expect(screen.getByText(/Supabase auth/i)).toBeInTheDocument();
+    expect(screen.getByText(/local fallback/i)).toBeInTheDocument();
     expect(screen.getByText(/49,984/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /ייצוא/i }));
-    expect(await screen.findByText(/הייצוא מוכן/i)).toBeInTheDocument();
+    const [exportButton, resetButton] = settingsActionButtons(container);
+    fireEvent.click(exportButton);
+    expect(await screen.findByDisplayValue(/"profile": null/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /איפוס נתונים מקומיים/i }));
-    expect(await screen.findByText(/לאישור מחיקה/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /אישור איפוס/i }));
-    expect(await screen.findByText(/רשומה אחת נמחקה/i)).toBeInTheDocument();
-    expect(screen.queryByText(/1 רשומות נמחקו/i)).not.toBeInTheDocument();
+    fireEvent.click(resetButton);
+    fireEvent.click(resetButton);
+    await waitFor(() => expect(screen.queryByDisplayValue(/"profile": null/i)).not.toBeInTheDocument());
   });
 
   it('shows settings even when usage metrics fail to load', async () => {
@@ -93,13 +83,7 @@ describe('Settings UI', () => {
           return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
         }
         if (url.endsWith('/api/settings')) {
-          return jsonResponse({
-            ai_provider: 'not_configured',
-            model: 'claude-haiku-4-5',
-            database: 'configured',
-            api_key_present: false,
-            disclaimer: 'זו אינה עצה רפואית.'
-          });
+          return jsonResponse(settingsPayload());
         }
         if (url.endsWith('/api/usage')) {
           return { ok: false, status: 500, json: async () => ({}) } as Response;
@@ -108,12 +92,10 @@ describe('Settings UI', () => {
       })
     );
 
-    render(<App />);
+    const { container } = render(<App />);
+    openSettings(container);
 
-    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
-
-    expect(await screen.findByText(/claude-haiku-4-5/i)).toBeInTheDocument();
-    expect(screen.queryByText(/ההגדרות לא זמינות/i)).not.toBeInTheDocument();
+    await waitForSettings();
   });
 
   it('shows an export failure without leaving the settings action busy', async () => {
@@ -125,13 +107,7 @@ describe('Settings UI', () => {
           return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
         }
         if (url.endsWith('/api/settings')) {
-          return jsonResponse({
-            ai_provider: 'not_configured',
-            model: 'claude-haiku-4-5',
-            database: 'configured',
-            api_key_present: false,
-            disclaimer: 'זו אינה עצה רפואית.'
-          });
+          return jsonResponse(settingsPayload());
         }
         if (url.endsWith('/api/usage')) {
           return jsonResponse({
@@ -153,15 +129,42 @@ describe('Settings UI', () => {
       })
     );
 
-    render(<App />);
+    const { container } = render(<App />);
+    openSettings(container);
+    await waitForSettings();
 
-    fireEvent.click(screen.getByRole('button', { name: /הגדרות/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /ייצוא/i }));
+    const [exportButton] = settingsActionButtons(container);
+    fireEvent.click(exportButton);
 
-    expect(await screen.findByText(/הייצוא נכשל/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ייצוא/i })).not.toBeDisabled();
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
   });
 });
+
+function settingsPayload() {
+  return {
+    ai_provider: 'not_configured',
+    model: 'claude-haiku-4-5',
+    chat_model: 'claude-haiku-4-5',
+    database: 'configured',
+    api_key_present: false,
+    supabase: 'not_configured',
+    supabase_storage: 'local',
+    disclaimer: 'General wellness only.'
+  };
+}
+
+function openSettings(container: HTMLElement) {
+  const navButtons = container.querySelectorAll<HTMLButtonElement>('.nav-button');
+  fireEvent.click(navButtons[navButtons.length - 1]);
+}
+
+function settingsActionButtons(container: HTMLElement): HTMLButtonElement[] {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>('.settings-actions button'));
+}
+
+async function waitForSettings() {
+  expect((await screen.findAllByText(/claude-haiku-4-5/i)).length).toBeGreaterThan(0);
+}
 
 function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;

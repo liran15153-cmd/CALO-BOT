@@ -44,7 +44,7 @@ describe('Onboarding UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /שמירת פרופיל/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/הפרופיל נשמר/i)).toBeInTheDocument();
+      expect(screen.getByText(/הפרופיל מוכן/i)).toBeInTheDocument();
     });
 
     const fetchMock = vi.mocked(fetch);

@@ -2,17 +2,21 @@ import { Dumbbell } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  fetchCurrentPendingAction,
   fetchCurrentWorkoutPlan,
   fetchNextWorkout,
   fetchRecentWorkoutLogs,
   generateWorkoutPlan,
+  resolvePendingAction,
   saveWorkoutLog,
   type ExecutionPlanExercise,
   type NextWorkout,
+  type PendingAction,
   type WorkoutLog,
   type WorkoutLogInput,
   type WorkoutPlan
 } from './api';
+import { formatAdjustmentExplanation } from './formatters';
 
 type WorkoutStatus = 'completed' | 'partial' | 'skipped' | 'modified';
 
@@ -36,10 +40,13 @@ export function WorkoutsPanel() {
   const [prompt, setPrompt] = useState('');
   const [logText, setLogText] = useState('');
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<WorkoutPlan | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [nextWorkout, setNextWorkout] = useState<NextWorkout | null>(null);
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null);
   const [recentLogs, setRecentLogs] = useState<WorkoutLog[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [replacementStatus, setReplacementStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [logStatus, setLogStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [structuredLogStatus, setStructuredLogStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [structuredLogError, setStructuredLogError] = useState<string | null>(null);
@@ -70,14 +77,22 @@ export function WorkoutsPanel() {
 
   useEffect(() => {
     let active = true;
-    fetchCurrentWorkoutPlan()
-      .then((currentPlan) => {
+    Promise.all([
+      fetchCurrentWorkoutPlan().catch(() => null),
+      fetchCurrentPendingAction().catch(() => null)
+    ])
+      .then(([currentPlan, currentPendingAction]) => {
         if (!active) return;
-        setPlan(currentPlan);
-      })
-      .catch(() => {
-        if (!active) return;
-        setPlan(null);
+        const candidatePlan = validCandidatePlan(currentPendingAction);
+        if (candidatePlan) {
+          setPlan((current) => current ?? candidatePlan);
+          setPendingPlan((current) => current ?? candidatePlan);
+          setPendingAction((current) => current ?? currentPendingAction);
+        } else {
+          setPlan((current) => current ?? currentPlan);
+          setPendingPlan((current) => current ?? null);
+          setPendingAction((current) => current ?? null);
+        }
       });
     fetchNextWorkout()
       .then((next) => {
@@ -109,13 +124,47 @@ export function WorkoutsPanel() {
     const trimmed = prompt.trim();
     if (!trimmed) return;
     setStatus('loading');
+    setReplacementStatus('idle');
     try {
       const nextPlan = await generateWorkoutPlan(trimmed);
       setPlan(nextPlan);
-      await loadNextWorkout();
+      setPendingPlan(nextPlan.pending_action && !nextPlan.is_current ? nextPlan : null);
+      setPendingAction(nextPlan.pending_action && !nextPlan.is_current ? nextPlan.pending_action : null);
+      if (nextPlan.is_current) {
+        await loadNextWorkout();
+      }
       setStatus('idle');
     } catch {
       setStatus('error');
+    }
+  }
+
+  async function handleActivatePendingPlan() {
+    if (!pendingAction) return;
+    setReplacementStatus('saving');
+    try {
+      const result = await resolvePendingAction(pendingAction.id, 'confirm');
+      setPlan(result.workout_plan);
+      setPendingPlan(null);
+      setPendingAction(null);
+      await loadNextWorkout();
+      setReplacementStatus('idle');
+    } catch {
+      setReplacementStatus('error');
+    }
+  }
+
+  async function handleDiscardPendingPlan() {
+    if (!pendingAction) return;
+    setReplacementStatus('saving');
+    try {
+      const result = await resolvePendingAction(pendingAction.id, 'decline');
+      setPlan(result.workout_plan ?? (await fetchCurrentWorkoutPlan()));
+      setPendingPlan(null);
+      setPendingAction(null);
+      setReplacementStatus('idle');
+    } catch {
+      setReplacementStatus('error');
     }
   }
 
@@ -224,15 +273,19 @@ export function WorkoutsPanel() {
                 </div>
               )}
               <div className="exercise-grid">
-                {executionExercisesFor(nextWorkout).map((exercise) => (
-                  <div className="exercise-row" key={executionExerciseId(exercise) ?? exercise.name}>
-                    <strong>{exercise.name}</strong>
-                    <span>{formatSetCount(exercise.sets)}</span>
-                    <span>{exercise.reps_or_duration}</span>
-                    <span>{exercise.rest}</span>
-                    {exercise.execution_note && <small>{exercise.execution_note}</small>}
-                  </div>
-                ))}
+                {executionExercisesFor(nextWorkout).map((exercise) => {
+                  const explanation = formatAdjustmentExplanation(exercise.reason, exercise.name);
+                  return (
+                    <div className="exercise-row" key={executionExerciseId(exercise) ?? exercise.name}>
+                      <strong>{exercise.name}</strong>
+                      <span>{formatSetCount(exercise.sets)}</span>
+                      <span>{exercise.reps_or_duration}</span>
+                      <span>{exercise.rest}</span>
+                      {exercise.execution_note && <small>{exercise.execution_note}</small>}
+                      {explanation && <small className="adjustment-explanation">{explanation}</small>}
+                    </div>
+                  );
+                })}
               </div>
               <p className="plan-note">{nextWorkout.execution_plan?.summary ?? nextWorkout.adaptation.next_adjustment}</p>
             </div>
@@ -369,6 +422,24 @@ export function WorkoutsPanel() {
 
       {status === 'error' && <p className="error-text">לא הצלחתי ליצור תוכנית.</p>}
 
+      {pendingPlan && (
+        <div className="plan-replacement-panel" role="status">
+          <div>
+            <strong>זו תוכנית חדשה שלא פעילה עדיין.</strong>
+            <p>התוכנית הקיימת נשארת פעילה עד שתבחר להחליף אותה. האימון הבא עדיין מגיע מהתוכנית הפעילה.</p>
+          </div>
+          <div className="plan-replacement-actions">
+            <button className="primary-button icon-button" type="button" onClick={handleActivatePendingPlan} disabled={replacementStatus === 'saving'}>
+              החלף לתוכנית החדשה
+            </button>
+            <button className="ghost-button" type="button" onClick={handleDiscardPendingPlan} disabled={replacementStatus === 'saving'}>
+              השאר את הקיימת
+            </button>
+          </div>
+          {replacementStatus === 'error' && <p className="error-text">לא הצלחתי לעדכן את בחירת התוכנית.</p>}
+        </div>
+      )}
+
       {plan && (
         <div className="plan-view">
           <div className="plan-summary">
@@ -420,7 +491,7 @@ export function WorkoutsPanel() {
             <strong>{formatWorkoutStatus(lastLog.status)}</strong>
             <span>רמת ביטחון: {formatConfidence(lastLog.parse_confidence)}</span>
             {lastLog.adaptation?.next_adjustment && <span>{lastLog.adaptation.next_adjustment}</span>}
-            {lastLog.pain_flag && <span className="error-text">סימון כאב נשמר</span>}
+            {lastLog.pain_flag && <span className="error-text">דווח כאב</span>}
             {lastLog.exercise_results.map((result, index) => (
               <span key={`${formatLoggedExercise(result)}-${index}`}>{formatLoggedExercise(result)}</span>
             ))}
@@ -505,6 +576,13 @@ function normalizeNextWorkout(value: NextWorkout | null): NextWorkout | null {
       exercise_adjustments: []
     }
   };
+}
+
+function validCandidatePlan(action: PendingAction | null): WorkoutPlan | null {
+  if (!action || action.status !== 'pending' || !action.candidate_plan || action.candidate_plan.is_current) {
+    return null;
+  }
+  return action.candidate_plan;
 }
 
 function executionExercisesFor(workout: NextWorkout): ExecutionPlanExercise[] {

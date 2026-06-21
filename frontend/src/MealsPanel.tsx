@@ -121,7 +121,7 @@ export function MealsPanel() {
       {meal && (
         <div className="inline-section">
           <h4>ארוחה שהועלתה</h4>
-          <p>הארוחה נשמרה. {meal.note ? `הערה: ${meal.note}. ` : ''}ההפניה לתמונה נשמרת מקומית.</p>
+          <p>הארוחה מוכנה לניתוח. {meal.note ? `הערה: ${meal.note}. ` : ''}ההפניה לתמונה זמינה מקומית.</p>
           <button className="ghost-button" type="button" onClick={handleAnalyze} disabled={status === 'analyzing'}>
             <ScanSearch size={16} aria-hidden="true" />
             ניתוח תמונה

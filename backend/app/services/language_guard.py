@@ -1,9 +1,13 @@
 import re
+from dataclasses import dataclass
+
+from backend.app.config import get_settings
 
 
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_+-]*")
 _HEBREW_TOKEN_RE = re.compile(r"[\u0590-\u05ff]+")
 _VISIBLE_WORD_RE = re.compile(r"[\u0590-\u05ff]+|[A-Za-z][A-Za-z0-9_+-]*")
+_SENTENCE_RE = re.compile(r"[^.!?\n]+[.!?]?")
 _ALLOWED_LATIN_TERM_PATTERNS = (
     r"\bRPE\b",
     r"\bRIR\b",
@@ -60,6 +64,18 @@ _DIRECT_HEBREW_ADDRESS_OR_COMMAND_TERMS = (
     "מתאמנת",
     "תוכל",
     "תוכלי",
+    "השתמש",
+    "השתמשי",
+    "השתמשו",
+    "תשתמש",
+    "תשתמשי",
+    "תשתמשו",
+    "הרם",
+    "הרימי",
+    "הרימו",
+    "תרים",
+    "תרימי",
+    "תרימו",
     "הוסף",
     "הוסיפי",
     "הוסיפו",
@@ -120,14 +136,144 @@ _DIRECT_HEBREW_ADDRESS_OR_COMMAND_TERMS = (
     "קבעי",
     "קבעו",
 )
+_NEUTRAL_COMMAND_REPLACEMENTS = {
+    "אתה": "",
+    "אתם": "",
+    "אתן": "",
+    "תוכל": "אפשר",
+    "תוכלי": "אפשר",
+    "השתמש": "להשתמש",
+    "השתמשי": "להשתמש",
+    "השתמשו": "להשתמש",
+    "תשתמש": "להשתמש",
+    "תשתמשי": "להשתמש",
+    "תשתמשו": "להשתמש",
+    "הרם": "להרים",
+    "הרימי": "להרים",
+    "הרימו": "להרים",
+    "תרים": "להרים",
+    "תרימי": "להרים",
+    "תרימו": "להרים",
+    "הוסף": "להוסיף",
+    "הוסיפי": "להוסיף",
+    "הוסיפו": "להוסיף",
+    "תוסיף": "להוסיף",
+    "תוסיפי": "להוסיף",
+    "תוסיפו": "להוסיף",
+    "התקדם": "להתקדם",
+    "התקדמי": "להתקדם",
+    "העלה": "להעלות",
+    "העלי": "להעלות",
+    "העלו": "להעלות",
+    "הורד": "להוריד",
+    "הורידי": "להוריד",
+    "הורידו": "להוריד",
+    "בחר": "לבחור",
+    "בחרי": "לבחור",
+    "בחרו": "לבחור",
+    "בצע": "לבצע",
+    "בצעי": "לבצע",
+    "בצעו": "לבצע",
+    "עשה": "לבצע",
+    "עשי": "לבצע",
+    "עשו": "לבצע",
+    "תעשה": "לבצע",
+    "תעשי": "לבצע",
+    "תעשו": "לבצע",
+    "שמור": "לשמור",
+    "שמרי": "לשמור",
+    "שמרו": "לשמור",
+    "עצור": "לעצור",
+    "עצרי": "לעצור",
+    "עצרו": "לעצור",
+    "פנה": "לפנות",
+    "פני": "לפנות",
+    "פנו": "לפנות",
+    "כתוב": "לכתוב",
+    "כתבי": "לכתוב",
+    "כתבו": "לכתוב",
+    "תכתוב": "לכתוב",
+    "תכתבי": "לכתוב",
+    "תכתבו": "לכתוב",
+    "נסה": "לנסות",
+    "נסי": "לנסות",
+    "נסו": "לנסות",
+    "שאל": "לשאול",
+    "שאלי": "לשאול",
+    "שאלו": "לשאול",
+    "תעד": "לתעד",
+    "תעדי": "לתעד",
+    "תעדו": "לתעד",
+    "קבע": "לקבוע",
+    "קבעי": "לקבוע",
+    "קבעו": "לקבוע",
+}
+_BROKEN_HEBREW_REPLACEMENTS = {
+    "אנחנו נשים את זה בחשבון": "ניקח את זה בחשבון",
+    "נשים את זה בחשבון": "ניקח את זה בחשבון",
+    "אימנים": "מתאמנים",
+    "מתכננן": "מתכנן",
+    "בואו נדברנו": "נדבר",
+    "חומקות": "התחכמויות",
+    "השבוע הבא אתה אמרת": "אמרת שבשבוע הבא",
+    "או זה יותר משאלה": "או שזו יותר שאלה",
+    "אשנה קצר וברור": "אענה קצר וברור",
+    "לתחילה בטוח": "כדי להתחיל בצורה בטוחה",
+    "בתוכניה": "בתוכנית",
+    "תוכניה": "תוכנית",
+    "תוכניית": "תוכנית",
+    "דחיפת קרקע": "שכיבות סמיכה",
+    "להשאר": "להישאר",
+    "סקוואט גוף ממושקל": "סקוואט במשקל גוף",
+    "אינץ׳ דחיפה": "שכיבות סמיכה",
+    "הינג׳ גג": "הינג׳ ירך",
+    "2 סטים כל תרגיל": "2 סטים לכל תרגיל",
+    "חזרות בעודן נשארות ברזרבה": "חזרות ברזרבה",
+    "לא תופסים כשל": "לא להגיע לכשל",
+    "מה החוששות שלך הכי גדולות": "מה החשש הכי גדול",
+    "גוף בעיקר משקלך": "משקל גוף",
+    "אני דאוג": "אני דואג",
+    "דאוג": "דואג",
+    "או זה": "או שזה",
+    "חומרא": "עומס גבוה",
+    "פעמים שתרגול האט": "לפעמים תרגול איטי",
+    "בעזה": "ברזרבה",
+    "לקצה המדף": "לקצה",
+    "קצה המדף": "הקצה",
+    "כוח בברך": "כאב בברך",
+    "בטוב": "בסדר",
+    "קשיבות לגופך": "הקשבה לגוף",
+    "אל תתחרות": "לא להתחרות",
+    "תתחרות": "להתחרות",
+    "גופך לא מתוקן": "הגוף לא מתאושש",
+    "חדות או נקיטה": "כאב חד",
+    "נקיטה": "כאב חד",
+    "לשלוש סטים": "לשלושה סטים",
+    "חזקק": "חזק",
+    "30 שנייה": "30 שניות",
+    "הקצה החד": "הקצה",
+    "האם אתה רוצה אני אגיד": "רוצה שאגיד",
+}
+_BROKEN_HEBREW_ARTIFACTS = tuple(_BROKEN_HEBREW_REPLACEMENTS)
+
+
+@dataclass(frozen=True)
+class ResponseQuality:
+    ok: bool
+    issues: tuple[str, ...] = ()
 
 
 def contains_hebrew(text: str) -> bool:
+    if not _language_guard_enabled():
+        return True
     return any("\u0590" <= character <= "\u05ff" for character in text)
 
 
 def has_disallowed_latin_text(text: str, *, allowed_source_text: str = "") -> bool:
     """Return True when Latin text dominates a Hebrew-first user-visible response."""
+
+    if not _language_guard_enabled():
+        return False
 
     del allowed_source_text
     latin_count = len(_latin_tokens(text))
@@ -151,7 +297,52 @@ def has_disallowed_latin_text(text: str, *, allowed_source_text: str = "") -> bo
     return latin_count >= 5 and (latin_count / visible_word_count) >= 0.75
 
 
+def has_suspicious_non_hebrew_script(text: str) -> bool:
+    """Return True for alphabetic scripts that should never appear in Hebrew coach output."""
+
+    if not _language_guard_enabled():
+        return False
+
+    for character in text:
+        if not character.isalpha():
+            continue
+        if "\u0590" <= character <= "\u05ff":
+            continue
+        if ("a" <= character.lower() <= "z"):
+            continue
+        return True
+    return False
+
+
+def has_broken_hebrew_artifacts(text: str) -> bool:
+    """Return True for known translated-sounding Hebrew artifacts in provider output."""
+
+    if not _language_guard_enabled():
+        return False
+    return any(artifact in text for artifact in _BROKEN_HEBREW_ARTIFACTS)
+
+
+def assess_hebrew_response_quality(user_text: str, response_text: str) -> ResponseQuality:
+    if not _language_guard_enabled():
+        return ResponseQuality(ok=True)
+
+    issues: list[str] = []
+    if not contains_hebrew(response_text):
+        issues.append("missing_hebrew")
+    if has_disallowed_latin_text(response_text):
+        issues.append("latin_text")
+    if has_suspicious_non_hebrew_script(response_text):
+        issues.append("suspicious_script")
+    if has_broken_hebrew_artifacts(response_text):
+        issues.append("broken_hebrew")
+    if violates_requested_neutral_address(user_text, response_text):
+        issues.append("neutral_address")
+    return ResponseQuality(ok=not issues, issues=tuple(issues))
+
+
 def violates_requested_neutral_address(user_text: str, response_text: str) -> bool:
+    if not _language_guard_enabled():
+        return False
     if not user_requested_neutral_address(user_text):
         return False
     return has_direct_hebrew_address_or_command(response_text)
@@ -180,6 +371,9 @@ def strip_markdown_markers(text: str) -> str:
 
 def polish_hebrew_coach_response(text: str) -> str:
     """Clean provider responses without turning the guard into a translator."""
+
+    if not _language_guard_enabled():
+        return text
 
     cleaned = strip_markdown_markers(text)
     replacements = {
@@ -210,16 +404,38 @@ def polish_hebrew_coach_response(text: str) -> str:
         "תוכנית שבוע קצרה": "תוכנית שבועית קצרה",
         "דחיפת אדמה": "שכיבות סמיכה",
         "משיכת גוף": "תרגיל משיכה",
+        "\u05dc\u05dc\u05d0\uc11c\u05d1\u05e8": "בלי",
+        "reserve in reserve": "חזרות ברזרבה",
+        **_BROKEN_HEBREW_REPLACEMENTS,
     }
     for broken, natural in replacements.items():
         cleaned = cleaned.replace(broken, natural)
+    cleaned = re.sub(r"(?<![A-Za-z])even(?![A-Za-z])", "", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     cleaned = re.sub(r" *\n *", "\n", cleaned)
     return cleaned.strip()
 
 
+def repair_hebrew_coach_response(user_text: str, response_text: str) -> str:
+    if not _language_guard_enabled():
+        return response_text
+
+    repaired = polish_hebrew_coach_response(response_text)
+    if user_requested_neutral_address(user_text):
+        repaired = _neutralize_direct_address(repaired)
+    repaired = _trim_hebrew_coach_response(repaired)
+    repaired = re.sub(r"\s{2,}", " ", repaired)
+    repaired = re.sub(r" *\n *", "\n", repaired)
+    return repaired.strip()
+
+
 def _latin_tokens(text: str) -> list[str]:
     return _LATIN_TOKEN_RE.findall(text)
+
+
+def _language_guard_enabled() -> bool:
+    settings = get_settings()
+    return settings.language_guard_enabled and settings.language_guard_mode != "off"
 
 
 def _hebrew_tokens(text: str) -> list[str]:
@@ -253,6 +469,31 @@ def _has_unapproved_latin_terms(text: str) -> bool:
 
 def _contains_hebrew_word(text: str, word: str) -> bool:
     return bool(re.search(rf"(?<![\u0590-\u05ff]){re.escape(word)}(?![\u0590-\u05ff])", text))
+
+
+def _neutralize_direct_address(text: str) -> str:
+    neutralized = text
+    for direct, neutral in _NEUTRAL_COMMAND_REPLACEMENTS.items():
+        neutralized = re.sub(
+            rf"(?<![\u0590-\u05ff]){re.escape(direct)}(?![\u0590-\u05ff])",
+            neutral,
+            neutralized,
+        )
+    neutralized = re.sub(r"\s+([?.!,;:])", r"\1", neutralized)
+    return neutralized
+
+
+def _trim_hebrew_coach_response(text: str) -> str:
+    sentence_parts = [match.group(0).strip() for match in _SENTENCE_RE.finditer(text) if match.group(0).strip()]
+    if len(sentence_parts) > 4:
+        text = " ".join(sentence_parts[:4])
+
+    words = text.split()
+    if len(words) > 90:
+        text = " ".join(words[:90]).rstrip(" ,;:")
+        if not re.search(r"[.!?]$", text):
+            text += "."
+    return text.strip()
 
 
 def _strip_markdown_table_row(match: re.Match[str]) -> str:

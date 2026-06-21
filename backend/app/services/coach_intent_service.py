@@ -24,12 +24,16 @@ class CoachIntentService:
             return CoachIntent(name="weekly_summary", payload_text=payload_text)
         if self._is_daily_summary(normalized):
             return CoachIntent(name="daily_summary", payload_text=payload_text)
+        if self._is_memory_update_ack(normalized):
+            return CoachIntent(name="memory_ack", payload_text=payload_text)
         if self._is_supplement_safety_guidance(normalized):
             return CoachIntent(name="supplement_safety_guidance", payload_text=payload_text)
         if self._is_weekly_action_plan_guidance(normalized):
             return CoachIntent(name="weekly_action_plan_guidance", payload_text=payload_text)
         if self._is_low_energy_action_guidance(normalized):
             return CoachIntent(name="low_energy_action_guidance", payload_text=payload_text)
+        if self._is_meal_image_guidance(normalized):
+            return CoachIntent(name="meal_image_guidance", payload_text=payload_text)
         if self._is_nutrition_guidance(normalized):
             return CoachIntent(name="nutrition_guidance", payload_text=payload_text)
         if self._is_workout_plan(normalized):
@@ -71,13 +75,16 @@ class CoachIntentService:
     def _is_workout_plan(text: str) -> bool:
         has_plan_language = any(term in text for term in ["plan", "program", "routine", "תוכנית", "תכנית"])
         has_workout_language = any(
-            term in text for term in ["workout", "training", "gym", "dumbbell", "אימון", "אימונים", "כושר", "משקולות"]
+            term in text
+            for term in ["workout", "training", "gym", "dumbbell", "אימון", "אימונים", "כושר", "כוח", "משקולות"]
         )
         has_creation_language = any(
             phrase in text
             for phrase in [
                 "create",
                 "build",
+                "give",
+                "give me",
                 "make",
                 "generate",
                 "תבנה",
@@ -108,13 +115,42 @@ class CoachIntentService:
                 "for today",
                 "today",
                 "right now",
+                "short workout",
+                "quick workout",
+                "beginner workout",
+                "starter workout",
                 "20 minute",
                 "20-minute",
                 "אימון אחד",
+                "אימון קצר",
                 "היום",
             ]
         )
-        return has_workout_language and has_creation_language and (has_plan_language or has_single_session_language)
+        has_training_week_language = any(
+            phrase in text
+            for phrase in [
+                "workout week",
+                "training week",
+                "week of workouts",
+                "שבוע אימונים",
+                "שבוע של אימונים",
+                "שבוע כוח",
+                "שבוע כושר",
+            ]
+        )
+        has_timeboxed_week_plan_language = (
+            has_plan_language
+            and any(phrase in text for phrase in ["שבוע הקרוב", "השבוע", "לשבוע"])
+            and any(term in text for term in ["דקות", "דקה", "ביום"])
+            and not any(term in text for term in ["תזונה", "ארוחה", "ארוחות", "אוכל", "תפריט"])
+        )
+        return has_creation_language and (
+            (
+                has_workout_language
+                and (has_plan_language or has_single_session_language or has_training_week_language)
+            )
+            or has_timeboxed_week_plan_language
+        )
 
     @staticmethod
     def _is_weekly_summary(text: str) -> bool:
@@ -128,6 +164,30 @@ class CoachIntentService:
         return any(phrase in text for phrase in ["daily summary", "today's summary", "סיכום יומי", "סיכום היום"])
 
     @staticmethod
+    def _is_memory_update_ack(text: str) -> bool:
+        starts_like_memory_update = any(
+            text.startswith(prefix)
+            for prefix in ["זכור", "תזכור", "תזכרי", "תזכרו", "remember", "keep in mind"]
+        )
+        has_preference_or_limitation = any(
+            phrase in text
+            for phrase in [
+                "שונא",
+                "אוהב",
+                "מעדיף",
+                "לא אוהב",
+                "רגיש",
+                "כאב",
+                "ציוד",
+                "preference",
+                "prefer",
+                "hate",
+                "avoid",
+            ]
+        )
+        return starts_like_memory_update and has_preference_or_limitation
+
+    @staticmethod
     def _is_nutrition_guidance(text: str) -> bool:
         asks_food_choice = any(phrase in text for phrase in ["מה לאכול", "מה כדאי לאכול", "סביב אימון", "לפני אימון", "אחרי אימון"])
         has_nutrition_goal = any(
@@ -136,6 +196,15 @@ class CoachIntentService:
         )
         asks_image_accuracy = "תמונה" in text and any(phrase in text for phrase in ["מדויק", "להעריך", "קלוריות"])
         return (asks_food_choice and has_nutrition_goal) or asks_image_accuracy
+
+    @staticmethod
+    def _is_meal_image_guidance(text: str) -> bool:
+        has_image = any(phrase in text for phrase in ["תמונה", "image", "photo"])
+        asks_estimate = any(
+            phrase in text
+            for phrase in ["קלוריות", "calories", "מדויק", "exact", "להעריך", "estimate", "ניתוח", "analyze"]
+        )
+        return has_image and asks_estimate
 
     @staticmethod
     def _is_workout_log(text: str) -> bool:
@@ -290,6 +359,7 @@ class CoachIntentService:
             phrase in text
             for phrase in [
                 "פעולה אחת",
+                "פעולה קטנה",
                 "משהו קטן",
                 "מינימום",
                 "מה לעשות",
@@ -300,7 +370,8 @@ class CoachIntentService:
                 "small action",
             ]
         )
-        return has_low_energy and asks_small_action
+        has_consistency_framing = any(phrase in text for phrase in ["רצף", "לשבור רצף", "consistency", "streak"])
+        return asks_small_action and (has_low_energy or has_consistency_framing)
 
     @staticmethod
     def _is_knee_squat_substitution(text: str) -> bool:

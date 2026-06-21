@@ -1,4 +1,26 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+﻿const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+
+let apiAccessToken: string | null = null;
+
+export function setApiAccessToken(token: string | null): void {
+  apiAccessToken = token;
+}
+
+export function clearApiAccessToken(): void {
+  apiAccessToken = null;
+}
+
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  if (!apiAccessToken) {
+    return fetch(input, init);
+  }
+  const headers: Record<string, string> = {};
+  new Headers(init.headers).forEach((value, key) => {
+    headers[key] = value;
+  });
+  headers.Authorization = `Bearer ${apiAccessToken}`;
+  return fetch(input, { ...init, headers });
+}
 
 export type HealthStatus = {
   status: string;
@@ -53,6 +75,7 @@ export type ChatSession = {
 export type WorkoutPlan = {
   id: number;
   is_current: boolean;
+  pending_action?: PendingAction | null;
   name: string;
   goal: string;
   plan_type?: string | null;
@@ -79,6 +102,25 @@ export type WorkoutPlan = {
   }>;
   progression_rule: string;
   recovery_note?: string | null;
+};
+
+export type PendingAction = {
+  id: number;
+  user_id?: number;
+  session_id?: number | null;
+  action_type: string;
+  status: string;
+  subject_type: string;
+  subject_id: number;
+  payload: Record<string, unknown>;
+  resolution?: string | null;
+  candidate_plan?: WorkoutPlan | null;
+};
+
+export type PendingActionResolveResult = {
+  pending_action: PendingAction;
+  workout_plan: WorkoutPlan | null;
+  message: string;
 };
 
 export type TrainingAdaptation = {
@@ -276,8 +318,11 @@ export type SummaryResponse = {
 export type SettingsState = {
   ai_provider: string;
   model: string;
+  chat_model: string;
   database: string;
   api_key_present: boolean;
+  supabase?: string;
+  supabase_storage?: string;
   disclaimer: string;
 };
 
@@ -294,123 +339,168 @@ export type UsageState = {
   estimated_tokens_in: number;
   estimated_tokens_out: number;
   estimated_tokens_total: number;
+  token_breakdown: Record<string, number>;
   daily_ai_token_limit: number;
   tokens_remaining: number;
 };
 
 export async function fetchHealth(): Promise<HealthStatus> {
-  const response = await fetch(`${API_BASE}/api/health`);
+  const response = await apiFetch(`${API_BASE}/api/health`);
   if (!response.ok) {
-    throw new Error(`בדיקת תקינות נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchOnboarding(): Promise<OnboardingState> {
-  const response = await fetch(`${API_BASE}/api/onboarding`);
+  const response = await apiFetch(`${API_BASE}/api/onboarding`);
   if (!response.ok) {
-    throw new Error(`טעינת פרופיל ראשוני נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function saveOnboarding(payload: OnboardingPayload): Promise<OnboardingState> {
-  const response = await fetch(`${API_BASE}/api/onboarding`, {
+  const response = await apiFetch(`${API_BASE}/api/onboarding`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
-    throw new Error(`שמירת פרופיל ראשוני נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function sendChatMessage(message: string, sessionId?: number): Promise<ChatResponse> {
-  const response = await fetch(`${API_BASE}/api/chat`, {
+  const response = await apiFetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, session_id: sessionId ?? null })
   });
   if (!response.ok) {
-    throw new Error(`בקשת הצ'אט נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
-export async function createChatSession(title = 'צ\'אט מאמן'): Promise<ChatSession> {
-  const response = await fetch(`${API_BASE}/api/chat/sessions`, {
+export async function createChatSession(title = 'Coach chat'): Promise<ChatSession> {
+  const response = await apiFetch(`${API_BASE}/api/chat/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title })
   });
   if (!response.ok) {
-    throw new Error(`יצירת שיחת מאמן נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function resetChatSession(sessionId: number): Promise<ChatSession> {
-  const response = await fetch(`${API_BASE}/api/chat/sessions/${sessionId}/reset`, {
+  const response = await apiFetch(`${API_BASE}/api/chat/sessions/${sessionId}/reset`, {
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`איפוס שיחת המאמן נכשל: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> {
-  const response = await fetch(`${API_BASE}/api/workout-plans`, {
+  const response = await apiFetch(`${API_BASE}/api/workout-plans`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt })
   });
   if (!response.ok) {
-    throw new Error(`יצירת תוכנית האימון נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function activateWorkoutPlan(planId: number): Promise<WorkoutPlan> {
+  const response = await apiFetch(`${API_BASE}/api/workout-plans/${planId}/activate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delete_previous: true })
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function discardWorkoutPlan(planId: number): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/api/workout-plans/${planId}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+}
+
+export async function fetchCurrentPendingAction(actionType = 'activate_workout_plan'): Promise<PendingAction | null> {
+  const response = await apiFetch(`${API_BASE}/api/pending-actions/current?action_type=${encodeURIComponent(actionType)}`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function resolvePendingAction(actionId: number, decision: 'confirm' | 'decline'): Promise<PendingActionResolveResult> {
+  const response = await apiFetch(`${API_BASE}/api/pending-actions/${actionId}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision })
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchCurrentWorkoutPlan(): Promise<WorkoutPlan | null> {
-  const response = await fetch(`${API_BASE}/api/workout-plans/current`);
+  const response = await apiFetch(`${API_BASE}/api/workout-plans/current`);
   if (response.status === 404) {
     return null;
   }
   if (!response.ok) {
-    throw new Error(`טעינת תוכנית האימון הנוכחית נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchNextWorkout(): Promise<NextWorkout | null> {
-  const response = await fetch(`${API_BASE}/api/workouts/next`);
+  const response = await apiFetch(`${API_BASE}/api/workouts/next`);
   if (response.status === 404) {
     return null;
   }
   if (!response.ok) {
-    throw new Error(`טעינת האימון הבא נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function saveWorkoutLog(input: string | WorkoutLogInput): Promise<WorkoutLog> {
   const body = typeof input === 'string' ? { text: input } : input;
-  const response = await fetch(`${API_BASE}/api/workout-logs`, {
+  const response = await apiFetch(`${API_BASE}/api/workout-logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    throw new Error(`שמירת תיעוד האימון נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchRecentWorkoutLogs(): Promise<WorkoutLog[]> {
-  const response = await fetch(`${API_BASE}/api/workout-logs/recent`);
+  const response = await apiFetch(`${API_BASE}/api/workout-logs/recent`);
   if (!response.ok) {
-    throw new Error(`טעינת תיעודי האימון האחרונים נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
@@ -419,92 +509,93 @@ export async function uploadMealImage(note: string, file: File): Promise<Meal> {
   const formData = new FormData();
   formData.set('note', note);
   formData.set('file', file);
-  const response = await fetch(`${API_BASE}/api/meals/upload`, {
+  const response = await apiFetch(`${API_BASE}/api/meals/upload`, {
     method: 'POST',
     body: formData
   });
   if (!response.ok) {
-    throw new Error(`העלאת הארוחה נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchRecentMeals(): Promise<Meal[]> {
-  const response = await fetch(`${API_BASE}/api/meals/recent`);
+  const response = await apiFetch(`${API_BASE}/api/meals/recent`);
   if (!response.ok) {
-    throw new Error(`טעינת הארוחות האחרונות נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function analyzeMealImage(mealId: number): Promise<MealAnalysis> {
-  const response = await fetch(`${API_BASE}/api/meals/${mealId}/analyze`, {
+  const response = await apiFetch(`${API_BASE}/api/meals/${mealId}/analyze`, {
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`ניתוח הארוחה נכשל: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function saveManualMeal(text: string): Promise<Meal> {
-  const response = await fetch(`${API_BASE}/api/meals/manual`, {
+  const response = await apiFetch(`${API_BASE}/api/meals/manual`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
   });
   if (!response.ok) {
-    throw new Error(`שמירת הארוחה הידנית נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchDashboard(): Promise<DashboardState> {
-  const response = await fetch(`${API_BASE}/api/dashboard`);
+  const response = await apiFetch(`${API_BASE}/api/dashboard`);
   if (!response.ok) {
-    throw new Error(`טעינת לוח הבקרה נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchCurrentWeeklySummary(): Promise<SummaryResponse> {
-  const response = await fetch(`${API_BASE}/api/summaries/weekly/current`);
+  const response = await apiFetch(`${API_BASE}/api/summaries/weekly/current`);
   if (!response.ok) {
-    throw new Error(`טעינת הסקירה השבועית נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchSettings(): Promise<SettingsState> {
-  const response = await fetch(`${API_BASE}/api/settings`);
+  const response = await apiFetch(`${API_BASE}/api/settings`);
   if (!response.ok) {
-    throw new Error(`טעינת ההגדרות נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function exportSettingsData(): Promise<unknown> {
-  const response = await fetch(`${API_BASE}/api/settings/export`);
+  const response = await apiFetch(`${API_BASE}/api/settings/export`);
   if (!response.ok) {
-    throw new Error(`ייצוא הנתונים נכשל: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function resetLocalData(): Promise<ResetResult> {
-  const response = await fetch(`${API_BASE}/api/settings/reset`, {
+  const response = await apiFetch(`${API_BASE}/api/settings/reset`, {
     method: 'POST'
   });
   if (!response.ok) {
-    throw new Error(`איפוס הנתונים נכשל: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
 
 export async function fetchUsage(): Promise<UsageState> {
-  const response = await fetch(`${API_BASE}/api/usage`);
+  const response = await apiFetch(`${API_BASE}/api/usage`);
   if (!response.ok) {
-    throw new Error(`טעינת נתוני השימוש נכשלה: ${response.status}`);
+    throw new Error(`API request failed: ${response.status}`);
   }
   return response.json();
 }
+

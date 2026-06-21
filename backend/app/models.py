@@ -19,13 +19,15 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    auth_user_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(120), nullable=False)
 
     profile: Mapped["UserProfile | None"] = relationship(back_populates="user", uselist=False)
 
 
 class UserProfile(Base, TimestampMixin):
-    __tablename__ = "user_profile"
+    __tablename__ = "fitness_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
@@ -69,6 +71,23 @@ class ChatMessage(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PendingAction(Base, TimestampMixin):
+    __tablename__ = "pending_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    session_id: Mapped[int | None] = mapped_column(ForeignKey("chat_sessions.id"), nullable=True, index=True)
+    action_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending", index=True)
+    subject_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    subject_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    resolution: Mapped[str | None] = mapped_column(String(40))
+    created_from_message_id: Mapped[int | None] = mapped_column(ForeignKey("chat_messages.id"), nullable=True)
+    resolved_by_message_id: Mapped[int | None] = mapped_column(ForeignKey("chat_messages.id"), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WorkoutPlan(Base, TimestampMixin):
@@ -128,7 +147,7 @@ class WorkoutLog(Base, TimestampMixin):
 
 
 class Meal(Base, TimestampMixin):
-    __tablename__ = "meals"
+    __tablename__ = "meal_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
@@ -151,7 +170,7 @@ class MealItem(Base, TimestampMixin):
     __tablename__ = "meal_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    meal_id: Mapped[int] = mapped_column(ForeignKey("meals.id"), index=True)
+    meal_id: Mapped[int] = mapped_column(ForeignKey("meal_logs.id"), index=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     quantity: Mapped[str | None] = mapped_column(String(120))
     calories_min: Mapped[int | None] = mapped_column(Integer)
@@ -162,10 +181,10 @@ class MealItem(Base, TimestampMixin):
 
 
 class MealImageAnalysis(Base, TimestampMixin):
-    __tablename__ = "meal_image_analysis"
+    __tablename__ = "meal_image_analyses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    meal_id: Mapped[int] = mapped_column(ForeignKey("meals.id"), index=True)
+    meal_id: Mapped[int] = mapped_column(ForeignKey("meal_logs.id"), index=True)
     detected_items: Mapped[list[dict]] = mapped_column(JSON, default=list)
     follow_up_questions: Mapped[list[str]] = mapped_column(JSON, default=list)
     analysis_json: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -173,7 +192,7 @@ class MealImageAnalysis(Base, TimestampMixin):
 
 
 class UserMemory(Base, TimestampMixin):
-    __tablename__ = "user_memories"
+    __tablename__ = "coaching_memories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
@@ -182,6 +201,30 @@ class UserMemory(Base, TimestampMixin):
     source: Mapped[str] = mapped_column(String(80), default="chat")
     confidence: Mapped[str] = mapped_column(String(20), default="medium")
     is_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class BodyMetric(Base, TimestampMixin):
+    __tablename__ = "body_metrics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    measured_on: Mapped[date] = mapped_column(Date, nullable=False)
+    weight_kg: Mapped[float | None] = mapped_column(Float)
+    body_fat_percent: Mapped[float | None] = mapped_column(Float)
+    waist_cm: Mapped[float | None] = mapped_column(Float)
+    measurements_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    source: Mapped[str] = mapped_column(String(80), nullable=False, default="manual")
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+class MemorySummary(Base, TimestampMixin):
+    __tablename__ = "memory_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    summary_type: Mapped[str] = mapped_column(String(60), nullable=False, default="long_term")
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_range_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class WeeklySummary(Base, TimestampMixin):
@@ -219,4 +262,5 @@ class UsageEvent(Base, TimestampMixin):
     model: Mapped[str | None] = mapped_column(String(120))
     estimated_tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     estimated_tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    token_breakdown_json: Mapped[dict] = mapped_column(JSON, default=dict)
     cost_estimate: Mapped[float | None] = mapped_column(Float)
