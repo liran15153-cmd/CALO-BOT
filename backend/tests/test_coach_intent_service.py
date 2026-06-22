@@ -122,3 +122,60 @@ def test_intent_service_keeps_bare_creatine_mentions_in_general_chat():
     assert service.classify("אני שונא קריאטין").name == "general_chat"
     assert service.classify("קריאטין בטוח?").name == "creatine_guidance"
     assert service.classify("תוסף קריאטין לפני אימון ערב, בטוח?").name == "supplement_safety_guidance"
+
+
+def test_intent_service_routes_food_judgment_questions_to_nutrition_not_meal_log():
+    service = CoachIntentService()
+
+    # "I ate X, is it ruining my cut?" is a nutrition question, not a meal to log.
+    assert service.classify("אכלתי המבורגר, זה דופק לי את החיטוב?").name == "nutrition_guidance"
+    assert service.classify("אכלתי פיצה, זה משמין?").name == "nutrition_guidance"
+    # A plain eaten-food statement is still a log.
+    assert service.classify("אכלתי חלבון לפני אימון").name == "meal_log"
+
+
+def test_intent_service_detects_eating_slang_only_with_food_context():
+    service = CoachIntentService()
+
+    assert service.classify("זללתי פיצה שלמה אתמול").name == "meal_log"
+    assert service.classify("חיסלתי צלחת אורז עם עוף").name == "meal_log"
+    # Slang verbs used about training must NOT become a meal log.
+    assert service.classify("טרפתי אימון רגליים").name != "meal_log"
+    assert service.classify("חיסלתי את כל הסטים").name != "meal_log"
+
+
+def test_intent_service_detects_gym_slang_workout_logs():
+    service = CoachIntentService()
+
+    assert service.classify("התאמנתי היום גב וביצפס").name == "workout_log"
+    assert service.classify("עשיתי רגליים").name == "workout_log"
+    assert service.classify("עשיתי chest day").name == "workout_log"
+    assert service.classify("אין לי כוח להתאמן, עשיתי רק 2 סטים חזה").name == "workout_log"
+    # A past-tense mention framed as a question is not a log.
+    assert service.classify("עשיתי chest day, כמה סטים הייתי צריך לעשות?").name != "workout_log"
+
+
+def test_intent_service_detects_motivation_and_recovery():
+    service = CoachIntentService()
+
+    assert service.classify("אין לי מוטיבציה היום").name == "motivation_recovery"
+    assert service.classify("נמאס לי, בא לי לוותר").name == "motivation_recovery"
+    assert service.classify("כמה ימי מנוחה צריך בין אימונים?").name == "motivation_recovery"
+    # Low-energy + explicit small-action request stays its own dedicated intent.
+    assert service.classify("אין לי כוח היום, תן לי פעולה אחת קטנה").name == "low_energy_action_guidance"
+
+
+def test_intent_service_detects_progress_and_body_metric_questions():
+    service = CoachIntentService()
+
+    assert service.classify("המשקל תקוע שבועיים מה לעשות?").name == "progress_metric"
+    assert service.classify("עליתי 2 קילו, זה שריר או שומן?").name == "progress_metric"
+    assert service.classify("ירדתי באחוזי שומן?").name == "progress_metric"
+    assert service.classify("המשקל תקוע אבל אני אוכל טוב ומתאמן").name == "progress_metric"
+
+
+def test_intent_service_detects_hebrew_strength_plan_request():
+    service = CoachIntentService()
+
+    # "תוכנית כוח" (strength plan) must be recognized as a plan request, not general chat.
+    assert service.classify("תבנה לי תוכנית כוח של 2 ימים בלי ציוד").name == "workout_plan"

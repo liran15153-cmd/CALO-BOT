@@ -31,7 +31,7 @@ _DETECTED_ITEM_FALLBACK_NAME = "פריט מזון שזוהה"
 _DETECTED_ITEM_UNKNOWN_QUANTITY = "לא ידוע"
 
 _MANUAL_PROTEIN_SHAKE_NAME = "שייק חלבון"
-_MANUAL_GREEK_YOGURT_NAME = "יווגורט יווני"
+_MANUAL_GREEK_YOGURT_NAME = "יוגורט יווני"
 _MANUAL_BANANA_NAME = "בננה"
 _MANUAL_EGG_NAME = "ביצה"
 _MANUAL_PIZZA_NAME = "פיצה"

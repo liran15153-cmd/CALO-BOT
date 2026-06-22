@@ -116,6 +116,8 @@ class CoachEngine:
         usage_service = UsageService(self.db)
         fallback = _KNOWLEDGE_INTENT_FALLBACKS.get(intent.name)
         fallback_text = fallback(intent.payload_text) if fallback else None
+        if fallback_text is not None and intent.name in {"motivation_recovery", "progress_metric"}:
+            fallback_text = self._personalize_with_recent_activity(user.id, fallback_text)
 
         # Without a provider key the migrated knowledge intents keep their existing local
         # answer, so behavior is unchanged unless Anthropic is configured.
@@ -272,6 +274,35 @@ class CoachEngine:
             provider_status="local_tool",
         )
 
+    def _personalize_with_recent_activity(self, user_id: int, text: str) -> str:
+        """Prepend one grounded sentence when the user has recent logged workouts.
+
+        Read-only: it only counts recent WorkoutLog rows already owned by the coach
+        layer. With no history, the safe general answer is returned unchanged.
+        """
+        from datetime import date, timedelta
+
+        from sqlalchemy import select
+
+        from backend.app.models import WorkoutLog
+
+        week_ago = date.today() - timedelta(days=7)
+        recent_completed = self.db.scalars(
+            select(WorkoutLog).where(
+                WorkoutLog.user_id == user_id,
+                WorkoutLog.logged_on >= week_ago,
+                WorkoutLog.status == "completed",
+            )
+        ).all()
+        count = len(recent_completed)
+        if count <= 0:
+            return text
+        if count == 1:
+            prefix = "ראיתי שתיעדת אימון אחד בשבוע האחרון — הבסיס קיים, בוא נמשיך מכאן. "
+        else:
+            prefix = f"ראיתי שתיעדת {count} אימונים בשבוע האחרון — יש לך רצף, אל תזלזל בזה. "
+        return f"{prefix}{text}"
+
     def _handle_tool_intent(
         self,
         user_id: int,
@@ -290,15 +321,24 @@ class CoachEngine:
 
         if intent_name == "workout_log":
             log = WorkoutService(self.db).parse_log(user_id=user_id, request=WorkoutLogRequest(text=payload_text))
-            status = "נשמר סימון כאב. עצור תנועות כואבות ופעל לפי הנחיות הבטיחות." if log.pain_flag else "תיעוד האימון נשמר."
-            return f"{status} רמת ביטחון: {_hebrew_confidence(log.parse_confidence)}."
+            if log.pain_flag:
+                return (
+                    "רשמתי את האימון וגם שהיה כאב. אל תדחוף דרך כאב — אם הוא חוזר, מחמיר או חד, "
+                    "עצור ושקול לפנות לאיש מקצוע מוסמך."
+                )
+            if log.parse_confidence == "low":
+                return (
+                    "רשמתי את האימון, כל הכבוד שסיימת. אם בא לך, כתוב לי גם כמה סטים, חזרות ומשקל "
+                    "כדי שאוכל לעקוב אחרי ההתקדמות."
+                )
+            return "רשמתי את האימון, כל הכבוד שסיימת. ממשיכים לתעד כדי לראות מגמה ברורה."
 
         if intent_name == "meal_log":
             meal = MealService(self.db).log_manual_meal(user_id=user_id, request=MealTextRequest(text=payload_text))
             return (
-                "תיעוד הארוחה נשמר עם טווח משוער: "
-                f"{meal.calories_min}-{meal.calories_max} קלוריות, "
-                f"{meal.protein_min}-{meal.protein_max} גרם חלבון."
+                "רשמתי את הארוחה. הערכה גסה בטווח: "
+                f"{meal.calories_min}-{meal.calories_max} קלוריות ו-"
+                f"{meal.protein_min}-{meal.protein_max} גרם חלבון. זאת הערכה, לא מדידה מדויקת."
             )
 
         if intent_name == "weekly_summary":
@@ -310,10 +350,6 @@ class CoachEngine:
             return f"{summary['summary']} הפעולה הבאה: {summary['next_action']}"
 
         return None
-
-
-def _hebrew_confidence(value: str | None) -> str:
-    return {"low": "נמוכה", "medium": "בינונית", "high": "גבוהה"}.get(value or "", value or "לא ידועה")
 
 
 def _workout_plan_saved_response(serialized: dict, pain_area: str | None = None) -> str:
@@ -494,6 +530,18 @@ def _nutrition_guidance_response(text: str) -> str:
             "בניתוח תמונה אציג מזונות שזוהו, טווח קלוריות, רמת ביטחון ושאלה אחת אם חסר מידע."
         )
 
+    ate_food = any(verb in normalized for verb in ["אכלתי", "i ate", "i had", "זללתי", "טרפתי", "חיסלתי"])
+    asks_judgment = any(
+        marker in normalized
+        for marker in ["חיטוב", "משמין", "דופק", "הורס", "מקלקל", "מעלה", "יעלה", "ישמין"]
+    )
+    if ate_food and asks_judgment:
+        return (
+            "ארוחה אחת לא בונה ולא הורסת חיטוב — מה שקובע הוא המאזן השבועי, לא מנה בודדת. "
+            "אם רוב השבוע מסודר עם חלבון, ירקות ולא יותר מדי קלוריות, ארוחה חופשית נכנסת בלי דרמה. "
+            "הפעולה הבאה: לחזור לארוחה הרגילה הבאה כרגיל, ולהסתכל על המגמה השבועית ולא על היום הבודד."
+        )
+
     return (
         "בלי לספור קלוריות, סביב אימון ערב כדאי לשמור על פשוט: ארוחה רגילה 2-3 שעות לפני האימון עם חלבון, פחמימה וירק. "
         "אם יש רעב קרוב לאימון, אפשר פרי או יוגורט/כריך קטן. "
@@ -548,6 +596,42 @@ def _creatine_guidance_response() -> str:
     )
 
 
+def _motivation_recovery_response(text: str) -> str:
+    normalized = text.lower()
+    asks_rest = any(
+        phrase in normalized
+        for phrase in ["מנוחה", "ימי מנוחה", "יום מנוחה", "rest day", "rest between"]
+    ) and not any(
+        phrase in normalized for phrase in ["אין מוטיבציה", "בא לי לוותר", "נמאס", "מאסתי", "אין חשק"]
+    )
+    if asks_rest:
+        return (
+            "מנוחה היא חלק מהאימון, לא בזבוז. בין אימון קשה לאותה קבוצת שרירים כדאי בערך 48 שעות. "
+            "אם מפצלים קבוצות, אפשר להתאמן בימים סמוכים. "
+            "הפעולה הבאה: לשמור לפחות יום מנוחה אחד מלא בשבוע, ולישון טוב — שם נבנה השריר."
+        )
+    return (
+        "ימים בלי חשק זה נורמלי, וזה לא אומר שנכשלת. אל תחכה למוטיבציה — היא מגיעה אחרי שמתחילים, לא לפני. "
+        "הפעולה הבאה: תעשה היום גרסה קטנה, אפילו 10-15 דקות. עקביות מנצחת מושלמות, "
+        "ולסמן אימון קצר עדיף על לדלג לגמרי."
+    )
+
+
+def _progress_metric_response(text: str) -> str:
+    normalized = text.lower()
+    if "שריר או שומן" in normalized:
+        return (
+            "קשה לדעת ממספר אחד על המשקל אם זה שריר או שומן, והמשקל קופץ עם מים, מלח ואוכל. "
+            "מה שבאמת מראה התקדמות: עומסים שעולים באימון, היקפים ותמונות כל כמה שבועות. "
+            "הפעולה הבאה: לשקול במשקל ממוצע שבועי, ולהסתכל על המגמה לאורך זמן ולא על יום בודד."
+        )
+    return (
+        "שבועיים בלי תזוזה במשקל זה לא בהכרח תקיעה — המשקל זז עם מים, שינה ואוכל. "
+        "לפני ששוברים הכל, כדאי להסתכל על ממוצע שבועי ועל העומסים באימון, לא על מספר יומי. "
+        "הפעולה הבאה: לשמור על העקביות עוד 1-2 שבועות, לוודא חלבון וצעדים, ואז לשנות דבר אחד בלבד."
+    )
+
+
 def _knee_squat_substitution_response() -> str:
     return (
         "אל תדחוף דרך כאב ברך. החלף היום לאחת משלוש חלופות: סקוואט לקופסה בטווח קצר וללא כאב, "
@@ -569,6 +653,8 @@ _KNOWLEDGE_INTENT_FALLBACKS = {
     "low_energy_action_guidance": lambda _payload_text: _low_energy_action_guidance_response(),
     "creatine_guidance": lambda _payload_text: _creatine_guidance_response(),
     "knee_squat_substitution": lambda _payload_text: _knee_squat_substitution_response(),
+    "motivation_recovery": _motivation_recovery_response,
+    "progress_metric": _progress_metric_response,
 }
 
 # Map each migrated intent to the context family that retrieves the most relevant knowledge.
@@ -578,4 +664,7 @@ _PROVIDER_CONTEXT_INTENT_FOR = {
     "weekly_action_plan_guidance": "workout_plan",
     "missed_workout_guidance": "workout_log",
     "fitness_term_guidance": "general_chat",
+    # Motivation and progress answers are grounded in the user's recent training history.
+    "motivation_recovery": "workout_log",
+    "progress_metric": "workout_log",
 }

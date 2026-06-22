@@ -122,6 +122,35 @@ def test_current_weekly_summary_is_read_only_for_dashboard(tmp_path):
     assert len(db.scalars(select(UsageEvent).where(UsageEvent.task == "summary")).all()) == 1
 
 
+def test_empty_daily_summary_reads_naturally_without_zero_counts(tmp_path):
+    client = make_client(tmp_path)
+
+    response = client.get("/api/summaries/daily")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"]["workouts_completed"] == 0
+    assert body["metrics"]["meals_logged"] == 0
+    # Natural reflection, never "0 אימונים"/"0 ארוחות".
+    assert "0 אימונים" not in body["summary"]
+    assert "0 ארוחות" not in body["summary"]
+    assert "עוד לא תיעדת אימון או ארוחה" in body["summary"]
+
+
+def test_empty_weekly_summary_reads_naturally_without_zero_counts(tmp_path):
+    client = make_client(tmp_path)
+
+    response = client.get("/api/summaries/weekly")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "0 אימונים" not in body["summary"]
+    assert "0 ארוחות" not in body["summary"]
+    assert "עדיין לא הושלם אימון" in body["summary"]
+    assert "בלי אימונים שפוספסו" in body["summary"]
+    assert "עדיין לא תועדה ארוחה" in body["summary"]
+
+
 def make_client(tmp_path) -> TestClient:
     client, _db = make_client_and_db(tmp_path)
     return client

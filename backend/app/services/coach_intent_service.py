@@ -40,13 +40,55 @@ class CoachIntentService:
             return CoachIntent(name="creatine_guidance", payload_text=payload_text)
         if self._is_equipment_substitution_guidance(normalized):
             return CoachIntent(name="equipment_substitution_guidance", payload_text=payload_text)
+        if self._is_progress_metric(normalized):
+            return CoachIntent(name="progress_metric", payload_text=payload_text)
+        if self._is_motivation_recovery(normalized):
+            return CoachIntent(name="motivation_recovery", payload_text=payload_text)
         if self._is_fitness_term_guidance(normalized):
             return CoachIntent(name="fitness_term_guidance", payload_text=payload_text)
         return CoachIntent(name="general_chat", payload_text=text)
 
+    # Common Israeli foods used to gate eating-slang and food-judgment questions, so a
+    # bare slang verb ("טרפתי אימון", "חיסלתי סטים") is never mistaken for a meal log.
+    _FOOD_CONTEXT_TERMS = (
+        "ארוחה",
+        "ארוחת",
+        "אוכל",
+        "פיצה",
+        "המבורגר",
+        "בורגר",
+        "סושי",
+        "שניצל",
+        "אורז",
+        "פסטה",
+        "עוף",
+        "בשר",
+        "סלט",
+        "חטיף",
+        "שוקולד",
+        "גלידה",
+        "לחם",
+        "כריך",
+        "טוסט",
+        "בורקס",
+        "פלאפל",
+        "שווארמה",
+        "חומוס",
+        "יוגורט",
+        "ביצים",
+        "ביצה",
+        "פחמימות",
+        "קלוריות",
+        "חלבון",
+    )
+
     @staticmethod
     def _is_meal_log(text: str) -> bool:
-        return any(
+        # A message that names food but is framed as a question ("אכלתי המבורגר, זה משמין?")
+        # is a nutrition question, not a log. Let it fall through to nutrition_guidance.
+        if CoachIntentService._is_food_judgment_question(text):
+            return False
+        if any(
             phrase in text
             for phrase in [
                 "log meal",
@@ -65,13 +107,44 @@ class CoachIntentService:
                 "ארוחת צהריים",
                 "ארוחת ערב",
             ]
+        ):
+            return True
+        # Eating slang only counts as a log when there is real food context next to it.
+        if any(verb in text for verb in ["זללתי", "טרפתי", "חיסלתי"]) and any(
+            food in text for food in CoachIntentService._FOOD_CONTEXT_TERMS
+        ):
+            return True
+        return False
+
+    @staticmethod
+    def _is_food_judgment_question(text: str) -> bool:
+        ate_food = any(
+            verb in text for verb in ["אכלתי", "i ate", "i had", "זללתי", "טרפתי", "חיסלתי"]
         )
+        asks_judgment = "?" in text and any(
+            marker in text
+            for marker in [
+                "דופק",
+                "משמין",
+                "ישמין",
+                "מעלה",
+                "יעלה",
+                "בריא",
+                "הורס",
+                "מקלקל",
+                "עושה לי",
+                "זה בסדר",
+                "חיטוב",
+            ]
+        )
+        return ate_food and asks_judgment
 
     @staticmethod
     def _is_workout_plan(text: str) -> bool:
         has_plan_language = any(term in text for term in ["plan", "program", "routine", "תוכנית", "תכנית"])
         has_workout_language = any(
-            term in text for term in ["workout", "training", "gym", "dumbbell", "אימון", "אימונים", "כושר", "משקולות"]
+            term in text
+            for term in ["workout", "training", "gym", "dumbbell", "אימון", "אימונים", "כושר", "משקולות", "כוח"]
         )
         has_creation_language = any(
             phrase in text
@@ -129,6 +202,8 @@ class CoachIntentService:
 
     @staticmethod
     def _is_nutrition_guidance(text: str) -> bool:
+        if CoachIntentService._is_food_judgment_question(text):
+            return True
         asks_food_choice = any(phrase in text for phrase in ["מה לאכול", "מה כדאי לאכול", "סביב אימון", "לפני אימון", "אחרי אימון"])
         has_nutrition_goal = any(
             phrase in text
@@ -172,6 +247,37 @@ class CoachIntentService:
         has_digit = any(token.isdigit() for token in text.split())
         if has_digit and not has_question_framing and ("sets of" in text or "סטים של" in text):
             return True
+        # Gym slang for a completed session: a past-tense training verb plus a muscle group
+        # or a "סטים" mention, but only when the message is not framed as a question.
+        # Catches "עשיתי רגליים", "עשיתי רק 2 סטים חזה", "עשיתי chest day", "התאמנתי גב".
+        if not has_question_framing:
+            if "התאמנתי" in text or "סיימתי אימון" in text or "עשיתי אימון" in text:
+                return True
+            has_training_verb = any(verb in text for verb in ["עשיתי", "התאמנתי", "סיימתי", "i did ", "did "])
+            has_gym_noun = any(
+                noun in text
+                for noun in [
+                    "רגליים",
+                    "חזה",
+                    "גב",
+                    "כתפיים",
+                    "כתף",
+                    "ידיים",
+                    "בטן",
+                    "ביצפס",
+                    "טריצפס",
+                    "סטים",
+                    "chest",
+                    "legs",
+                    "back",
+                    "shoulders",
+                    "biceps",
+                    "triceps",
+                    "leg day",
+                ]
+            )
+            if has_training_verb and has_gym_noun:
+                return True
         # "פספסתי אימון" alone is ambiguous. Treat it as a log only when the user
         # explicitly asks to record it (e.g. "פספסתי אימון אתמול, איך לתעד?").
         # Otherwise it falls through to missed_workout_guidance.
@@ -389,6 +495,71 @@ class CoachIntentService:
 
         guidance_markers = ["מה", "איך", "תסביר", "הסבר", "עדיף", "צריך", "?", "what", "how", "explain", "should"]
         return any(marker in text for marker in guidance_markers)
+
+    @staticmethod
+    def _is_motivation_recovery(text: str) -> bool:
+        has_demotivation = any(
+            phrase in text
+            for phrase in [
+                "אין מוטיבציה",
+                "אין לי מוטיבציה",
+                "אין חשק",
+                "אין לי חשק",
+                "בא לי לוותר",
+                "מתחשק לי לוותר",
+                "מאסתי",
+                "נמאס לי",
+                "אני מתוסכל",
+                "אני מתוסכלת",
+                "לא בא לי",
+                "no motivation",
+                "want to quit",
+                "feel like giving up",
+            ]
+        )
+        asks_rest = any(
+            phrase in text
+            for phrase in [
+                "כמה מנוחה",
+                "כמה ימי מנוחה",
+                "כמה זמן מנוחה",
+                "ימי מנוחה",
+                "יום מנוחה",
+                "מנוחה בין אימונים",
+                "rest days",
+                "rest between",
+            ]
+        )
+        return has_demotivation or asks_rest
+
+    @staticmethod
+    def _is_progress_metric(text: str) -> bool:
+        mentions_metric = any(
+            phrase in text
+            for phrase in [
+                "המשקל תקוע",
+                "תקוע במשקל",
+                "תקועה במשקל",
+                "המשקל לא זז",
+                "המשקל עומד",
+                "עליתי במשקל",
+                "ירדתי במשקל",
+                "עליתי קילו",
+                "אחוזי שומן",
+                "אחוז שומן",
+                "שריר או שומן",
+                "מסת שריר",
+                "לא רואה תוצאות",
+                "אין תוצאות",
+                "stuck at weight",
+                "weight plateau",
+                "body fat",
+            ]
+        )
+        weight_with_number = ("קילו" in text or "ק\"ג" in text or "kg" in text) and any(
+            token.isdigit() for token in text.split()
+        ) and any(verb in text for verb in ["עליתי", "ירדתי", "עלתה", "ירד", "תקוע", "gained", "lost"])
+        return mentions_metric or weight_with_number
 
     @staticmethod
     def _strip_command_prefix(text: str) -> str:
