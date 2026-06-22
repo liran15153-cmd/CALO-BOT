@@ -1,5 +1,7 @@
 import re
 
+from backend.app.services.text_normalization import normalize_user_text
+
 
 PAIN_OR_INJURY_TERMS = ["hurts", "pain", "injury", "injured", "sharp pain", "כאב", "פציעה", "נפצעתי", "כואב"]
 
@@ -29,7 +31,7 @@ _PAIN_AREAS_HE = {
 
 
 def _scrub_negated_pain(text: str) -> str:
-    scrubbed = text
+    scrubbed = normalize_user_text(text)
     for pattern in NEGATED_PAIN_PATTERNS:
         scrubbed = re.sub(pattern, " ", scrubbed)
     return scrubbed

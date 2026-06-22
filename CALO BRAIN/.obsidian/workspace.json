@@ -192,8 +192,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "5565d7da40b92d4d",
+  "active": "f54ef559accf7e40",
   "lastOpenFiles": [
+    "02_ARCHITECTURE/04-Supabase-Data-Layer.md",
     "08_ARCHIVE/01-Historical-Report-Index.md",
     "07_DELIVERY/03-Next-Iteration-Plan.md",
     "07_DELIVERY/02-Definition-of-Done.md",
@@ -219,7 +220,6 @@
     "07_DELIVERY/01-Release-Checklist.md",
     "01_PRODUCT/02-Product-Behavior.md",
     "08_ARCHIVE/GOAL_REPORT_1000_LINES.md",
-    "05_OPERATIONS/03-Session-Handoffs.md",
     "Assets",
     "08_ARCHIVE",
     "07_DELIVERY",

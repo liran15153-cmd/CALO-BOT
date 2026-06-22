@@ -14,6 +14,7 @@ from backend.app.api.workouts import logs_router, router as workout_plans_router
 from backend.app.config import get_settings
 from backend.app.db import init_db
 from backend.app.schemas import HealthResponse
+from backend.app.services.readiness_service import ReadinessService
 
 
 settings = get_settings()
@@ -40,6 +41,11 @@ def health() -> HealthResponse:
         ai_provider=current_settings.ai_provider_status,
         no_api_key_mode=current_settings.ai_provider_status == "not_configured",
     )
+
+
+@app.get("/api/readiness")
+def readiness() -> dict:
+    return ReadinessService(get_settings()).status()
 
 
 app.include_router(onboarding_router)

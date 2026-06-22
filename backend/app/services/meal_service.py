@@ -232,13 +232,6 @@ class MealService:
         return payload
 
     @staticmethod
-    def _resolve_meal_image_path(image_path: str, upload_root: Path) -> Path:
-        path = Path(image_path)
-        if path.is_absolute():
-            return path
-        return upload_root.resolve() / path
-
-    @staticmethod
     def serialize_item(item: MealItem) -> dict:
         return {
             "id": item.id,

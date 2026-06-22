@@ -7,15 +7,17 @@ AI fitness coach product foundation with structured onboarding, chat, workout pl
 1. Copy `.env.example` to `.env.local`.
 2. Fill Supabase values only in `.env.local`:
    - `SUPABASE_URL`
+   - `SUPABASE_JWKS_URL` (`https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`)
    - `SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SECRET_KEY` only for trusted server-side/admin work
    - `DATABASE_URL` with the Supabase Postgres connection string when using Supabase
-3. Keep `SUPABASE_AUTH_REQUIRED=false` for local SQLite development. Set it to `true` when running against Supabase Auth.
+3. Keep `SUPABASE_AUTH_REQUIRED=false` for local SQLite development. Set it to `true` when running against Supabase Auth; production auth uses local JWKS JWT validation, not a fallback Auth REST lookup.
 4. Run:
 
 ```powershell
 npm run install:all
 npm test
+npm run scan:secrets
 npm run dev
 ```
 
@@ -38,10 +40,32 @@ psql $env:DATABASE_URL -f supabase/verify_schema_rls.sql
 
 The verification query should show every expected `public` table with `table_exists=true`, `rls_enabled=true`, and at least one policy. It should also return the `body_metrics` columns `body_fat_percent`, `measurements_json`, and `source`, plus the private `meal-images` bucket.
 
-Manual user-isolation check:
+Runtime readiness:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/readiness
+```
+
+`/api/readiness` returns non-secret status for database, Supabase Auth, JWKS config, Storage config, `auth_required`, and `production_ready`. It must not expose keys, tokens, `DATABASE_URL`, or JWKS contents.
+
+Automated user-isolation and Storage check:
+
+```powershell
+$env:SUPABASE_URL="https://<project-ref>.supabase.co"
+$env:SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
+$env:SUPABASE_TEST_USER_A_EMAIL="a@example.com"
+$env:SUPABASE_TEST_USER_A_PASSWORD="..."
+$env:SUPABASE_TEST_USER_B_EMAIL="b@example.com"
+$env:SUPABASE_TEST_USER_B_PASSWORD="..."
+npm run verify:supabase
+```
+
+`npm run verify:supabase` signs in two real Supabase Auth users, uses an existing user A `public.users` row or inserts a verifier-owned row, verifies user B cannot read it, checks user B update/delete isolation only for a row the verifier created, uploads one private `meal-images` object under user A's auth id, verifies user B cannot read or delete it, and cleans up only verifier-created data. If required env vars are missing, it reports `skipped`; that is not live proof.
+
+Manual API user-isolation check:
 
 1. Create two Supabase Auth users.
-2. Run the backend with `SUPABASE_AUTH_REQUIRED=true`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and Supabase Postgres `DATABASE_URL`.
+2. Run the backend with `SUPABASE_AUTH_REQUIRED=true`, `SUPABASE_URL`, `SUPABASE_JWKS_URL`, `SUPABASE_PUBLISHABLE_KEY`, and Supabase Postgres `DATABASE_URL`.
 3. Sign in as user A and create onboarding, chat, workout log, meal log, body metric, and memory summary.
 4. Sign in as user B and confirm user A data is not returned by API routes or by direct Data API requests with user B's JWT.
 
@@ -50,5 +74,9 @@ Manual user-isolation check:
 - Do not commit `.env.local`.
 - Do not expose `SUPABASE_SECRET_KEY` in the frontend. Only `VITE_SUPABASE_PUBLISHABLE_KEY` is browser-safe.
 - If any Supabase secret key was sent in chat, rotate it in Supabase before production use and delete the old key.
-- Supabase is the data/auth/storage layer. Coach intent routing, safety rules, workout planning, meal estimation, memory extraction, and usage limits remain backend services.
-- Local meal-image file storage is a development fallback for SQLite/no-auth mode only. Production should run with Supabase configured and `SUPABASE_AUTH_REQUIRED=true` so meal images go through the private `meal-images` bucket.
+- Supabase project URLs are public config; `DATABASE_URL`, secret keys, and JWKS validation internals stay server-side. The frontend may receive only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- Supabase is used backend-only for CALO data tables. Do not add direct client-side Data API table access without a separate RLS/grants/user-isolation review.
+- Supabase Auth access tokens are validated locally against `SUPABASE_JWKS_URL`; the JWKS URL must belong to the same project ref as `SUPABASE_URL`.
+- Supabase Storage meal images must stay in a private bucket under `<auth_user_id>/<date>/<uuid>.<ext>`. Browser access should use short-lived signed URLs through the backend, not public object URLs.
+- Coach intent routing, safety rules, workout planning, meal estimation, memory extraction, and usage limits remain backend services.
+- Local meal-image file storage is a development fallback for SQLite/no-auth mode only. Production or `SUPABASE_AUTH_REQUIRED=true` must use the private Supabase `meal-images` bucket.

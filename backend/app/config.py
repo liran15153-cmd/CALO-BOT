@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_publishable_key: str | None = Field(default=None, repr=False)
     supabase_secret_key: str | None = Field(default=None, repr=False)
+    supabase_jwks_url: str | None = None
     supabase_auth_required: bool = False
     supabase_storage_bucket: str = "meal-images"
 

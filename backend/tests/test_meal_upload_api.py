@@ -6,11 +6,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.app.config import Settings
 from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
 from backend.app.models import Meal, MealImageAnalysis, MealItem, UsageEvent
 from backend.app.services.ai_provider import AIResult
+from backend.app.services.file_storage_service import FileStorageService
 
 
 def test_meal_upload_stores_file_and_database_record(tmp_path):
@@ -50,6 +52,66 @@ def test_meal_upload_rejects_local_file_fallback_in_production(tmp_path, monkeyp
     assert "Supabase Storage is required" in response.json()["detail"]
     assert db.scalar(select(Meal)) is None
     get_settings.cache_clear()
+
+
+def test_meal_upload_rejects_local_file_fallback_when_supabase_auth_required(tmp_path):
+    service = FileStorageService(
+        tmp_path,
+        settings=Settings(
+            _env_file=None,
+            supabase_url="https://nexmxwvivewvgmrritqa.supabase.co",
+            supabase_publishable_key="publishable-test-key",
+            supabase_auth_required=True,
+        ),
+    )
+
+    try:
+        store_test_image(service, user_id=7, owner_key="auth-user-abc")
+    except ValueError as exc:
+        assert "Supabase Storage is required" in str(exc)
+    else:
+        raise AssertionError("local fallback should be rejected when Supabase Auth is required")
+    assert not (tmp_path / "meals").exists()
+
+
+def test_meal_image_download_rejects_local_file_fallback_in_production(tmp_path):
+    service = FileStorageService(
+        tmp_path,
+        settings=Settings(_env_file=None, app_env="production"),
+    )
+
+    try:
+        service.download_meal_image("meals/7/image.jpg")
+    except ValueError as exc:
+        assert "Supabase Storage is required" in str(exc)
+    else:
+        raise AssertionError("local download fallback should be rejected in production")
+
+
+def test_supabase_meal_image_path_uses_auth_user_id(tmp_path, monkeypatch):
+    requests = []
+    service = FileStorageService(
+        tmp_path,
+        access_token="user-jwt",
+        settings=Settings(
+            _env_file=None,
+            supabase_url="https://nexmxwvivewvgmrritqa.supabase.co",
+            supabase_publishable_key="publishable-test-key",
+        ),
+    )
+
+    def fake_post(url: str, **kwargs):
+        requests.append((url, kwargs["headers"]))
+        return FakeStorageResponse(201)
+
+    monkeypatch.setattr("backend.app.services.file_storage_service.httpx.post", fake_post)
+
+    stored_path = store_test_image(service, user_id=7, owner_key="auth-user-abc")
+
+    assert str(stored_path).startswith(f"auth-user-abc/{date.today().isoformat()}/")
+    assert not str(stored_path).startswith("7/")
+    assert "/storage/v1/object/meal-images/auth-user-abc/" in requests[0][0]
+    assert requests[0][1]["Authorization"] == "Bearer user-jwt"
 
 
 def test_meal_upload_rejects_jpeg_content_type_with_invalid_magic_bytes(tmp_path):
@@ -276,6 +338,32 @@ def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
 
 def enable_language_guard(monkeypatch) -> None:
     monkeypatch.setenv("LANGUAGE_GUARD_ENABLED", "true")
+
+
+def store_test_image(service: FileStorageService, *, user_id: int, owner_key: str):
+    import asyncio
+
+    return asyncio.run(
+        service.store_meal_image(
+            user_id=user_id,
+            owner_key=owner_key,
+            file=FakeUploadFile("image/png", b"\x89PNG\r\n\x1a\nfake-png"),
+        )
+    )
+
+
+class FakeStorageResponse:
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+
+class FakeUploadFile:
+    def __init__(self, content_type: str, content: bytes):
+        self.content_type = content_type
+        self._content = content
+
+    async def read(self, _size: int) -> bytes:
+        return self._content
 
 
 class FakeImageProvider:

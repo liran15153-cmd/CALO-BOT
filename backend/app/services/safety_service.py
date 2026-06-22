@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import SafetyEvent
 from backend.app.services.pain_text import has_pain_or_injury_signal
+from backend.app.services.text_normalization import normalize_user_text
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,7 @@ class SafetyService:
         self.db = db
 
     def classify(self, text: str) -> SafetyResult:
-        normalized = text.lower()
+        normalized = normalize_user_text(text)
 
         if any(
             term in normalized

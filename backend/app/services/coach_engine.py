@@ -106,7 +106,9 @@ class CoachEngine:
                 metadata=response_metadata,
             )
 
-        intent = CoachIntentService().classify(payload.message)
+        intent_service = CoachIntentService()
+        intent = intent_service.classify(payload.message)
+        secondary_intent = intent_service.secondary_state_intent(payload.message, intent.name)
         tool_response = self._handle_tool_intent(
             user_id=user.id,
             session_id=session.id,
@@ -117,6 +119,9 @@ class CoachEngine:
         )
         if tool_response is not None:
             response_text, response_metadata = _unpack_tool_result(tool_response)
+            if secondary_intent is not None:
+                response_text = _append_secondary_intent_prompt(response_text, secondary_intent)
+                response_metadata = {**response_metadata, "secondary_intent": secondary_intent}
             UsageService(self.db).record(
                 user_id=user.id,
                 task="chat",
@@ -487,6 +492,9 @@ class CoachEngine:
         if intent_name == "memory_ack":
             return _memory_ack_response()
 
+        if intent_name == "non_fitness":
+            return _non_fitness_response()
+
         if intent_name == "weekly_summary":
             summary = SummaryService(self.db).weekly_summary(user_id=user_id)
             return f"{summary.summary_text} הפעולה הבאה: {summary.next_action}"
@@ -506,6 +514,25 @@ def _unpack_tool_result(result: ToolResult) -> tuple[str, dict[str, Any]]:
     if isinstance(result, tuple):
         return result
     return result, {}
+
+
+def _append_secondary_intent_prompt(response_text: str, secondary_intent: str) -> str:
+    if secondary_intent == "workout_plan":
+        return (
+            f"{response_text} קלטתי גם בקשה לאימון או תוכנית, אבל לא אשמור תוכנית מתוך אותה הודעה. "
+            "הפעולה הבאה: שלח בקשת אימון אחת בנפרד."
+        )
+    if secondary_intent == "meal_log":
+        return (
+            f"{response_text} קלטתי גם ארוחה לתיעוד, אבל לא אשמור ארוחה מתוך אותה הודעה. "
+            "הפעולה הבאה: שלח את הארוחה בנפרד."
+        )
+    if secondary_intent == "workout_log":
+        return (
+            f"{response_text} קלטתי גם תיעוד אימון, אבל לא אשמור אותו מתוך אותה הודעה. "
+            "הפעולה הבאה: שלח את תיעוד האימון בנפרד."
+        )
+    return response_text
 
 
 def _confirms_plan_replacement(text: str) -> bool:
@@ -915,6 +942,8 @@ def _progress_metric_response(text: str) -> str:
         "לפני ששוברים הכל, כדאי להסתכל על ממוצע שבועי ועל העומסים באימון, לא על מספר יומי. "
         "הפעולה הבאה: לשמור על העקביות עוד 1-2 שבועות, לוודא חלבון וצעדים, ואז לשנות דבר אחד בלבד."
     )
+def _non_fitness_response() -> str:
+    return "אני ממוקד בכושר, תזונה כללית, התאוששות והרגלים. הפעולה הבאה: שלח שאלה שקשורה לאימון, ארוחה, כאב באימון או התקדמות."
 
 
 def _knee_squat_substitution_response() -> str:

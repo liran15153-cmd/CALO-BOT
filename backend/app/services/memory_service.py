@@ -2,6 +2,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import ChatMessage, MemorySummary, UserMemory, UserProfile
+from backend.app.services.text_normalization import normalize_user_text
 
 
 MIN_SUMMARY_MEMORIES = 3
@@ -98,7 +99,7 @@ class MemoryService:
 
     @staticmethod
     def _extract(text: str) -> list[tuple[str, str]]:
-        normalized = text.lower()
+        normalized = normalize_user_text(text)
         memories: list[tuple[str, str]] = []
         seen: set[tuple[str, str]] = set()
 

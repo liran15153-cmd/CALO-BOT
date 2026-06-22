@@ -16,6 +16,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": ".webp",
 }
 MAX_MEAL_IMAGE_BYTES = 5 * 1024 * 1024
+_SUPABASE_STORAGE_REQUIRED_MESSAGE = "Supabase Storage is required for meal images when Supabase Auth or production mode is enabled"
 
 
 class FileStorageService:
@@ -43,8 +44,8 @@ class FileStorageService:
                 owner_key=owner_key or str(user_id),
             )
 
-        if self.settings.app_env == "production":
-            raise ValueError("Supabase Storage is required for meal images in production")
+        if self.settings.app_env == "production" or self.settings.supabase_auth_required:
+            raise ValueError(_SUPABASE_STORAGE_REQUIRED_MESSAGE)
 
         # Development fallback for local SQLite/no-auth runs only.
         root = self.upload_root.resolve()
@@ -57,6 +58,8 @@ class FileStorageService:
 
     def download_meal_image(self, image_path: str) -> Path:
         if not self.settings.supabase_configured or not self.access_token:
+            if self.settings.app_env == "production" or self.settings.supabase_auth_required:
+                raise ValueError(_SUPABASE_STORAGE_REQUIRED_MESSAGE)
             path = Path(image_path)
             return path if path.is_absolute() else self.upload_root.resolve() / path
 

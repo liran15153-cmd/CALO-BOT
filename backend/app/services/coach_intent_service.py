@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from backend.app.services.text_normalization import normalize_user_text
+
 
 @dataclass(frozen=True)
 class CoachIntent:
@@ -9,8 +11,8 @@ class CoachIntent:
 
 class CoachIntentService:
     def classify(self, text: str) -> CoachIntent:
-        normalized = text.lower().strip()
-        payload_text = self._strip_command_prefix(text)
+        normalized = normalize_user_text(text)
+        payload_text = self._strip_command_prefix(normalized)
 
         # Logging actions outrank guidance/summary: a message that records something
         # the user did should always be treated as a log, not as a question about it.
@@ -50,6 +52,8 @@ class CoachIntentService:
             return CoachIntent(name="motivation_recovery", payload_text=payload_text)
         if self._is_fitness_term_guidance(normalized):
             return CoachIntent(name="fitness_term_guidance", payload_text=payload_text)
+        if self._is_non_fitness_request(normalized):
+            return CoachIntent(name="non_fitness", payload_text=payload_text)
         return CoachIntent(name="general_chat", payload_text=text)
 
     # Common Israeli foods used to gate eating-slang and food-judgment questions, so a
@@ -85,6 +89,16 @@ class CoachIntentService:
         "קלוריות",
         "חלבון",
     )
+
+    def secondary_state_intent(self, text: str, primary_name: str) -> str | None:
+        normalized = normalize_user_text(text)
+        if primary_name != "workout_plan" and self._is_workout_plan(normalized):
+            return "workout_plan"
+        if primary_name != "meal_log" and self._is_meal_log(normalized):
+            return "meal_log"
+        if primary_name != "workout_log" and self._is_workout_log(normalized):
+            return "workout_log"
+        return None
 
     @staticmethod
     def _is_meal_log(text: str) -> bool:
@@ -148,7 +162,26 @@ class CoachIntentService:
         has_plan_language = any(term in text for term in ["plan", "program", "routine", "תוכנית", "תכנית"])
         has_workout_language = any(
             term in text
-            for term in ["workout", "training", "gym", "dumbbell", "אימון", "אימונים", "כושר", "כוח", "משקולות"]
+            for term in [
+                "workout",
+                "training",
+                "gym",
+                "dumbbell",
+                "leg",
+                "legs",
+                "pushup",
+                "pushups",
+                "run",
+                "running",
+                "squat",
+                "אימון",
+                "אימונים",
+                "כושר",
+                "כוח",
+                "משקולות",
+                "ריצה",
+                "רגליים",
+            ]
         )
         has_creation_language = any(
             phrase in text
@@ -630,6 +663,22 @@ class CoachIntentService:
             token.isdigit() for token in text.split()
         ) and any(verb in text for verb in ["עליתי", "ירדתי", "עלתה", "ירד", "תקוע", "gained", "lost"])
         return mentions_metric or weight_with_number
+
+    @staticmethod
+    def _is_non_fitness_request(text: str) -> bool:
+        return any(
+            phrase in text
+            for phrase in [
+                "resignation email",
+                "write an email",
+                "email to my manager",
+                "cover letter",
+                "קורות חיים",
+                "מייל למנהל",
+                "לכתוב מייל",
+                "מכתב התפטרות",
+            ]
+        )
 
     @staticmethod
     def _strip_command_prefix(text: str) -> str:
