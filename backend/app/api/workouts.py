@@ -117,6 +117,8 @@ def create_workout_log(
     source_text = _workout_log_safety_source(payload, pain_flag=log.pain_flag)
     if source_text:
         safety_result = SafetyService(db).classify(source_text)
+        # Record both hard-blocked events and soft pain signals so a logged workout that
+        # mentions pain leaves an audit trail, matching the coach chat path.
         if safety_result.flagged or safety_result.event_type:
             SafetyService(db).record_event(user_id=user.id, source_text=source_text, result=safety_result)
     workout_ids = [log.workout_id] if log.workout_id else None

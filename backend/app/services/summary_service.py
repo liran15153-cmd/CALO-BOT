@@ -27,8 +27,12 @@ class SummaryService:
         next_action = "תעד היום ארוחה אחת או אימון אחד." if not workouts and not meals else "תכנן את האימון הבא או ארוחה אחת עם דגש על חלבון."
         if pain_flags:
             next_action = "הימנע מתנועות כואבות ושקול פנייה לאיש מקצוע אם הכאב נמשך."
+        if not workouts and not meals:
+            summary_text = "היום עוד לא תיעדת אימון או ארוחה."
+        else:
+            summary_text = f"היום {_completed_workouts_summary(completed)} ו{_meals_logged_summary(len(meals))}."
         return {
-            "summary": f"היום {_completed_workouts_summary(completed)} ו{_meals_logged_summary(len(meals))}.",
+            "summary": summary_text,
             "metrics": {
                 "date": day.isoformat(),
                 "workouts_completed": completed,
@@ -131,18 +135,24 @@ class SummaryService:
 
 
 def _completed_workouts_summary(count: int) -> str:
+    if count == 0:
+        return "עדיין לא הושלם אימון"
     if count == 1:
         return "הושלם אימון אחד"
     return f"הושלמו {count} אימונים"
 
 
 def _missed_workouts_summary(count: int) -> str:
+    if count == 0:
+        return "בלי אימונים שפוספסו"
     if count == 1:
         return "אימון אחד פוספס"
     return f"{count} אימונים פוספסו"
 
 
 def _meals_logged_summary(count: int) -> str:
+    if count == 0:
+        return "עדיין לא תועדה ארוחה"
     if count == 1:
         return "תועדה ארוחה אחת"
     return f"תועדו {count} ארוחות"

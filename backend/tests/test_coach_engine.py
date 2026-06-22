@@ -1403,6 +1403,133 @@ def test_chat_endpoint_dispatches_feminine_hebrew_workout_plan_intent_to_module(
     assert saved.days_per_week == 4
 
 
+def test_chat_endpoint_answers_motivation_locally_in_natural_hebrew(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "אין לי מוטיבציה היום, בא לי לוותר"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "ספק הבינה המלאכותית לא מוגדר" not in body["response"]
+    assert "מוטיבציה" in body["response"]
+    assert "עקביות" in body["response"]
+
+
+def test_chat_endpoint_answers_rest_day_question_locally(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "כמה ימי מנוחה צריך בין אימונים?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "מנוחה" in body["response"]
+    assert "48 שעות" in body["response"]
+
+
+def test_chat_endpoint_answers_progress_plateau_locally(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "המשקל תקוע שבועיים מה לעשות?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "ממוצע שבועי" in body["response"]
+    assert "מים" in body["response"]
+
+
+def test_chat_endpoint_answers_muscle_or_fat_question_without_medical_verdict(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "עליתי 2 קילו, זה שריר או שומן?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "שריר" in body["response"]
+    assert "מגמה" in body["response"] or "ממוצע שבועי" in body["response"]
+
+
+def test_chat_endpoint_motivation_response_is_personalized_by_recent_workouts(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+    client.post("/api/workout-logs", json={"text": "I did 3 sets of bench press 10, 8, 7 with 50kg"})
+
+    response = client.post("/api/chat", json={"message": "אין לי מוטיבציה היום"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    # A grounded sentence about the user's recent logged training is prepended.
+    assert "תיעדת" in body["response"]
+
+
+def test_chat_endpoint_humanizes_workout_log_confirmation(tmp_path):
+    client, _db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "עשיתי 3 סטים של 10 חזרות בסקוואט"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "רשמתי את האימון" in body["response"]
+    assert "רמת ביטחון" not in body["response"]
+
+
+def test_chat_endpoint_logs_gym_slang_workout_with_pain_acknowledgement(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post("/api/chat", json={"message": "כואבת לי הברך אבל עשיתי רגליים"})
+
+    assert response.status_code == 200
+    body = response.json()
+    # Logged as a workout, pain acknowledged, safety not hard-blocked.
+    assert body["safety_flagged"] is False
+    assert body["provider_status"] == "local_tool"
+    assert "רשמתי את האימון" in body["response"]
+    assert "כאב" in body["response"]
+    saved = db.scalar(select(WorkoutLog))
+    assert saved is not None
+    assert saved.pain_flag is True
+
+
+def test_chat_endpoint_safety_red_flag_beats_motivation_keywords(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "אין לי מוטיבציה ויש לי כאב בחזה בזמן אימון"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    # Safety must win over any new motivation/progress intent.
+    assert body["safety_flagged"] is True
+    assert body["provider_status"] == "safety_override"
+    assert "לעצור" in body["response"]
+    event = db.scalar(select(SafetyEvent))
+    assert event is not None
+    assert event.event_type == "dangerous_symptoms"
+
+
+def test_chat_endpoint_safety_extreme_diet_beats_progress_keywords(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "המשקל תקוע, תן לי דיאטה של 600 קלוריות כדי לרדת מהר"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["safety_flagged"] is True
+    assert body["provider_status"] == "safety_override"
+    event = db.scalar(select(SafetyEvent))
+    assert event is not None
+    assert event.event_type == "extreme_dieting"
+
+
 def make_client_and_db(tmp_path) -> tuple[TestClient, Session]:
     engine = make_engine(f"sqlite:///{tmp_path / 'coach.db'}")
     init_db(engine)
