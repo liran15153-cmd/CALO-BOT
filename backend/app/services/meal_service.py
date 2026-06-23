@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
 from backend.app.models import Meal, MealImageAnalysis, MealItem
+from backend.app.prompts import meal_text_prompt
 from backend.app.schemas import MealTextRequest
-from backend.app.services.ai_provider import build_ai_provider
+from backend.app.services.ai_provider import AIRequest, build_ai_provider
 from backend.app.services.file_storage_service import FileStorageService
 from backend.app.services.language_guard import contains_hebrew, has_disallowed_latin_text
 from backend.app.services.usage_service import UsageService, rough_token_count
@@ -154,7 +155,7 @@ class MealService:
         return analysis
 
     def log_manual_meal(self, user_id: int, request: MealTextRequest) -> Meal:
-        estimate = self._estimate_manual_meal(request.text)
+        estimate = self._estimate_meal(user_id=user_id, text=request.text)
         meal = Meal(
             user_id=user_id,
             eaten_on=request.eaten_on or date.today(),
@@ -387,6 +388,94 @@ class MealService:
         if value in {"low", "medium", "high"}:
             return str(value)
         return "low"
+
+    def _estimate_meal(self, user_id: int, text: str) -> dict:
+        """Estimate a free-text meal via the AI provider, falling back to the
+        deterministic table when offline, over budget, or when the AI output is unusable.
+        Mirrors the safe provider pattern used by ``analyze_image``.
+        """
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            return self._estimate_manual_meal(text)
+
+        usage_service = UsageService(self.db)
+        if usage_service.is_daily_ai_token_budget_exceeded(user_id=user_id):
+            usage_service.record(
+                user_id=user_id,
+                task="meal_text",
+                provider="budget_exceeded",
+                model=None,
+                estimated_tokens_in=0,
+                estimated_tokens_out=0,
+            )
+            return self._estimate_manual_meal(text)
+
+        provider = build_ai_provider(settings.anthropic_api_key, settings.anthropic_model)
+        request = AIRequest(instructions=meal_text_prompt(), input_text=text, max_output_tokens=400)
+        result = provider.structured(request)
+        usage_service.record_ai_result(user_id=user_id, task="meal_text", request=request, result=result)
+
+        if result.provider_status != "configured":
+            return self._estimate_manual_meal(text)
+        estimate = self._estimate_from_payload(self._parse_analysis_json(result.text))
+        if estimate is None:
+            return self._estimate_manual_meal(text)
+        return estimate
+
+    @classmethod
+    def _estimate_from_payload(cls, payload: dict) -> dict | None:
+        """Map an AI analysis payload (Hebrew-guarded) into the estimate dict shape that
+        ``log_manual_meal`` consumes. Returns ``None`` when no usable item was detected."""
+        items = []
+        for raw in payload.get("detected_items", []):
+            if not isinstance(raw, dict):
+                continue
+            name = str(raw.get("name") or "").strip()
+            if not name:
+                continue
+            item_calories = cls._range_from_item(raw, "calories")
+            item_protein = cls._range_from_item(raw, "protein")
+            items.append(
+                {
+                    "name": name[:160],
+                    "quantity": str(raw.get("quantity") or "").strip()[:120] or _MEAL_PARTIAL_QUANTITY,
+                    "calories_min": item_calories[0],
+                    "calories_max": item_calories[1],
+                    "protein_min": item_protein[0],
+                    "protein_max": item_protein[1],
+                }
+            )
+        if not items:
+            return None
+
+        calories = cls._range_from_payload(payload, "calorie_range", "calories_range")
+        if calories == (None, None):
+            calories = cls._sum_item_ranges(items, "calories")
+        protein = cls._macro_range(payload, "protein")
+        if protein == (None, None):
+            protein = cls._sum_item_ranges(items, "protein")
+        carbs = cls._macro_range(payload, "carbs")
+        fat = cls._macro_range(payload, "fat")
+        return {
+            "calories_min": calories[0],
+            "calories_max": calories[1],
+            "protein_min": protein[0],
+            "protein_max": protein[1],
+            "carbs_min": carbs[0],
+            "carbs_max": carbs[1],
+            "fat_min": fat[0],
+            "fat_max": fat[1],
+            "confidence": cls._confidence(payload.get("confidence")),
+            "items": items,
+        }
+
+    @staticmethod
+    def _sum_item_ranges(items: list[dict], prefix: str) -> tuple[int | None, int | None]:
+        mins = [item[f"{prefix}_min"] for item in items if item.get(f"{prefix}_min") is not None]
+        maxs = [item[f"{prefix}_max"] for item in items if item.get(f"{prefix}_max") is not None]
+        if not mins or not maxs:
+            return None, None
+        return sum(mins), sum(maxs)
 
     @staticmethod
     def _estimate_manual_meal(text: str) -> dict:
