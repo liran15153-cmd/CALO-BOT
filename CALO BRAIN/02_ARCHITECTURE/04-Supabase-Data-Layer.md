@@ -2,7 +2,7 @@
 type: architecture
 status: active
 source_of_truth: true
-updated: 2026-06-22
+updated: 2026-06-23
 related_paths:
   - supabase/migrations/202606210001_calo_core_schema.sql
   - backend/app/auth.py
@@ -15,7 +15,7 @@ notes: >-
 
 # Supabase Data Layer
 
-Supabase is the data/auth/storage layer only. CALO coach behavior stays in backend services: intent routing, safety, workout planning, memory extraction, meal estimation, dashboard calculation, and usage budgeting.
+Supabase is the data/auth/storage layer only. CALO coach behavior stays in backend services: intent routing, safety, workout planning, meal estimation, dashboard calculation, and usage budgeting.
 
 ## Runtime split
 
@@ -27,7 +27,7 @@ Supabase is the data/auth/storage layer only. CALO coach behavior stays in backe
 
 ## Persistence
 
-The Supabase migration creates RLS-protected tables for users, fitness profiles, chat sessions/messages, workout plans/workouts/exercises/logs, meal logs/items/image analyses, coaching memories, memory summaries, body metrics, safety events, usage events, weekly summaries, and pending actions.
+The Supabase migration creates RLS-protected tables for users, fitness profiles, chat sessions/messages, pending actions, workout plans/workouts/exercises/logs, meal logs/items/image analyses, body metrics, safety events, and usage events. A later cleanup migration removes legacy personalization/state and summary tables from older deployments.
 
 Meal images move from `data/uploads` to the private `meal-images` Supabase Storage bucket when Supabase Auth is configured. Local upload storage is allowed only for SQLite/no-auth development.
 
