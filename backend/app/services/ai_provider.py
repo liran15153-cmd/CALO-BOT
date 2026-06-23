@@ -25,6 +25,7 @@ class AIResult:
     estimated_tokens_in: int = 0
     estimated_tokens_out: int = 0
     token_breakdown: dict[str, Any] = field(default_factory=dict)
+    structured_output: dict[str, Any] | None = None
 
 
 class AIProvider(Protocol):
@@ -32,6 +33,9 @@ class AIProvider(Protocol):
         ...
 
     def structured(self, request: AIRequest) -> AIResult:
+        ...
+
+    def extract_tool(self, request: AIRequest, tool: dict[str, Any]) -> AIResult:
         ...
 
     def summarize(self, request: AIRequest) -> AIResult:
@@ -48,6 +52,9 @@ class NoConfiguredAIProvider:
         return self._not_configured()
 
     def structured(self, request: AIRequest) -> AIResult:
+        return self._not_configured()
+
+    def extract_tool(self, request: AIRequest, tool: dict[str, Any]) -> AIResult:
         return self._not_configured()
 
     def summarize(self, request: AIRequest) -> AIResult:
@@ -90,6 +97,48 @@ class AnthropicProvider:
             baseline_input_text=request.baseline_input_text,
         )
         return self._responses_text(structured_request)
+
+    def extract_tool(self, request: AIRequest, tool: dict[str, Any]) -> AIResult:
+        """Call the model with a forced tool so it returns schema-validated structured
+        output. Returns ``structured_output`` with the tool input, or ``provider_error``
+        when the call fails or the model returns no matching ``tool_use`` block."""
+        response = self._call_messages_api(
+            model=self.model,
+            system=request.instructions,
+            messages=[{"role": "user", "content": request.input_text}],
+            tools=[tool],
+            tool_choice={"type": "tool", "name": tool["name"]},
+            max_tokens=request.max_output_tokens,
+        )
+        if response is None:
+            return self._provider_error()
+        tool_input = _extract_anthropic_tool_use(response, tool["name"])
+        if tool_input is None:
+            return AIResult(text="", provider_status="provider_error", used_model=self.model)
+        usage = getattr(response, "usage", None)
+        input_tokens = getattr(usage, "input_tokens", None) or _rough_token_count(
+            request.instructions + "\n" + request.input_text
+        )
+        output_tokens = getattr(usage, "output_tokens", None) or 0
+        component_counts = self._count_request_components(request)
+        count_source = "anthropic_usage+anthropic_count_tokens" if component_counts else "anthropic_usage+local_estimate"
+        token_breakdown = build_token_breakdown(
+            request=request,
+            output_text="",
+            input_total=input_tokens,
+            output_total=output_tokens,
+            component_token_counts=component_counts,
+            source=count_source,
+        )
+        return AIResult(
+            text="",
+            provider_status="configured",
+            used_model=self.model,
+            estimated_tokens_in=input_tokens,
+            estimated_tokens_out=output_tokens,
+            token_breakdown=token_breakdown,
+            structured_output=tool_input,
+        )
 
     def summarize(self, request: AIRequest) -> AIResult:
         return self._responses_text(request)
@@ -228,6 +277,16 @@ def _extract_anthropic_text(response: Any) -> str:
     content = getattr(response, "content", None) or []
     text_parts = [getattr(block, "text", "") for block in content if getattr(block, "type", None) == "text"]
     return "\n".join(part for part in text_parts if part)
+
+
+def _extract_anthropic_tool_use(response: Any, tool_name: str) -> dict[str, Any] | None:
+    content = getattr(response, "content", None) or []
+    for block in content:
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == tool_name:
+            tool_input = getattr(block, "input", None)
+            if isinstance(tool_input, dict):
+                return tool_input
+    return None
 
 
 def _rough_token_count(text: str) -> int:
