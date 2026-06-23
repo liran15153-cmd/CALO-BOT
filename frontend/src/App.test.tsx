@@ -45,22 +45,7 @@ describe('App shell', () => {
               current_streak: 0,
               missed_workouts: 0,
               next_recommended_action: 'Start with one short workout.',
-              nutrition_action: 'Add one balanced meal first.',
-              recent_coach_notes: []
-            })
-          } as Response;
-        }
-        if (url.endsWith('/api/summaries/weekly/current')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              summary: null,
-              metrics: {},
-              next_action: null,
-              week_start: null,
-              week_end: null,
-              persisted: false
+              nutrition_action: 'Add one balanced meal first.'
             })
           } as Response;
         }

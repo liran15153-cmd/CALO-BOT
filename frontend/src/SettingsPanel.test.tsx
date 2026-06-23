@@ -19,7 +19,6 @@ describe('Settings UI', () => {
             completed_workouts_this_week: 0,
             meals_logged_this_week: 0,
             estimated_nutrition_range: null,
-            recent_coach_notes: [],
             current_streak: 0,
             missed_workouts: 0,
             next_recommended_action: 'Complete onboarding.'

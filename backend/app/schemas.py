@@ -253,12 +253,6 @@ class BodyMetricResponse(BaseModel):
     note: str | None
 
 
-class SummaryResponse(BaseModel):
-    summary: str
-    metrics: dict[str, Any]
-    next_action: str
-
-
 class SettingsResponse(BaseModel):
     ai_provider: str
     model: str

@@ -26,16 +26,6 @@ def test_usage_tracks_chat_attempts_with_no_provider(tmp_path):
     assert body["tokens_remaining"] == body["daily_ai_token_limit"] - body["estimated_tokens_total"]
 
 
-def test_usage_tracks_summary_generation(tmp_path):
-    client = make_client(tmp_path)
-
-    summary = client.get("/api/summaries/weekly")
-    usage = client.get("/api/usage")
-
-    assert summary.status_code == 200
-    assert usage.json()["summary_requests_count"] == 1
-
-
 def test_usage_tracks_image_analysis_attempts(tmp_path):
     client = make_client(tmp_path)
     app.state.upload_root = tmp_path / "uploads"

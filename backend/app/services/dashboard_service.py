@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Meal, User, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
+from backend.app.models import Meal, User, UserProfile, WorkoutLog, WorkoutPlan
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.workout_service import WorkoutService
 
@@ -27,7 +27,6 @@ class DashboardService:
         today_meals = [meal for meal in meals if meal.eaten_on == today]
         today_workouts = [workout for workout in workouts if workout.logged_on == today]
         active_dates = self._activity_dates(user.id, today=today)
-        memories = self._recent_memories(user.id)
         plan = workout_service.current_plan(user_id=user.id)
         calories_min, calories_max = self._nutrition_range(meals)
         nutrition_range = None if calories_min is None or calories_max is None else [calories_min, calories_max]
@@ -49,7 +48,6 @@ class DashboardService:
             "estimated_nutrition_range": nutrition_range,
             "estimated_protein_range_today": protein_range_today,
             "nutrition_action": self._nutrition_action(today_meals=today_meals, today_workouts=today_workouts),
-            "recent_coach_notes": [_display_memory_content(memory.content) for memory in memories],
             "current_streak": self._current_streak(active_dates=active_dates, today=today),
             "missed_workouts": missed,
             "next_recommended_action": self._next_recommended_action(
@@ -106,16 +104,6 @@ class DashboardService:
             streak += 1
             cursor -= timedelta(days=1)
         return streak
-
-    def _recent_memories(self, user_id: int) -> list[UserMemory]:
-        return list(
-            self.db.scalars(
-                select(UserMemory)
-                .where(UserMemory.user_id == user_id, UserMemory.is_sensitive.is_(False))
-                .order_by(desc(UserMemory.created_at))
-                .limit(4)
-            ).all()
-        )
 
     @staticmethod
     def _nutrition_range(meals: list[Meal]) -> tuple[int, int] | tuple[None, None]:
@@ -180,13 +168,3 @@ class DashboardService:
         workout_name = next_workout.get("name") or "האימון הבא"
         adjustment = next_workout.get("next_adjustment") or "שמור על התוכנית הנוכחית."
         return f"לבצע את {workout_name}. {adjustment}"
-
-
-def _display_memory_content(content: str) -> str:
-    legacy_translations = {
-        "User has access to dumbbells": "למשתמש יש גישה למשקולות יד",
-        "User has access to resistance bands": "למשתמש יש גישה לגומיות התנגדות",
-        "User prefers short workouts": "המשתמש מעדיף אימונים קצרים",
-        "User trains after work": "המשתמש בדרך כלל מתאמן אחרי העבודה",
-    }
-    return legacy_translations.get(content, content)

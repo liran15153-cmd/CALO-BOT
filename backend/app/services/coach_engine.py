@@ -16,12 +16,10 @@ from backend.app.services.language_guard import (
     repair_hebrew_coach_response,
 )
 from backend.app.services.meal_service import MealService
-from backend.app.services.memory_service import MemoryService
 from backend.app.services.pending_action_service import PendingActionService
 from backend.app.services.pain_text import extract_pain_area
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.safety_service import SafetyService
-from backend.app.services.summary_service import SummaryService
 from backend.app.services.token_budgeting import build_optimized_chat_request
 from backend.app.services.usage_service import UsageService
 from backend.app.services.workout_service import WorkoutService
@@ -50,7 +48,6 @@ class CoachEngine:
             role="user",
             content=payload.message,
         )
-        MemoryService(self.db).extract_and_store(user_id=user.id, source_text=payload.message)
 
         safety = SafetyService(self.db)
         safety_result = safety.classify(payload.message)
@@ -71,7 +68,6 @@ class CoachEngine:
                 content=safety_result.response,
                 metadata={"safety": True},
             )
-            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
@@ -137,7 +133,6 @@ class CoachEngine:
                 content=response_text,
                 metadata={"provider_status": "local_tool", "intent": intent.name, **response_metadata},
             )
-            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
@@ -194,7 +189,6 @@ class CoachEngine:
                 content=budget_response,
                 metadata={"provider_status": "budget_exceeded"},
             )
-            MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
             return ChatResponse(
                 session_id=session.id,
                 user_message_id=user_message.id,
@@ -276,7 +270,6 @@ class CoachEngine:
                 **quality_metadata,
             },
         )
-        MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
 
         return ChatResponse(
             session_id=session.id,
@@ -315,7 +308,6 @@ class CoachEngine:
             content=response_text,
             metadata={"provider_status": "local_tool", "intent": intent_name, **(metadata or {})},
         )
-        MemoryService(self.db).refresh_long_term_summary(user_id=user.id)
         return ChatResponse(
             session_id=session.id,
             user_message_id=user_message.id,
@@ -489,19 +481,8 @@ class CoachEngine:
         if intent_name == "creatine_guidance":
             return _creatine_guidance_response()
 
-        if intent_name == "memory_ack":
-            return _memory_ack_response()
-
         if intent_name == "non_fitness":
             return _non_fitness_response()
-
-        if intent_name == "weekly_summary":
-            summary = SummaryService(self.db).weekly_summary(user_id=user_id)
-            return f"{summary.summary_text} הפעולה הבאה: {summary.next_action}"
-
-        if intent_name == "daily_summary":
-            summary = SummaryService(self.db).daily_summary(user_id=user_id)
-            return f"{summary['summary']} הפעולה הבאה: {summary['next_action']}"
 
         return None
 
@@ -902,10 +883,6 @@ def _creatine_guidance_response() -> str:
         "דבר עם רופא או דיאטן לפני שימוש. אם אין מניעה: 3-5 גרם ביום של creatine monohydrate, "
         "עם מים, בלי לצפות לקסם. קודם ודא שהתוכנית, החלבון והשינה עקביים."
     )
-
-
-def _memory_ack_response() -> str:
-    return "מעכשיו אתחשב בזה בתכנון אימונים, התאמות ופעולה הבאה. אם זה משפיע על האימון הקרוב, כדאי לבחור גרסה שמתאימה לזה כבר היום."
 
 
 def _motivation_recovery_response(text: str) -> str:

@@ -74,8 +74,6 @@ def compact_provider_context(*, context: dict[str, Any], user_message: str) -> d
         "recent_workouts": _records(context.get("recent_workouts") or [], _WORKOUT_KEYS, _WORKOUT_TRIMS),
         "training_status": _drop_empty(context.get("training_status") or {}),
         "recent_meals": _records(context.get("recent_meals") or [], _MEAL_KEYS, _MEAL_TRIMS),
-        "memories": _compact_text_list(context.get("memories") or [], limit=4, max_chars=120),
-        "caution_notes": _compact_text_list(context.get("caution_notes") or [], limit=3, max_chars=140),
         "recent_chat": _compact_recent_chat(context.get("recent_chat") or [], user_message=user_message),
         "coaching_knowledge": _compact_coaching_knowledge(context.get("coaching_knowledge") or {}),
     }

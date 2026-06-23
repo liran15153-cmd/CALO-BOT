@@ -160,7 +160,6 @@ def test_supabase_migration_defines_user_owned_rls_policies():
         "workout_logs",
         "meal_logs",
         "body_metrics",
-        "memory_summaries",
     ):
         assert f"alter table public.{table} enable row level security;" in sql
     assert "to authenticated" in sql
@@ -189,9 +188,12 @@ def test_supabase_manual_verification_sql_checks_schema_rls_and_storage():
 
 
 def test_supabase_migrations_are_non_destructive():
+    # The legacy-memory/summaries cleanup migration is intentionally destructive and is
+    # excluded here; this guard protects the core schema migrations from accidental drops.
     migration_sql = "\n".join(
         path.read_text(encoding="utf-8").lower()
         for path in Path("supabase/migrations").glob("*.sql")
+        if "drop_legacy_memory_and_summaries" not in path.name
     )
 
     forbidden_fragments = (
@@ -208,11 +210,18 @@ def test_supabase_migrations_are_non_destructive():
         "alter table public.workout_logs drop",
         "alter table public.meal_logs drop",
         "alter table public.body_metrics drop",
-        "alter table public.coaching_memories drop",
-        "alter table public.memory_summaries drop",
     )
     for forbidden in forbidden_fragments:
         assert forbidden not in migration_sql
+
+
+def test_supabase_cleanup_migration_drops_legacy_memory_and_summary_tables():
+    cleanup_sql = Path(
+        "supabase/migrations/202606230001_drop_legacy_memory_and_summaries.sql"
+    ).read_text(encoding="utf-8").lower()
+
+    for table in ("coaching_memories", "memory_summaries", "weekly_summaries"):
+        assert f"drop table if exists public.{table}" in cleanup_sql
 
 
 def test_env_example_contains_only_supabase_placeholders():

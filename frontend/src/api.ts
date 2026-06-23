@@ -300,19 +300,9 @@ export type DashboardState = {
   estimated_nutrition_range: [number | null, number | null] | null;
   estimated_protein_range_today: [number | null, number | null] | null;
   nutrition_action: string;
-  recent_coach_notes: string[];
   current_streak: number;
   missed_workouts: number;
   next_recommended_action: string;
-};
-
-export type SummaryResponse = {
-  summary?: string | null;
-  metrics?: Record<string, number | string | null | undefined>;
-  next_action?: string | null;
-  week_start?: string | null;
-  week_end?: string | null;
-  persisted?: boolean;
 };
 
 export type SettingsState = {
@@ -551,14 +541,6 @@ export async function saveManualMeal(text: string): Promise<Meal> {
 
 export async function fetchDashboard(): Promise<DashboardState> {
   const response = await apiFetch(`${API_BASE}/api/dashboard`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-export async function fetchCurrentWeeklySummary(): Promise<SummaryResponse> {
-  const response = await apiFetch(`${API_BASE}/api/summaries/weekly/current`);
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }

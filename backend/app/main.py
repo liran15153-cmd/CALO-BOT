@@ -8,7 +8,6 @@ from backend.app.api.meals import router as meals_router
 from backend.app.api.onboarding import router as onboarding_router
 from backend.app.api.pending_actions import router as pending_actions_router
 from backend.app.api.settings import router as settings_router
-from backend.app.api.summaries import router as summaries_router
 from backend.app.api.usage import router as usage_router
 from backend.app.api.workouts import logs_router, router as workout_plans_router, workouts_router
 from backend.app.config import get_settings
@@ -55,7 +54,6 @@ app.include_router(workout_plans_router)
 app.include_router(logs_router)
 app.include_router(workouts_router)
 app.include_router(meals_router)
-app.include_router(summaries_router)
 app.include_router(dashboard_router)
 app.include_router(body_metrics_router)
 app.include_router(settings_router)

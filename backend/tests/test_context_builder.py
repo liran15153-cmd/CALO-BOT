@@ -1,7 +1,7 @@
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.db import init_db, make_engine
-from backend.app.models import ChatMessage, ChatSession, UserMemory, WorkoutLog
+from backend.app.models import ChatMessage, ChatSession, WorkoutLog
 from backend.app.schemas import OnboardingPayload
 from backend.app.services.context_builder import ContextBuilder
 from backend.app.services.profile_service import ProfileService
@@ -18,63 +18,14 @@ def test_context_builder_uses_compact_context_not_full_chat_history(tmp_path):
 
     for index in range(8):
       db.add(ChatMessage(session_id=session.id, user_id=profile.user_id, role="user", content=f"turn {index}"))
-    db.add(UserMemory(user_id=profile.user_id, memory_type="preference", content="User prefers short workouts"))
     db.commit()
 
     context = ContextBuilder(db).build(user_id=profile.user_id, session_id=session.id)
 
     assert context["profile"]["main_goal"] == "build_muscle"
-    assert context["memories"] == ["User prefers short workouts"]
     assert len(context["recent_chat"]) == 4
     assert "turn 0" not in str(context)
     assert "turn 7" in str(context)
-
-
-def test_context_builder_filters_memories_for_intent(tmp_path):
-    db = make_session(tmp_path)
-    profile_service = ProfileService(db)
-    profile = profile_service.upsert_onboarding(valid_payload())
-    db.add_all(
-        [
-            UserMemory(user_id=profile.user_id, memory_type="equipment", content="User has access to dumbbells"),
-            UserMemory(user_id=profile.user_id, memory_type="nutrition", content="User avoids dairy"),
-            UserMemory(user_id=profile.user_id, memory_type="schedule", content="User trains after work"),
-        ]
-    )
-    db.commit()
-
-    context = ContextBuilder(db).build(user_id=profile.user_id, intent="meal_log")
-
-    assert "User avoids dairy" in context["memories"]
-    assert "User has access to dumbbells" not in context["memories"]
-
-
-def test_context_builder_exposes_sensitive_limitations_as_caution_notes(tmp_path):
-    db = make_session(tmp_path)
-    profile_service = ProfileService(db)
-    profile = profile_service.upsert_onboarding(valid_payload())
-    db.add_all(
-        [
-            UserMemory(
-                user_id=profile.user_id,
-                memory_type="preference",
-                content="המשתמש מעדיף אימונים קצרים",
-            ),
-            UserMemory(
-                user_id=profile.user_id,
-                memory_type="safety_limitation",
-                content="המשתמש דיווח על רגישות ברך בסקוואט",
-                is_sensitive=True,
-            ),
-        ]
-    )
-    db.commit()
-
-    context = ContextBuilder(db).build(user_id=profile.user_id, intent="general_chat")
-
-    assert "המשתמש מעדיף אימונים קצרים" in context["memories"]
-    assert "המשתמש דיווח על רגישות ברך בסקוואט" not in context["memories"]
-    assert context["caution_notes"] == ["המשתמש דיווח על רגישות ברך בסקוואט"]
 
 
 def test_context_builder_includes_compact_coaching_knowledge(tmp_path):

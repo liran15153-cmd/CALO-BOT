@@ -1,11 +1,10 @@
-import { CalendarCheck, Dumbbell, Flame, NotebookText, TrendingUp, Utensils } from 'lucide-react';
+import { CalendarCheck, Dumbbell, Flame, NotebookText, Utensils } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { fetchCurrentWeeklySummary, fetchDashboard, type DashboardState, type SummaryResponse } from './api';
+import { fetchDashboard, type DashboardState } from './api';
 
 export function DashboardPanel() {
   const [dashboard, setDashboard] = useState<DashboardState | null>(null);
-  const [weeklySummary, setWeeklySummary] = useState<SummaryResponse | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
@@ -19,15 +18,6 @@ export function DashboardPanel() {
       .catch(() => {
         if (!active) return;
         setStatus('error');
-      });
-    fetchCurrentWeeklySummary()
-      .then((data) => {
-        if (!active) return;
-        setWeeklySummary(data.summary?.trim() ? data : null);
-      })
-      .catch(() => {
-        if (!active) return;
-        setWeeklySummary(null);
       });
     return () => {
       active = false;
@@ -52,9 +42,6 @@ export function DashboardPanel() {
   }
 
   const nutritionRange = formatNutritionRange(dashboard.estimated_nutrition_range);
-  const weeklyRangeLabel = formatWeekRange(weeklySummary?.week_start, weeklySummary?.week_end);
-  const weeklyConsistency = formatConsistency(weeklySummary?.metrics);
-  const weeklyMetricItems = formatWeeklyMetricItems(weeklySummary?.metrics);
 
   return (
     <section className="panel dashboard-panel">
@@ -118,45 +105,6 @@ export function DashboardPanel() {
           <p>{dashboard.nutrition_action}</p>
         </div>
       </div>
-
-      {weeklySummary?.summary ? (
-        <section className="weekly-review" aria-label="סקירה שבועית">
-          <div className="weekly-review-header">
-            <div className="weekly-review-title">
-              <strong>סקירה שבועית</strong>
-              {weeklyRangeLabel ? <span>{weeklyRangeLabel}</span> : null}
-            </div>
-            {weeklyConsistency ? <span className="next-action-signal">{weeklyConsistency}</span> : null}
-          </div>
-          <p>{weeklySummary.summary}</p>
-          {weeklyMetricItems.length > 0 ? (
-            <div className="weekly-review-metrics">
-              {weeklyMetricItems.map((item) => (
-                <span className="weekly-review-metric" key={item.label}>
-                  {item.label}: {item.value}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {weeklySummary.next_action ? (
-            <p className="weekly-review-action">
-              <TrendingUp size={16} aria-hidden="true" />
-              <span>{weeklySummary.next_action}</span>
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
-      {dashboard.recent_coach_notes.length > 0 ? (
-        <div className="coach-notes">
-          <h4>זיכרון מאמן אחרון</h4>
-          <ul>
-            {dashboard.recent_coach_notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -177,51 +125,6 @@ function formatProteinRange(range: DashboardState['estimated_protein_range_today
 
 function formatMealCountToday(value: number): string {
   return value === 1 ? 'ארוחה אחת היום' : `${value} ארוחות היום`;
-}
-
-function formatWeekRange(start?: string | null, end?: string | null): string | null {
-  if (!start || !end) return null;
-  const startLabel = formatShortDate(start);
-  const endLabel = formatShortDate(end);
-  if (!startLabel || !endLabel) return null;
-  return `${startLabel} - ${endLabel}`;
-}
-
-function formatShortDate(value: string): string | null {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
-}
-
-function formatConsistency(metrics?: SummaryResponse['metrics']): string | null {
-  const value = numberMetric(metrics, 'consistency_percentage');
-  return value == null ? null : `${value}% עקביות`;
-}
-
-function formatWeeklyMetricItems(metrics?: SummaryResponse['metrics']): Array<{ label: string; value: string }> {
-  const completed = numberMetric(metrics, 'workouts_completed');
-  const missed = numberMetric(metrics, 'missed_workouts');
-  const meals = numberMetric(metrics, 'meals_logged');
-  return [
-    completed == null ? null : { label: 'הושלמו', value: formatWorkoutCount(completed) },
-    missed == null ? null : { label: 'פוספסו', value: formatWorkoutCount(missed) },
-    meals == null ? null : { label: 'ארוחות', value: formatMealCount(meals) }
-  ].filter((item): item is { label: string; value: string } => item !== null);
-}
-
-function numberMetric(metrics: SummaryResponse['metrics'] | undefined, key: string): number | null {
-  const value = metrics?.[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function formatWorkoutCount(value: number): string {
-  if (value === 1) return 'אימון אחד';
-  return `${value} אימונים`;
-}
-
-function formatMealCount(value: number): string {
-  if (value === 1) return 'ארוחה אחת';
-  return `${value} ארוחות`;
 }
 
 function formatLoadSignal(signal?: string | null): string {
