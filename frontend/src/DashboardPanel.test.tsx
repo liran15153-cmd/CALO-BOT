@@ -12,21 +12,6 @@ describe('Dashboard UI', () => {
         if (url.endsWith('/api/health')) {
           return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
         }
-        if (url.endsWith('/api/summaries/weekly/current')) {
-          return jsonResponse({
-            summary: 'סיכום שבועי: הושלמו 2 אימונים, אימון אחד פוספס, תועדו 4 ארוחות.',
-            metrics: {
-              workouts_completed: 2,
-              missed_workouts: 1,
-              consistency_percentage: 67,
-              meals_logged: 4
-            },
-            next_action: 'לבצע את האימון הבא בגרסה שמרנית ולתעד ארוחה אחת עם חלבון.',
-            week_start: '2026-06-15',
-            week_end: '2026-06-21',
-            persisted: false
-          });
-        }
         if (url.endsWith('/api/dashboard')) {
           return jsonResponse({
             current_goal: 'build_muscle',
@@ -45,7 +30,6 @@ describe('Dashboard UI', () => {
             estimated_nutrition_range: [1200, 1800],
             estimated_protein_range_today: [35, 55],
             nutrition_action: 'יש ארוחה מתועדת היום. לשמור על תיעוד פשוט.',
-            recent_coach_notes: ['User prefers short workouts'],
             current_streak: 1,
             missed_workouts: 1,
             next_recommended_action: 'לבצע את האימון המתוכנן הבא.'
@@ -78,10 +62,6 @@ describe('Dashboard UI', () => {
     expect(screen.getByText(/35-55 גרם חלבון/i)).toBeInTheDocument();
     expect(screen.getByText(/יש ארוחה מתועדת היום/i)).toBeInTheDocument();
     expect(screen.queryByText(/adherence_risk/i)).not.toBeInTheDocument();
-    expect(await screen.findByText(/סקירה שבועית/i)).toBeInTheDocument();
-    expect(screen.getByText(/סיכום שבועי: הושלמו 2 אימונים/i)).toBeInTheDocument();
-    expect(screen.getByText(/67% עקביות/i)).toBeInTheDocument();
-    expect(screen.getByText(/לבצע את האימון הבא בגרסה שמרנית/i)).toBeInTheDocument();
   });
 
   it('does not render a fake nutrition range when the API has no estimate', async () => {
@@ -103,7 +83,6 @@ describe('Dashboard UI', () => {
             estimated_nutrition_range: [null, null],
             estimated_protein_range_today: null,
             nutrition_action: 'לתעד ארוחה אחת היום עם טווח משוער.',
-            recent_coach_notes: [],
             current_streak: 0,
             missed_workouts: 0,
             next_recommended_action: 'סיים אונבורדינג.'
@@ -138,7 +117,6 @@ describe('Dashboard UI', () => {
             estimated_nutrition_range: null,
             estimated_protein_range_today: null,
             nutrition_action: 'לתעד ארוחה אחת היום עם טווח משוער.',
-            recent_coach_notes: [],
             current_streak: 0,
             missed_workouts: 0,
             next_recommended_action: 'סיים אונבורדינג.'

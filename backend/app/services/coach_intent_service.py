@@ -22,12 +22,6 @@ class CoachIntentService:
             return CoachIntent(name="meal_log", payload_text=payload_text)
         if self._is_missed_workout_guidance(normalized):
             return CoachIntent(name="missed_workout_guidance", payload_text=payload_text)
-        if self._is_weekly_summary(normalized):
-            return CoachIntent(name="weekly_summary", payload_text=payload_text)
-        if self._is_daily_summary(normalized):
-            return CoachIntent(name="daily_summary", payload_text=payload_text)
-        if self._is_memory_update_ack(normalized):
-            return CoachIntent(name="memory_ack", payload_text=payload_text)
         if self._is_supplement_safety_guidance(normalized):
             return CoachIntent(name="supplement_safety_guidance", payload_text=payload_text)
         if self._is_weekly_action_plan_guidance(normalized):
@@ -256,41 +250,6 @@ class CoachIntentService:
             )
             or has_timeboxed_week_plan_language
         )
-
-    @staticmethod
-    def _is_weekly_summary(text: str) -> bool:
-        return any(
-            phrase in text
-            for phrase in ["weekly summary", "summarize my week", "סיכום שבועי", "סיכום השבוע", "סכמי לי את השבוע"]
-        )
-
-    @staticmethod
-    def _is_daily_summary(text: str) -> bool:
-        return any(phrase in text for phrase in ["daily summary", "today's summary", "סיכום יומי", "סיכום היום"])
-
-    @staticmethod
-    def _is_memory_update_ack(text: str) -> bool:
-        starts_like_memory_update = any(
-            text.startswith(prefix)
-            for prefix in ["זכור", "תזכור", "תזכרי", "תזכרו", "remember", "keep in mind"]
-        )
-        has_preference_or_limitation = any(
-            phrase in text
-            for phrase in [
-                "שונא",
-                "אוהב",
-                "מעדיף",
-                "לא אוהב",
-                "רגיש",
-                "כאב",
-                "ציוד",
-                "preference",
-                "prefer",
-                "hate",
-                "avoid",
-            ]
-        )
-        return starts_like_memory_update and has_preference_or_limitation
 
     @staticmethod
     def _is_nutrition_guidance(text: str) -> bool:

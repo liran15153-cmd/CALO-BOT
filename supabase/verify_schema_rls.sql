@@ -11,10 +11,7 @@ with expected_tables(table_name) as (
     ('meal_logs'),
     ('meal_items'),
     ('meal_image_analyses'),
-    ('coaching_memories'),
-    ('memory_summaries'),
     ('body_metrics'),
-    ('weekly_summaries'),
     ('safety_events'),
     ('usage_events'),
     ('pending_actions')

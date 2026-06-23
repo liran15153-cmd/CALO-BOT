@@ -191,18 +191,6 @@ class MealImageAnalysis(Base, TimestampMixin):
     provider_status: Mapped[str] = mapped_column(String(40), default="not_configured")
 
 
-class UserMemory(Base, TimestampMixin):
-    __tablename__ = "coaching_memories"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    memory_type: Mapped[str] = mapped_column(String(60), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    source: Mapped[str] = mapped_column(String(80), default="chat")
-    confidence: Mapped[str] = mapped_column(String(20), default="medium")
-    is_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
-
-
 class BodyMetric(Base, TimestampMixin):
     __tablename__ = "body_metrics"
 
@@ -215,28 +203,6 @@ class BodyMetric(Base, TimestampMixin):
     measurements_json: Mapped[dict] = mapped_column(JSON, default=dict)
     source: Mapped[str] = mapped_column(String(80), nullable=False, default="manual")
     note: Mapped[str | None] = mapped_column(Text)
-
-
-class MemorySummary(Base, TimestampMixin):
-    __tablename__ = "memory_summaries"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    summary_type: Mapped[str] = mapped_column(String(60), nullable=False, default="long_term")
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    source_range_json: Mapped[dict] = mapped_column(JSON, default=dict)
-
-
-class WeeklySummary(Base, TimestampMixin):
-    __tablename__ = "weekly_summaries"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    week_start: Mapped[date] = mapped_column(Date, nullable=False)
-    week_end: Mapped[date] = mapped_column(Date, nullable=False)
-    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
-    metrics_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    next_action: Mapped[str | None] = mapped_column(Text)
 
 
 class SafetyEvent(Base, TimestampMixin):

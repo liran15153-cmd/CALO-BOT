@@ -334,10 +334,7 @@ button {
 }
 
 .metric-card p,
-.next-action p,
-.weekly-review p,
-.coach-notes h4,
-.coach-notes ul {
+.next-action p {
   margin: 0;
 }
 
@@ -374,80 +371,6 @@ button {
   font-size: 12px;
   line-height: 1;
   padding: 5px 8px;
-}
-
-.weekly-review {
-  margin-top: 16px;
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
-}
-
-.weekly-review-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.weekly-review-title {
-  display: grid;
-  gap: 3px;
-}
-
-.weekly-review-title strong {
-  font-size: 16px;
-}
-
-.weekly-review-title span,
-.weekly-review-metric {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.weekly-review-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.weekly-review-metric {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fffdf8;
-  padding: 6px 9px;
-}
-
-.weekly-review-action {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-}
-
-.weekly-review-action svg {
-  flex: 0 0 auto;
-  margin-top: 3px;
-  color: var(--accent-strong);
-}
-
-.coach-notes {
-  margin-top: 16px;
-  display: grid;
-  gap: 8px;
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
-}
-
-.coach-notes h4 {
-  font-size: 16px;
-}
-
-.coach-notes ul {
-  padding-right: 20px;
-  padding-left: 0;
-  color: var(--muted);
 }
 
 .settings-panel {

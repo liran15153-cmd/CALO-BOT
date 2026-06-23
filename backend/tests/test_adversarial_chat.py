@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import ChatMessage, Meal, SafetyEvent, UserMemory, WorkoutPlan
+from backend.app.models import ChatMessage, Meal, SafetyEvent, WorkoutPlan
 from backend.app.services.coach_intent_service import CoachIntentService
 
 
@@ -47,25 +47,6 @@ def test_dual_meal_and_plan_does_not_silently_drop_second_state_intent(tmp_path)
     assert db.scalar(select(func.count()).select_from(Meal)) == 1
     assert db.scalar(select(func.count()).select_from(WorkoutPlan)) == 0
     assert "אימון" in body["response"]
-    coach_message = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
-    assert coach_message is not None
-    assert coach_message.metadata_json["secondary_intent"] == "workout_plan"
-
-
-def test_memory_plus_plan_does_not_silently_drop_second_state_intent(tmp_path):
-    client, db = make_client_and_db(tmp_path)
-
-    response = client.post(
-        "/api/chat",
-        json={"message": "זכור שאני שונא ריצה ותבנה לי תוכנית בלי ריצה"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["provider_status"] == "local_tool"
-    assert db.scalar(select(func.count()).select_from(UserMemory)) == 1
-    assert db.scalar(select(func.count()).select_from(WorkoutPlan)) == 0
-    assert "תוכנית" in body["response"]
     coach_message = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
     assert coach_message is not None
     assert coach_message.metadata_json["secondary_intent"] == "workout_plan"

@@ -29,18 +29,6 @@ def test_intent_service_detects_hebrew_training_week_creation_as_workout_plan():
     assert service.classify("Give me a short workout for today").name == "workout_plan"
 
 
-def test_intent_service_detects_hebrew_summary_requests():
-    service = CoachIntentService()
-
-    assert service.classify("תני לי סיכום שבועי לפי מה שתיעדתי").name == "weekly_summary"
-    assert service.classify("תני לי סיכום יומי קצר").name == "daily_summary"
-
-
-def test_intent_service_detects_memory_update_acknowledgements():
-    service = CoachIntentService()
-
-    assert service.classify("זכור שאני שונא ריצה ומעדיף אופניים או הליכה").name == "memory_ack"
-    assert service.classify("remember I prefer dumbbells and hate running").name == "memory_ack"
 
 
 def test_intent_service_detects_hebrew_workout_and_meal_logs():
@@ -123,7 +111,6 @@ def test_intent_service_prefers_meal_log_over_summary_when_food_is_mentioned():
     service = CoachIntentService()
 
     assert service.classify("סיכום היום: אכלתי ביצים").name == "meal_log"
-    assert service.classify("סיכום שבועי בבקשה").name == "weekly_summary"
 
 
 def test_intent_service_routes_missed_workout_questions_about_logging_to_workout_log():

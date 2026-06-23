@@ -1,7 +1,7 @@
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import BodyMetric, ChatMessage, Meal, MemorySummary, UserMemory, UserProfile, WorkoutLog, WorkoutPlan
+from backend.app.models import BodyMetric, ChatMessage, Meal, UserProfile, WorkoutLog, WorkoutPlan
 from backend.app.services.coaching_knowledge import CoachingKnowledgeService
 from backend.app.services.training_adaptation_service import TrainingAdaptationService
 
@@ -28,23 +28,6 @@ class ContextBuilder:
         ).all()
         meals = self.db.scalars(
             select(Meal).where(Meal.user_id == user_id).order_by(desc(Meal.eaten_on)).limit(5)
-        ).all()
-        memory_query = select(UserMemory).where(UserMemory.user_id == user_id, UserMemory.is_sensitive.is_(False))
-        relevant_types = self._memory_types_for_intent(intent)
-        if relevant_types:
-            memory_query = memory_query.where(UserMemory.memory_type.in_(relevant_types))
-        memories = self.db.scalars(memory_query.order_by(desc(UserMemory.created_at)).limit(6)).all()
-        caution_notes = self.db.scalars(
-            select(UserMemory)
-            .where(UserMemory.user_id == user_id, UserMemory.memory_type == "safety_limitation")
-            .order_by(desc(UserMemory.created_at))
-            .limit(4)
-        ).all()
-        memory_summaries = self.db.scalars(
-            select(MemorySummary)
-            .where(MemorySummary.user_id == user_id)
-            .order_by(desc(MemorySummary.updated_at), desc(MemorySummary.id))
-            .limit(2)
         ).all()
         body_metrics = self.db.scalars(
             select(BodyMetric)
@@ -85,21 +68,10 @@ class ContextBuilder:
                 }
                 for meal in meals
             ],
-            "memories": [memory.content for memory in memories],
-            "memory_summaries": [summary.content for summary in memory_summaries],
-            "caution_notes": [memory.content for memory in caution_notes],
             "body_metrics": [self._body_metric(metric) for metric in body_metrics],
             "recent_chat": recent_chat,
             "coaching_knowledge": CoachingKnowledgeService().for_provider_context(intent, query=user_message),
         }
-
-    @staticmethod
-    def _memory_types_for_intent(intent: str | None) -> set[str]:
-        if intent in {"meal_log", "meal_image"}:
-            return {"nutrition", "allergy", "preference"}
-        if intent in {"workout_plan", "workout_log"}:
-            return {"equipment", "schedule", "preference"}
-        return set()
 
     @staticmethod
     def _profile(profile: UserProfile | None) -> dict:

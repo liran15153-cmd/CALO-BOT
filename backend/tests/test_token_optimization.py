@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app.config import get_settings
 from backend.app.db import init_db, make_engine
-from backend.app.models import ChatMessage, ChatSession, Meal, UsageEvent, UserMemory, WorkoutLog, WorkoutPlan
+from backend.app.models import ChatMessage, ChatSession, Meal, UsageEvent, WorkoutLog, WorkoutPlan
 from backend.app.schemas import OnboardingPayload
 from backend.app.services.ai_provider import AIRequest, AIResult
 from backend.app.services.context_builder import ContextBuilder
@@ -115,14 +115,6 @@ def test_optimized_chat_request_cuts_input_tokens_by_half_without_dropping_conte
         )
     db.add_all(
         [
-            UserMemory(user_id=profile.user_id, memory_type="preference", content="Prefers short workouts after work"),
-            UserMemory(user_id=profile.user_id, memory_type="equipment", content="Has dumbbells and resistance bands"),
-            UserMemory(
-                user_id=profile.user_id,
-                memory_type="safety_limitation",
-                content="Knee gets sensitive in deep squats",
-                is_sensitive=True,
-            ),
             WorkoutPlan(
                 user_id=profile.user_id,
                 name="Short Strength",
@@ -190,8 +182,6 @@ def test_optimized_chat_request_cuts_input_tokens_by_half_without_dropping_conte
 
     assert optimized_tokens <= legacy_tokens * 0.5
     assert optimized_context["profile"]["goal"] == "build_muscle"
-    assert "Prefers short workouts after work" in optimized_context["memories"]
-    assert "Knee gets sensitive" in optimized_context["caution_notes"][0]
     assert optimized_context["recent_chat"]
     assert "coaching_knowledge" in optimized_context
     assert "safety_boundaries" in knowledge

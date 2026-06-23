@@ -13,14 +13,11 @@ from backend.app.models import (
     Meal,
     MealImageAnalysis,
     MealItem,
-    MemorySummary,
     PendingAction,
     SafetyEvent,
     UsageEvent,
     User,
-    UserMemory,
     UserProfile,
-    WeeklySummary,
     Workout,
     WorkoutExercise,
     WorkoutLog,
@@ -63,10 +60,7 @@ class SettingsService:
         workouts = self.db.scalars(select(Workout).where(Workout.user_id == user.id)).all()
         logs = self.db.scalars(select(WorkoutLog).where(WorkoutLog.user_id == user.id)).all()
         meals = self.db.scalars(select(Meal).where(Meal.user_id == user.id)).all()
-        memories = self.db.scalars(select(UserMemory).where(UserMemory.user_id == user.id)).all()
-        memory_summaries = self.db.scalars(select(MemorySummary).where(MemorySummary.user_id == user.id)).all()
         body_metrics = self.db.scalars(select(BodyMetric).where(BodyMetric.user_id == user.id)).all()
-        summaries = self.db.scalars(select(WeeklySummary).where(WeeklySummary.user_id == user.id)).all()
         safety_events = self.db.scalars(select(SafetyEvent).where(SafetyEvent.user_id == user.id)).all()
         pending_actions = self.db.scalars(select(PendingAction).where(PendingAction.user_id == user.id)).all()
 
@@ -99,26 +93,6 @@ class SettingsService:
                 for log in logs
             ],
             "meals": [MealService.serialize_meal(meal) for meal in meals],
-            "memories": [
-                {
-                    "id": memory.id,
-                    "type": memory.memory_type,
-                    "content": memory.content,
-                    "source": memory.source,
-                    "confidence": memory.confidence,
-                    "is_sensitive": memory.is_sensitive,
-                }
-                for memory in memories
-            ],
-            "memory_summaries": [
-                {
-                    "id": summary.id,
-                    "summary_type": summary.summary_type,
-                    "content": summary.content,
-                    "source_range": summary.source_range_json or {},
-                }
-                for summary in memory_summaries
-            ],
             "body_metrics": [
                 {
                     "id": metric.id,
@@ -131,17 +105,6 @@ class SettingsService:
                     "note": metric.note,
                 }
                 for metric in body_metrics
-            ],
-            "weekly_summaries": [
-                {
-                    "id": summary.id,
-                    "week_start": summary.week_start.isoformat(),
-                    "week_end": summary.week_end.isoformat(),
-                    "summary": summary.summary_text,
-                    "metrics": summary.metrics_json or {},
-                    "next_action": summary.next_action,
-                }
-                for summary in summaries
             ],
             "safety_events": [
                 {
@@ -189,9 +152,6 @@ class SettingsService:
         for model in (
             UsageEvent,
             SafetyEvent,
-            WeeklySummary,
-            MemorySummary,
-            UserMemory,
             BodyMetric,
             Meal,
             WorkoutLog,

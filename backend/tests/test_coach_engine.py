@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
-from backend.app.models import ChatMessage, Meal, PendingAction, SafetyEvent, UsageEvent, WeeklySummary, Workout, WorkoutLog, WorkoutPlan
+from backend.app.models import ChatMessage, Meal, PendingAction, SafetyEvent, UsageEvent, Workout, WorkoutLog, WorkoutPlan
 from backend.app.services.workout_service import WorkoutService
 
 
@@ -425,23 +425,6 @@ def test_chat_endpoint_logs_meal_with_coaching_response_not_save_confirmation(tm
     assert saved_meal is not None
 
 
-def test_chat_endpoint_acknowledges_memory_update_locally(tmp_path, monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    get_settings.cache_clear()
-    client, _db = make_client_and_db(tmp_path)
-    provider = CapturingProvider()
-    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
-
-    response = client.post("/api/chat", json={"message": "זכור שאני שונא ריצה ומעדיף אופניים או הליכה."})
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["provider_status"] == "local_tool"
-    assert "אתחשב" in body["response"]
-    assert_no_storage_confirmation(body["response"])
-    assert provider.last_request is None
-
-
 def test_chat_endpoint_logs_workout_with_negated_pain_without_safety_override(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
@@ -459,25 +442,6 @@ def test_chat_endpoint_logs_workout_with_negated_pain_without_safety_override(tm
     assert saved_log.status == "completed"
     assert saved_log.pain_flag is False
     assert db.scalar(select(SafetyEvent)) is None
-
-
-def test_chat_endpoint_answers_weekly_summary_with_local_summary_service(tmp_path):
-    client, db = make_client_and_db(tmp_path)
-    client.post("/api/workout-logs", json={"text": "I did 3 sets of bench press 10, 8, 7 with 50kg"})
-    client.post("/api/meals/manual", json={"text": "I ate rice, chicken and salad"})
-
-    response = client.post("/api/chat", json={"message": "תני לי סיכום שבועי לפי מה שתיעדתי"})
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["provider_status"] == "local_tool"
-    assert "סיכום שבועי" in body["response"]
-    assert "לפי הנתונים השמורים" in body["response"]
-    assert "אימון אחד" in body["response"]
-    assert "1 אימונים" not in body["response"]
-    saved_summary = db.scalar(select(WeeklySummary))
-    assert saved_summary is not None
-    assert saved_summary.metrics_json["workouts_completed"] == 1
 
 
 def test_chat_endpoint_blocks_provider_when_daily_token_budget_is_spent(tmp_path, monkeypatch):
