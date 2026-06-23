@@ -69,6 +69,58 @@ def test_anthropic_provider_counts_component_and_legacy_baseline_tokens():
     assert result.token_breakdown["audit"]["input_reduction_ratio_provider"] == 0.5833
 
 
+SAMPLE_TOOL = {
+    "name": "save_facts",
+    "description": "Save extracted coaching facts.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"facts": {"type": "array"}},
+        "required": ["facts"],
+    },
+}
+
+
+def test_extract_tool_returns_structured_output_and_passes_tool_schema():
+    fake_client = FakeToolClient()
+    provider = AnthropicProvider(api_key="redacted", model="claude-haiku-4-5", client=fake_client)
+
+    result = provider.extract_tool(AIRequest(instructions="extract facts", input_text="יש לי קטלבל"), SAMPLE_TOOL)
+
+    assert result.provider_status == "configured"
+    assert result.structured_output == {"facts": [{"type": "equipment", "text_he": "יש קטלבל"}]}
+    call = fake_client.messages.calls[0]
+    assert call["tools"] == [SAMPLE_TOOL]
+    assert call["tool_choice"] == {"type": "tool", "name": "save_facts"}
+    assert result.estimated_tokens_in == 7
+    assert result.estimated_tokens_out == 3
+
+
+def test_no_configured_provider_extract_tool_is_not_configured():
+    result = NoConfiguredAIProvider().extract_tool(AIRequest(instructions="x", input_text="y"), SAMPLE_TOOL)
+
+    assert result.provider_status == "not_configured"
+    assert result.structured_output is None
+
+
+def test_extract_tool_reports_provider_error_when_request_fails():
+    provider = AnthropicProvider(api_key="redacted", model="claude-haiku-4-5", client=FailingAnthropicClient())
+
+    result = provider.extract_tool(AIRequest(instructions="x", input_text="y"), SAMPLE_TOOL)
+
+    assert result.provider_status == "provider_error"
+    assert result.structured_output is None
+
+
+def test_extract_tool_reports_provider_error_when_no_tool_use_block():
+    # FakeAnthropicClient returns a text-only response, i.e. the model ignored the tool.
+    provider = AnthropicProvider(api_key="redacted", model="claude-haiku-4-5", client=FakeAnthropicClient())
+
+    result = provider.extract_tool(AIRequest(instructions="x", input_text="y"), SAMPLE_TOOL)
+
+    assert result.provider_status == "provider_error"
+    assert result.structured_output is None
+
+
 class FakeUsage:
     input_tokens = 7
     output_tokens = 3
@@ -137,3 +189,28 @@ class FailingMessages:
 class FailingAnthropicClient:
     def __init__(self):
         self.messages = FailingMessages()
+
+
+class FakeToolUseBlock:
+    type = "tool_use"
+    name = "save_facts"
+    input = {"facts": [{"type": "equipment", "text_he": "יש קטלבל"}]}
+
+
+class FakeToolResponse:
+    content = [FakeToolUseBlock()]
+    usage = FakeUsage()
+
+
+class FakeToolMessages:
+    def __init__(self):
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return FakeToolResponse()
+
+
+class FakeToolClient:
+    def __init__(self):
+        self.messages = FakeToolMessages()
