@@ -7,9 +7,9 @@ from backend.app.main import app
 def test_readiness_reports_local_dev_not_production_ready(monkeypatch):
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./data/app.db")
-    monkeypatch.delenv("SUPABASE_URL", raising=False)
-    monkeypatch.delenv("SUPABASE_JWKS_URL", raising=False)
-    monkeypatch.delenv("SUPABASE_PUBLISHABLE_KEY", raising=False)
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_JWKS_URL", "")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "")
     monkeypatch.setenv("SUPABASE_AUTH_REQUIRED", "false")
     get_settings.cache_clear()
     client = TestClient(app)
