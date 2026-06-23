@@ -1,4 +1,4 @@
-from scripts.verify_supabase_live import missing_live_verification_env, run_live_verification
+from scripts.verify_supabase_live import env_with_dotenv_files, missing_live_verification_env, run_live_verification
 
 
 def test_live_verifier_reports_missing_credentials_without_faking_success():
@@ -25,6 +25,23 @@ def test_live_verifier_accepts_minimum_credentials_for_http_rls_and_storage_chec
     }
 
     assert missing_live_verification_env(env) == []
+
+
+def test_live_verifier_loads_dotenv_files_without_overriding_process_env(tmp_path):
+    (tmp_path / ".env").write_text(
+        "SUPABASE_URL=https://from-env.example\nSUPABASE_PUBLISHABLE_KEY=from-env\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env.local").write_text(
+        "SUPABASE_PUBLISHABLE_KEY=from-local\nSUPABASE_TEST_USER_A_EMAIL=a@example.com\n",
+        encoding="utf-8",
+    )
+
+    env = env_with_dotenv_files({"SUPABASE_URL": "https://from-process.example"}, root=tmp_path)
+
+    assert env["SUPABASE_URL"] == "https://from-process.example"
+    assert env["SUPABASE_PUBLISHABLE_KEY"] == "from-local"
+    assert env["SUPABASE_TEST_USER_A_EMAIL"] == "a@example.com"
 
 
 def test_live_verifier_does_not_overwrite_or_delete_existing_user_row(monkeypatch):

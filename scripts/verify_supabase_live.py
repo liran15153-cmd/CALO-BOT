@@ -4,6 +4,8 @@ import json
 import os
 import sys
 from datetime import date
+from pathlib import Path
+from collections.abc import Sequence
 from typing import Mapping
 from urllib.parse import quote
 from uuid import uuid4
@@ -25,6 +27,29 @@ VERIFIER_B_UPDATE_ATTEMPT_NAME = "CALO RLS verifier B attempt"
 
 def missing_live_verification_env(env: Mapping[str, str]) -> list[str]:
     return [name for name in REQUIRED_ENV if not env.get(name)]
+
+
+def env_with_dotenv_files(
+    env: Mapping[str, str],
+    *,
+    root: Path | None = None,
+    filenames: Sequence[str] = (".env", ".env.local"),
+) -> dict[str, str]:
+    loaded: dict[str, str] = {}
+    base = root or Path.cwd()
+    for filename in filenames:
+        path = base / filename
+        if not path.exists():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key:
+                loaded[key] = value.strip().strip('"').strip("'")
+    return {**loaded, **dict(env)}
 
 
 def run_live_verification(env: Mapping[str, str]) -> dict:
@@ -292,7 +317,7 @@ def _raise_for_status(response: httpx.Response, message: str) -> None:
 
 def main() -> int:
     try:
-        result = run_live_verification(os.environ)
+        result = run_live_verification(env_with_dotenv_files(os.environ))
     except Exception as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False, indent=2))
         return 1
