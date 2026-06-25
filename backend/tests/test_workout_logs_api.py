@@ -1090,6 +1090,7 @@ def test_structured_workout_log_rejects_unknown_or_mismatched_workout_and_exerci
         json={"workout_id": 999999, "status": "completed", "notes": "Done"},
     )
     assert unknown_workout.status_code == 400
+    assert unknown_workout.json()["detail"] == "האימון שביקשת לתעד לא נמצא."
 
     mismatched_exercise = client.post(
         "/api/workout-logs",
@@ -1107,6 +1108,24 @@ def test_structured_workout_log_rejects_unknown_or_mismatched_workout_and_exerci
         },
     )
     assert mismatched_exercise.status_code == 400
+    assert mismatched_exercise.json()["detail"] == "התרגיל שביקשת לתעד לא שייך לאימון הזה."
+
+    exercise_without_workout = client.post(
+        "/api/workout-logs",
+        json={
+            "status": "completed",
+            "exercises": [
+                {
+                    "exercise_id": exercise_id,
+                    "exercise_name": "Known exercise",
+                    "status": "completed",
+                    "sets": [{"set_index": 1, "reps": 10, "completed": True}],
+                }
+            ],
+        },
+    )
+    assert exercise_without_workout.status_code == 400
+    assert exercise_without_workout.json()["detail"] == "כדי לתעד תרגיל מתוך תוכנית, צריך לציין גם את האימון המתאים."
 
 
 def test_recent_workout_logs_returns_saved_logs_ordered_newest_first(tmp_path):

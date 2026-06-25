@@ -11169,3 +11169,22 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused WorkoutsPanel suite: `23 passed`.
+
+## Final Workout Log Error Copy Cleanup - 2026-06-26
+
+### Verification target
+
+- Prevent raw `workout_id` / `exercise_id` implementation field names from leaking in user-facing workout-log API errors.
+
+### Changes
+
+- Replaced structured workout-log reference validation errors with natural Hebrew details.
+- Added API assertions for unknown workout, mismatched exercise, and exercise-without-workout cases.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_workout_logs_api.py --basetemp .pytest-tmp-workout-log-errors`
+
+### Result
+
+- Focused workout-log API suite: `34 passed`.

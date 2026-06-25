@@ -886,19 +886,19 @@ class WorkoutService:
     def _validate_workout_log_references(self, user_id: int, request: WorkoutLogRequest) -> None:
         if request.workout_id is None:
             if any(exercise.exercise_id is not None for exercise in request.exercises):
-                raise ValueError("exercise_id דורש workout_id")
+                raise ValueError("כדי לתעד תרגיל מתוך תוכנית, צריך לציין גם את האימון המתאים.")
             return
 
         workout = self.db.get(Workout, request.workout_id)
         if workout is None or workout.user_id != user_id:
-            raise ValueError("workout_id לא נמצא")
+            raise ValueError("האימון שביקשת לתעד לא נמצא.")
 
         for exercise in request.exercises:
             if exercise.exercise_id is None:
                 continue
             workout_exercise = self.db.get(WorkoutExercise, exercise.exercise_id)
             if workout_exercise is None or workout_exercise.workout_id != request.workout_id:
-                raise ValueError("exercise_id לא שייך ל-workout_id")
+                raise ValueError("התרגיל שביקשת לתעד לא שייך לאימון הזה.")
 
     def parse_log(self, user_id: int, request: WorkoutLogRequest) -> WorkoutLog:
         if request.text is None:
