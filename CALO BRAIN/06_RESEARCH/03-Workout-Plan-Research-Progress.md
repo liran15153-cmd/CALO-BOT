@@ -11125,3 +11125,8 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Added explicit malformed localStorage JSON coverage for the same auth-session cleanup path.
 - `npm --prefix frontend test -- --run auth.test.ts`: `3 passed`.
+
+### Expiry follow-up
+
+- Stored sessions with a past `expires_at` are now cleared instead of bypassing the login screen with an expired Supabase access token.
+- `npm --prefix frontend test -- --run auth.test.ts App.test.tsx api.test.ts`: `11 passed`.

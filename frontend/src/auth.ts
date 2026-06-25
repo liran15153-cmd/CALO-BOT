@@ -25,6 +25,10 @@ export function getStoredAuthSession(): SupabaseAuthSession | null {
       window.localStorage.removeItem(SESSION_KEY);
       return null;
     }
+    if (typeof session.expires_at === 'number' && session.expires_at <= Math.floor(Date.now() / 1000)) {
+      window.localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     return session as SupabaseAuthSession;
   } catch {
     window.localStorage.removeItem(SESSION_KEY);

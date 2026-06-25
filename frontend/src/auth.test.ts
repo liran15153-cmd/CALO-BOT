@@ -28,4 +28,11 @@ describe('auth session storage', () => {
     expect(getStoredAuthSession()).toBeNull();
     expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
+
+  it('clears expired stored sessions', () => {
+    storeAuthSession({ access_token: 'expired-user-jwt', expires_at: 1 });
+
+    expect(getStoredAuthSession()).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
+  });
 });
