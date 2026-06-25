@@ -39,7 +39,8 @@ describe('API client', () => {
 
     await createChatSession();
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ title: "צ'אט מאמן" });
+    const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+    expect(JSON.parse(String(calls[0][1]?.body))).toEqual({ title: "צ'אט מאמן" });
   });
 
   it('attaches a Supabase bearer token when configured', async () => {
