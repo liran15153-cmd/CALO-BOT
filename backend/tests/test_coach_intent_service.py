@@ -15,6 +15,22 @@ def test_classify_with_trace_reports_rule_and_confidence():
     assert confidence == "low"
 
 
+def test_intent_service_keeps_logging_priority_over_plan_requests():
+    service = CoachIntentService()
+
+    intent, rule, _confidence = service.classify_with_trace(
+        "תעד אימון: עשיתי סקוואט 3 סטים ותבנה לי תוכנית חדשה לשבוע הבא"
+    )
+    assert intent.name == "workout_log"
+    assert rule == "workout_log"
+
+    intent, rule, _confidence = service.classify_with_trace(
+        "אכלתי ארוחת ערב: אורז ועוף, וגם תן לי תוכנית אימונים"
+    )
+    assert intent.name == "meal_log"
+    assert rule == "meal_log"
+
+
 def test_intent_service_detects_hebrew_workout_plan_requests():
     intent = CoachIntentService().classify("תבנה לי תוכנית אימון של 2 ימים עם משקולות")
 
