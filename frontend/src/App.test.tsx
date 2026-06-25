@@ -74,7 +74,7 @@ describe('App shell', () => {
   it('shows local-only provider mode when API key is missing', async () => {
     render(<App />);
 
-    expect(await screen.findByText(/AI provider is not configured/i)).toBeInTheDocument();
-    expect(await screen.findByText(/local-only mode/i)).toBeInTheDocument();
+    expect(await screen.findByText(/ספק הבינה המלאכותית לא מוגדר/i)).toBeInTheDocument();
+    expect(await screen.findByText(/מצב מקומי בלבד/i)).toBeInTheDocument();
   });
 });

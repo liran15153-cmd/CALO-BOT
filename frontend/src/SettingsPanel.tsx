@@ -133,13 +133,13 @@ export function SettingsPanel() {
         </div>
         {settings.supabase ? (
           <div className="settings-row">
-            <span>Supabase auth</span>
+            <span>אימות Supabase</span>
             <strong>{formatSupabaseStatus(settings.supabase)}</strong>
           </div>
         ) : null}
         {settings.supabase_storage ? (
           <div className="settings-row">
-            <span>Supabase storage</span>
+            <span>אחסון Supabase</span>
             <strong>{formatSupabaseStatus(settings.supabase_storage)}</strong>
           </div>
         ) : null}

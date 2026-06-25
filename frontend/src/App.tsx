@@ -110,8 +110,8 @@ function App() {
         ) : null}
         {isNoApiKeyMode ? (
           <div className="provider-alert" role="status" aria-live="polite">
-            <span>AI provider is not configured</span>
-            <p>The app is running in local-only mode. Core coaching features stay usable without external calls.</p>
+            <span>ספק הבינה המלאכותית לא מוגדר</span>
+            <p>האפליקציה פועלת במצב מקומי בלבד. פעולות הליבה נשארות זמינות בלי קריאות חיצוניות.</p>
           </div>
         ) : null}
       </aside>

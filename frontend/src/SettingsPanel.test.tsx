@@ -60,8 +60,10 @@ describe('Settings UI', () => {
     await waitForSettings();
     expect(screen.queryByText(/not_configured/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/sk-/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Supabase auth/i)).toBeInTheDocument();
-    expect(screen.getByText(/local fallback/i)).toBeInTheDocument();
+    expect(screen.getByText('אימות Supabase')).toBeInTheDocument();
+    expect(screen.getByText('מצב מקומי')).toBeInTheDocument();
+    expect(screen.queryByText(/local fallback/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/General wellness only/i)).not.toBeInTheDocument();
     expect(screen.getByText(/49,984/i)).toBeInTheDocument();
 
     const [exportButton, resetButton] = settingsActionButtons(container);
@@ -148,7 +150,7 @@ function settingsPayload() {
     api_key_present: false,
     supabase: 'not_configured',
     supabase_storage: 'local',
-    disclaimer: 'General wellness only.'
+    disclaimer: 'מידע כללי לאורח חיים בריא בלבד.'
   };
 }
 

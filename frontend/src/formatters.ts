@@ -24,12 +24,12 @@ export function formatDatabaseStatus(status: string | null | undefined): string 
 export function formatSupabaseStatus(status: string | null | undefined): string {
   return (
     {
-      configured: 'configured',
-      configured_optional: 'configured, auth optional',
-      required: 'auth required',
-      local: 'local fallback',
-      not_configured: 'not configured'
-    }[status ?? ''] ?? 'unknown'
+      configured: 'מוגדר',
+      configured_optional: 'מוגדר, אימות אופציונלי',
+      required: 'אימות נדרש',
+      local: 'מצב מקומי',
+      not_configured: 'לא מוגדר'
+    }[status ?? ''] ?? 'לא ידוע'
   );
 }
 
