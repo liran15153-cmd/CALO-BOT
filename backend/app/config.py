@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-haiku-4-5"
     anthropic_chat_model: str | None = None
     daily_ai_token_limit: int = Field(default=50000, ge=0)
+    intent_llm_fallback_enabled: bool = Field(default=False)
     language_guard_enabled: bool = True
     language_guard_mode: str = Field(default="repair", pattern="^(off|repair|strict)$")
     supabase_url: str | None = None

@@ -2616,6 +2616,113 @@ def test_chat_endpoint_sends_query_retrieved_knowledge_to_configured_provider(tm
     assert len(str(knowledge)) < 7000
 
 
+def test_intent_llm_fallback_flag_off_never_invoked(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "false")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "workout_plan", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "בא לי מסגרת מסודרת לחודש הקרוב כדי לחזור לכושר"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "configured"
+    assert provider.extract_calls == 0
+    assert provider.chat_calls == 1
+    assert db.scalar(select(WorkoutPlan)) is None
+
+
+def test_intent_llm_fallback_routes_free_form_hebrew_plan_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "workout_plan", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "בא לי מסגרת מסודרת לחודש הקרוב כדי לחזור לכושר"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert provider.extract_calls == 1
+    assert provider.chat_calls == 0
+    assert db.scalar(select(WorkoutPlan)) is not None
+    assert db.scalar(select(UsageEvent).where(UsageEvent.provider == "configured")) is not None
+    coach_message = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
+    assert coach_message is not None
+    assert coach_message.metadata_json["intent"] == "workout_plan"
+    assert coach_message.metadata_json["intent_llm_fallback"] is True
+
+
+def test_intent_llm_fallback_unknown_result_continues_general_chat(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "unknown", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "בא לי מסגרת מסודרת לחודש הקרוב כדי לחזור לכושר"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "configured"
+    assert "תשובה כללית" in body["response"]
+    assert provider.extract_calls == 1
+    assert provider.chat_calls == 1
+    assert db.scalar(select(WorkoutPlan)) is None
+
+
+def test_intent_llm_fallback_does_not_override_deterministic_workout_log(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "workout_plan", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "תעד אימון: עשיתי סקוואט 3 סטים, RPE 7, בלי כאב"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "local_tool"
+    assert provider.extract_calls == 0
+    assert provider.chat_calls == 0
+    assert db.scalar(select(WorkoutLog)) is not None
+
+
+def test_intent_llm_fallback_never_runs_for_safety_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    get_settings.cache_clear()
+    client, _db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "workout_plan", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "אני רוצה לקחת קלנבוטרול כדי לרדת מהר במשקל"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "safety_override"
+    assert provider.extract_calls == 0
+    assert provider.chat_calls == 0
+
+
 def test_fitness_term_intent_stays_local_when_provider_is_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
@@ -3486,6 +3593,43 @@ class EchoedGenericEnglishProvider:
             used_model="fake-model",
             estimated_tokens_in=10,
             estimated_tokens_out=8,
+        )
+
+
+class IntentFallbackProvider:
+    def __init__(self, structured_output):
+        self.structured_output = structured_output
+        self.extract_calls = 0
+        self.chat_calls = 0
+        self.last_request = None
+        self.last_tool = None
+
+    def extract_tool(self, request, tool):
+        from backend.app.services.ai_provider import AIResult
+
+        self.extract_calls += 1
+        self.last_request = request
+        self.last_tool = tool
+        return AIResult(
+            text="",
+            provider_status="configured",
+            used_model="fake-model",
+            estimated_tokens_in=9,
+            estimated_tokens_out=2,
+            structured_output=self.structured_output,
+        )
+
+    def chat(self, request):
+        from backend.app.services.ai_provider import AIResult
+
+        self.chat_calls += 1
+        self.last_request = request
+        return AIResult(
+            text="תשובה כללית בעברית.",
+            provider_status="configured",
+            used_model="fake-model",
+            estimated_tokens_in=12,
+            estimated_tokens_out=4,
         )
 
 

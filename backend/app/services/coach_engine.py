@@ -10,7 +10,8 @@ from backend.app.schemas import ChatRequest, ChatResponse, MealTextRequest, Work
 from backend.app.services.ai_provider import build_ai_provider
 from backend.app.services.chat_service import ChatService
 from backend.app.services.context_builder import ContextBuilder
-from backend.app.services.coach_intent_service import CoachIntentService
+from backend.app.services.coach_intent_service import CoachIntent, CoachIntentService
+from backend.app.services.intent_llm_fallback import IntentLlmFallback
 from backend.app.services.language_guard import (
     assess_hebrew_response_quality,
     repair_hebrew_coach_response,
@@ -129,6 +130,30 @@ class CoachEngine:
 
         intent_service = CoachIntentService()
         intent = intent_service.classify(payload.message)
+        usage_service = UsageService(self.db)
+        intent_fallback_metadata: dict[str, Any] = {}
+        if (
+            intent.name == "general_chat"
+            and self.settings.intent_llm_fallback_enabled
+            and self.settings.anthropic_api_key
+            and not usage_service.is_daily_ai_token_budget_exceeded(user_id=user.id)
+        ):
+            provider = build_ai_provider(self.settings.anthropic_api_key, self.settings.chat_model)
+            fallback_classifier = IntentLlmFallback(provider)
+            fallback_intent_name, fallback_confidence = fallback_classifier.classify(payload.message)
+            if fallback_classifier.last_request is not None and fallback_classifier.last_result is not None:
+                usage_service.record_ai_result(
+                    user_id=user.id,
+                    task="chat",
+                    request=fallback_classifier.last_request,
+                    result=fallback_classifier.last_result,
+                )
+            if fallback_intent_name is not None:
+                intent = CoachIntent(name=fallback_intent_name, payload_text=payload.message)
+                intent_fallback_metadata = {
+                    "intent_llm_fallback": True,
+                    "intent_llm_confidence": fallback_confidence,
+                }
         secondary_intent = intent_service.secondary_state_intent(payload.message, intent.name)
         tool_response = self._handle_tool_intent(
             user_id=user.id,
@@ -142,6 +167,7 @@ class CoachEngine:
         )
         if tool_response is not None:
             response_text, response_metadata = _unpack_tool_result(tool_response)
+            response_metadata = {**intent_fallback_metadata, **response_metadata}
             if secondary_intent is not None:
                 response_text = _append_secondary_intent_prompt(response_text, secondary_intent)
                 response_metadata = {**response_metadata, "secondary_intent": secondary_intent}
@@ -169,7 +195,6 @@ class CoachEngine:
                 provider_status="local_tool",
             )
 
-        usage_service = UsageService(self.db)
         fallback = _KNOWLEDGE_INTENT_FALLBACKS.get(intent.name)
         fallback_text = fallback(intent.payload_text) if fallback else None
         if fallback_text is not None and intent.name in {"motivation_recovery", "progress_metric"}:
@@ -185,6 +210,7 @@ class CoachEngine:
                 user_message=user_message,
                 response_text=fallback_text,
                 intent_name=intent.name,
+                metadata=intent_fallback_metadata,
             )
 
         if self.settings.anthropic_api_key and usage_service.is_daily_ai_token_budget_exceeded(user_id=user.id):
@@ -196,6 +222,7 @@ class CoachEngine:
                     user_message=user_message,
                     response_text=fallback_text,
                     intent_name=intent.name,
+                    metadata=intent_fallback_metadata,
                 )
             budget_response = (
                 "תקציב הבינה המלאכותית היומי נוצל. לא שלחתי בקשה לספק הבינה המלאכותית. "
@@ -267,7 +294,7 @@ class CoachEngine:
                 response_text=fallback_text,
                 intent_name=intent.name,
                 record_usage=False,
-                metadata=quality_metadata,
+                metadata={**intent_fallback_metadata, **quality_metadata},
             )
         elif ai_result.provider_status == "configured":
             if "neutral_address" in quality.issues:
@@ -294,6 +321,7 @@ class CoachEngine:
                 "model": ai_result.used_model,
                 "intent": intent.name,
                 "token_breakdown": token_metadata,
+                **intent_fallback_metadata,
                 **quality_metadata,
             },
         )
