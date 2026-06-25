@@ -11200,6 +11200,7 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Added a global `RequestValidationError` handler that returns Hebrew validation details.
 - Preserved custom Hebrew validation messages while replacing generic enum/range/type messages with a short Hebrew fallback.
+- Kept mixed validation responses complete by returning both custom Hebrew messages and generic Hebrew fallbacks when needed.
 - Added onboarding API coverage for both custom Hebrew validation and generic invalid enum validation.
 
 ### Checks run

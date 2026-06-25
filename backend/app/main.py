@@ -19,6 +19,7 @@ from backend.app.services.readiness_service import ReadinessService
 
 
 settings = get_settings()
+GENERIC_VALIDATION_MESSAGE = "בקשת API לא תקינה. יש לבדוק את השדות והערכים שנשלחו."
 
 app = FastAPI(title="CALO Coach API", version="0.1.0")
 init_db()
@@ -34,11 +35,13 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
-    messages = [_hebrew_validation_message(str(error.get("msg") or "")) for error in exc.errors()]
-    hebrew_messages = [message for message in messages if message]
+    messages = [
+        _hebrew_validation_message(str(error.get("msg") or "")) or GENERIC_VALIDATION_MESSAGE
+        for error in exc.errors()
+    ]
     return JSONResponse(
         status_code=422,
-        content={"detail": hebrew_messages or ["בקשת API לא תקינה. יש לבדוק את השדות והערכים שנשלחו."]},
+        content={"detail": list(dict.fromkeys(messages))},
     )
 
 

@@ -48,6 +48,19 @@ def test_onboarding_api_validation_errors_are_hebrew(tmp_path):
     assert "Input should be" not in str(response.json())
 
 
+def test_onboarding_api_validation_keeps_custom_and_generic_hebrew_errors(tmp_path):
+    client = make_client(tmp_path)
+    payload = valid_payload(main_goal="invalid_goal", consent_disclaimer=False)
+
+    response = client.post("/api/onboarding", json=payload)
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "בקשת API לא תקינה. יש לבדוק את השדות והערכים שנשלחו." in detail
+    assert "יש לאשר שהאפליקציה מספקת הכוונת כושר ותזונה כללית בלבד" in detail
+    assert "Input should be" not in str(response.json())
+
+
 def make_client(tmp_path) -> TestClient:
     engine = make_engine(f"sqlite:///{tmp_path / 'api.db'}")
     init_db(engine)
