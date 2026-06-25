@@ -62,12 +62,14 @@ describe('App shell', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the local coach workspace and primary navigation', () => {
+  it('renders the local coach workspace and primary navigation', async () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /CALO Coach/i })).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('dir', 'rtl');
     expect(screen.getByRole('main')).toHaveAttribute('lang', 'he');
+    expect(await screen.findByText(/מסד הנתונים מוכן/i)).toBeInTheDocument();
+    expect(screen.queryByText(/SQLite מוכן/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole('button')).toHaveLength(6);
   });
 

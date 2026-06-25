@@ -124,7 +124,7 @@ function App() {
           </div>
           <div className="health-pill">
             <Activity size={16} aria-hidden="true" />
-            <span>{health?.database === 'configured' ? 'SQLite מוכן' : 'האחסון בהמתנה'}</span>
+            <span>{health?.database === 'configured' ? 'מסד הנתונים מוכן' : 'האחסון בהמתנה'}</span>
           </div>
         </header>
 

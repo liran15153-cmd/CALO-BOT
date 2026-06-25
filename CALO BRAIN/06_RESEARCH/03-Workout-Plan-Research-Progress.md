@@ -11130,3 +11130,22 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Stored sessions with a past `expires_at` are now cleared instead of bypassing the login screen with an expired Supabase access token.
 - `npm --prefix frontend test -- --run auth.test.ts App.test.tsx api.test.ts`: `11 passed`.
+
+## Final Frontend Database Status Copy Cleanup - 2026-06-26
+
+### Verification target
+
+- Avoid implying the frontend is always backed by SQLite when the health payload only says the database is configured.
+
+### Changes
+
+- Replaced the hardcoded `SQLite מוכן` status with neutral Hebrew copy: `מסד הנתונים מוכן`.
+- Added App shell coverage so the UI does not regress to SQLite-specific wording.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run App.test.tsx`
+
+### Result
+
+- Focused App shell suite: `2 passed`.
