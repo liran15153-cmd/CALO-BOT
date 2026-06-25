@@ -23,7 +23,7 @@ def test_readiness_reports_local_dev_not_production_ready(monkeypatch):
     assert body["checks"]["database"]["status"] == "local_sqlite"
     assert body["checks"]["supabase_auth"]["status"] == "not_configured"
     assert body["checks"]["storage"]["status"] == "local"
-    assert body["issues"] == ["Supabase Auth is not required"]
+    assert body["issues"] == ["אימות Supabase לא נדרש"]
     assert "secret" not in str(body).lower()
     get_settings.cache_clear()
 
@@ -45,7 +45,7 @@ def test_readiness_rejects_auth_required_with_sqlite(monkeypatch):
     assert body["status"] == "not_ready"
     assert body["production_ready"] is False
     assert body["checks"]["database"]["status"] == "invalid"
-    assert "Supabase Auth requires a non-SQLite DATABASE_URL" in body["issues"]
+    assert "אימות Supabase דורש DATABASE_URL שאינו SQLite" in body["issues"]
     get_settings.cache_clear()
 
 

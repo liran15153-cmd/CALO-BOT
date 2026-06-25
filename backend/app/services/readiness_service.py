@@ -37,12 +37,12 @@ class ReadinessService:
 
     def _database_check(self) -> Check:
         if not self.settings.database_url:
-            return Check("not_configured", "DATABASE_URL is not set")
+            return Check("not_configured", "DATABASE_URL לא מוגדר")
         if self.settings.database_url.startswith("sqlite"):
             if self.settings.supabase_auth_required or self.settings.app_env == "production":
-                return Check("invalid", "SQLite is local-only")
-            return Check("local_sqlite", "SQLite local development database")
-        return Check("configured", "Non-SQLite database configured")
+                return Check("invalid", "SQLite הוא מסד נתונים מקומי בלבד")
+            return Check("local_sqlite", "SQLite למסד נתונים מקומי בפיתוח")
+        return Check("configured", "מסד נתונים שאינו SQLite מוגדר")
 
     def _supabase_auth_check(self) -> Check:
         missing = []
@@ -54,39 +54,39 @@ class ReadinessService:
             missing.append("SUPABASE_JWKS_URL")
         if missing:
             if self.settings.supabase_auth_required:
-                return Check("invalid", "Missing " + ", ".join(missing))
-            return Check("not_configured", "Supabase Auth is optional in local development")
+                return Check("invalid", "חסרים: " + ", ".join(missing))
+            return Check("not_configured", "אימות Supabase אופציונלי בפיתוח מקומי")
         if _project_ref(self.settings.supabase_url or "") is None:
-            return Check("invalid", "SUPABASE_URL is not a Supabase project URL")
+            return Check("invalid", "SUPABASE_URL אינו כתובת פרויקט Supabase")
         if _jwks_project_ref(self.settings.supabase_jwks_url or "") is None:
-            return Check("invalid", "SUPABASE_JWKS_URL is not a Supabase JWKS URL")
+            return Check("invalid", "SUPABASE_JWKS_URL אינו כתובת JWKS של Supabase")
         if _project_ref(self.settings.supabase_url or "") != _jwks_project_ref(self.settings.supabase_jwks_url or ""):
-            return Check("invalid", "SUPABASE_JWKS_URL project does not match SUPABASE_URL")
-        return Check("configured", "Supabase Auth config is present")
+            return Check("invalid", "פרויקט SUPABASE_JWKS_URL אינו תואם ל-SUPABASE_URL")
+        return Check("configured", "הגדרת אימות Supabase קיימת")
 
     def _jwks_check(self) -> Check:
         if not self.settings.supabase_jwks_url:
-            return Check("not_configured", "JWKS URL is not set")
+            return Check("not_configured", "כתובת JWKS לא מוגדרת")
         if _jwks_project_ref(self.settings.supabase_jwks_url) is None:
-            return Check("invalid", "JWKS URL is malformed")
-        return Check("configured", "JWKS URL is configured for local JWT verification")
+            return Check("invalid", "כתובת JWKS לא תקינה")
+        return Check("configured", "כתובת JWKS מוגדרת לאימות JWT מקומי")
 
     def _storage_check(self) -> Check:
         if not self.settings.supabase_storage_bucket:
-            return Check("invalid", "SUPABASE_STORAGE_BUCKET is not set")
+            return Check("invalid", "SUPABASE_STORAGE_BUCKET לא מוגדר")
         if self.settings.supabase_configured:
-            return Check("configured", f"Supabase Storage bucket '{self.settings.supabase_storage_bucket}' configured")
+            return Check("configured", f"מיכל אחסון Supabase '{self.settings.supabase_storage_bucket}' מוגדר")
         if self.settings.supabase_auth_required or self.settings.app_env == "production":
-            return Check("invalid", "Supabase Storage is required outside local development")
-        return Check("local", "Local meal-image storage fallback")
+            return Check("invalid", "אחסון Supabase נדרש מחוץ לפיתוח מקומי")
+        return Check("local", "שמירת תמונות ארוחה מקומית")
 
     def _issues(self, checks: dict[str, Check]) -> list[str]:
         issues: list[str] = []
         if not self.settings.supabase_auth_required:
-            issues.append("Supabase Auth is not required")
+            issues.append("אימות Supabase לא נדרש")
         if checks["database"].status == "invalid":
             if self.settings.supabase_auth_required:
-                issues.append("Supabase Auth requires a non-SQLite DATABASE_URL")
+                issues.append("אימות Supabase דורש DATABASE_URL שאינו SQLite")
             else:
                 issues.append(checks["database"].detail)
         for name in ("supabase_auth", "jwks", "storage"):
