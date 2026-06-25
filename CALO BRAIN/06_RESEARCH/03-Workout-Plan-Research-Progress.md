@@ -10973,5 +10973,10 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Latest pushed commit:
   - `5b8cc88 Cover frontend API Hebrew errors`
+  - `8bd059c Fix API client test build typing`
 - API client tests: `5 passed`.
+- First full `npm run build` after adding the test failed on TypeScript mock-call tuple typing.
+- Fixed the test with an explicit typed mock-call cast.
+- Full local suite after the fix: backend `586 passed`, frontend `52 passed`.
+- Build, lint, and diff check passed after the fix.
 - Frontend lint passed.
