@@ -395,7 +395,7 @@ describe('Workout plan UI', () => {
     expect(await screen.findByText(/תוכנית כוח שמורה/i)).toBeInTheDocument();
     expect(screen.getByText('תוכנית חודשית')).toBeInTheDocument();
     expect(screen.getByText('4 שבועות, 45 דקות לאימון')).toBeInTheDocument();
-    expect(screen.getByText('גומיות התנגדות, מוט, ספסל, כבלים, חדר כושר, בית, משקל גוף, גומיות התנגדות')).toBeInTheDocument();
+    expect(screen.getByText('גומיות התנגדות, מוט, ספסל, כבלים, חדר כושר, בית, משקל גוף')).toBeInTheDocument();
     expect(screen.getByText('התקדמות לפי שבוע')).toBeInTheDocument();
     expect(screen.getByText(/שבוע 4: שבוע בדיקה\/שימור לפני החודש הבא/i)).toBeInTheDocument();
     expect(screen.getByText('מה לתעד')).toBeInTheDocument();

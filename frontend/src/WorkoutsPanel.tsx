@@ -789,35 +789,34 @@ function formatSetCount(sets: string): string {
 
 function formatEquipment(equipment: string[]): string {
   if (equipment.length === 0) return 'משקל גוף';
-  return equipment
-    .map((item) => {
-      const key = item.trim().toLowerCase();
-      return (
-        {
-          dumbbells: 'משקולות יד',
-          dumbbell: 'משקולת יד',
-          'resistance bands': 'גומיות התנגדות',
-          resistance_bands: 'גומיות התנגדות',
-          bands: 'גומיות התנגדות',
-          band: 'גומייה',
-          bodyweight: 'משקל גוף',
-          'body weight': 'משקל גוף',
-          'body-weight': 'משקל גוף',
-          home: 'בית',
-          gym: 'חדר כושר',
-          machines: 'מכונות',
-          machine: 'מכונה',
-          cables: 'כבלים',
-          cable: 'כבל',
-          cable_machine: 'כבל',
-          bench: 'ספסל',
-          barbell: 'מוט',
-          kettlebell: 'קטלבל',
-          pull_up_bar: 'מתח'
-        }[key] ?? item
-      );
-    })
-    .join(', ');
+  const labels = equipment.map((item) => {
+    const key = item.trim().toLowerCase();
+    return (
+      {
+        dumbbells: 'משקולות יד',
+        dumbbell: 'משקולת יד',
+        'resistance bands': 'גומיות התנגדות',
+        resistance_bands: 'גומיות התנגדות',
+        bands: 'גומיות התנגדות',
+        band: 'גומייה',
+        bodyweight: 'משקל גוף',
+        'body weight': 'משקל גוף',
+        'body-weight': 'משקל גוף',
+        home: 'בית',
+        gym: 'חדר כושר',
+        machines: 'מכונות',
+        machine: 'מכונה',
+        cables: 'כבלים',
+        cable: 'כבל',
+        cable_machine: 'כבל',
+        bench: 'ספסל',
+        barbell: 'מוט',
+        kettlebell: 'קטלבל',
+        pull_up_bar: 'מתח'
+      }[key] ?? item
+    );
+  });
+  return Array.from(new Set(labels)).join(', ');
 }
 
 function formatWorkoutStatus(status: string): string {
