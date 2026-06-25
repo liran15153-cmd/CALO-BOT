@@ -10844,3 +10844,30 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Full local suite: backend `586 passed`, frontend `50 passed`.
 - Lint and diff check passed.
 - Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
+
+## Final Hebrew-First Readiness Cleanup - 2026-06-26
+
+### Verification target
+
+- Keep `/api/readiness` diagnostic details Hebrew-first while preserving machine-readable status keys.
+
+### Changes
+
+- Translated readiness check details and issue messages.
+- Kept `status`, check names, env var names, and boolean fields unchanged as API contract.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_supabase_readiness.py --basetemp .pytest-tmp-readiness-hebrew`
+- `npm test`
+- `npm run lint`
+- `git diff --check`
+
+### Result
+
+- Latest pushed commit:
+  - `ae0faed Translate readiness details to Hebrew`
+- Readiness tests: `4 passed`.
+- Full local suite: backend `586 passed`, frontend `50 passed`.
+- Lint and diff check passed.
+- Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
