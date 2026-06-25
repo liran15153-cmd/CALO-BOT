@@ -11189,3 +11189,23 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused workout-log API suite: `34 passed`.
+
+## Final API Validation Hebrew Cleanup - 2026-06-26
+
+### Verification target
+
+- Prevent default FastAPI/Pydantic 422 validation messages from returning English user-facing text.
+
+### Changes
+
+- Added a global `RequestValidationError` handler that returns Hebrew validation details.
+- Preserved custom Hebrew validation messages while replacing generic enum/range/type messages with a short Hebrew fallback.
+- Added onboarding API coverage for both custom Hebrew validation and generic invalid enum validation.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_onboarding_api.py backend/tests/test_workout_schema.py --basetemp .pytest-tmp-validation-hebrew`
+
+### Result
+
+- Focused onboarding/schema validation suite: `11 passed`.

@@ -34,6 +34,18 @@ def test_onboarding_api_rejects_missing_consent(tmp_path):
     response = client.post("/api/onboarding", json=payload)
 
     assert response.status_code == 422
+    assert response.json()["detail"] == ["יש לאשר שהאפליקציה מספקת הכוונת כושר ותזונה כללית בלבד"]
+
+
+def test_onboarding_api_validation_errors_are_hebrew(tmp_path):
+    client = make_client(tmp_path)
+    payload = valid_payload(main_goal="invalid_goal")
+
+    response = client.post("/api/onboarding", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == ["בקשת API לא תקינה. יש לבדוק את השדות והערכים שנשלחו."]
+    assert "Input should be" not in str(response.json())
 
 
 def make_client(tmp_path) -> TestClient:

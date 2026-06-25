@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.app.api.body_metrics import router as body_metrics_router
 from backend.app.api.chat import router as chat_router
@@ -28,6 +30,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    messages = [_hebrew_validation_message(str(error.get("msg") or "")) for error in exc.errors()]
+    hebrew_messages = [message for message in messages if message]
+    return JSONResponse(
+        status_code=422,
+        content={"detail": hebrew_messages or ["בקשת API לא תקינה. יש לבדוק את השדות והערכים שנשלחו."]},
+    )
+
+
+def _hebrew_validation_message(message: str) -> str | None:
+    for prefix in ("Value error, ", "Assertion failed, "):
+        if message.startswith(prefix):
+            message = message.removeprefix(prefix)
+    return message if any("\u0590" <= char <= "\u05ff" for char in message) else None
 
 
 @app.get("/api/health", response_model=HealthResponse)
