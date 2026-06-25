@@ -10712,8 +10712,8 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - `rg "memory_summaries"` found only the old core schema migration, the cleanup migration, and the migration tests. No backend runtime service reads or writes `memory_summaries`.
 - `CALO BRAIN/01_PRODUCT/02-Product-Behavior.md`, `CALO BRAIN/03_REFERENCE/03-Prompt-Registry.md`, and `CALO BRAIN/06_RESEARCH/02-Coaching-Knowledge-Source.md` exist in the branch.
 - `CALO BRAIN/05_OPERATIONS/03-Session-Handoffs.md` is absent. The remaining references found by `rg` are historical report/progress-log mentions, not live code or an active runtime dependency.
-- `frontend/src/api.ts` has `activateWorkoutPlan()`, but it throws a generic error for any non-OK response and has no 404-specific activation handling.
-- `frontend/src/WorkoutsPanel.tsx` uses pending-action confirmation through `resolvePendingAction()` for candidate activation; search found no direct `activateWorkoutPlan()` caller in the panel.
+- `frontend/src/api.ts` no longer exports direct `activateWorkoutPlan()` / `discardWorkoutPlan()` helpers; search found no frontend caller for direct activation/discard.
+- `frontend/src/WorkoutsPanel.tsx` uses pending-action confirmation through `resolvePendingAction()` for candidate activation, so the single-workout 400 status is not a frontend compatibility break.
 - `backend/tests/test_workout_plans_api.py::test_activate_workout_plan_rejects_single_workout_and_keeps_current_plan` explicitly expects HTTP 400 for trying to activate a single workout.
 
 ### Commands run
