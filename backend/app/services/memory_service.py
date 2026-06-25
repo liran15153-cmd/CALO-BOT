@@ -1,3 +1,10 @@
+"""Deterministic, safety-scoped memory extraction.
+
+This branch keeps MemoryService limited to safety facts used by context/safety
+flows. Broader preference/goal memory and automatic supersession policy should
+be split into a separate PR instead of expanding this workout-plan branch.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

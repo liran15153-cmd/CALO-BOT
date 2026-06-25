@@ -920,6 +920,59 @@ def test_chat_scoped_cable_unavailable_removes_metadata_only_without_replacement
     assert saved.plan_json["plan_edit_history"][-1]["changed_exercises"] == 0
 
 
+def test_scoped_edit_normalizes_previously_removed_cable_alternatives(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    plan_response = client.post(
+        "/api/workout-plans",
+        json={"prompt": "Build a one day gym plan", "duration_weeks": 1, "days_per_week": 1},
+    )
+    saved = db.get(WorkoutPlan, plan_response.json()["id"])
+    assert saved is not None
+
+    plan_json = dict(saved.plan_json)
+    days = [
+        {
+            **dict(day),
+            "exercises": [dict(exercise) for exercise in (day.get("exercises") or [])],
+        }
+        for day in plan_json["days"]
+    ]
+    days[0]["exercises"][0]["alternatives"] = ["חתירה בכבל", "חתירה עם משקולת"]
+    plan_json["days"] = days
+    plan_json["plan_edit_history"] = [
+        {"date": "2026-01-01", "edit_type": "remove_cable", "changed_exercises": 1, "source": "test"}
+    ]
+    saved.plan_json = plan_json
+    first_workout = db.scalar(select(Workout).where(Workout.plan_id == saved.id).order_by(Workout.id))
+    assert first_workout is not None
+    first_row = db.scalar(select(WorkoutExercise).where(WorkoutExercise.workout_id == first_workout.id).order_by(WorkoutExercise.id))
+    assert first_row is not None
+    first_row.alternatives = ["חתירה בכבל", "חתירה עם משקולת"]
+    db.commit()
+
+    response = client.post("/api/chat", json={"message": "תוריד נפח מהתוכנית השבוע, אני עייף"})
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "local_tool"
+    db.refresh(saved)
+    saved_text = json.dumps(
+        [
+            {"name": exercise["name"], "alternatives": exercise.get("alternatives", [])}
+            for day in saved.plan_json["days"]
+            for exercise in day["exercises"]
+        ],
+        ensure_ascii=False,
+    )
+    row_text = json.dumps(
+        [{"name": row.name, "alternatives": row.alternatives or []} for row in db.scalars(select(WorkoutExercise)).all()],
+        ensure_ascii=False,
+    )
+    assert "כבל" not in saved_text
+    assert "כבל" not in row_text
+    assert "משקולת" in saved_text
+    assert "משקולת" in row_text
+
+
 def test_chat_workout_log_after_cable_substitution_keeps_progression_generic(tmp_path):
     client, db = make_client_and_db(tmp_path)
     plan_response = client.post(

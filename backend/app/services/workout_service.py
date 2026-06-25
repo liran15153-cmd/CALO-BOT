@@ -329,7 +329,6 @@ class WorkoutService:
         if not changed_exercises and edit_type == "reduce_volume":
             message = "לא מצאתי סטים שאפשר להוריד בלי להפוך את האימון לריק. הפעולה הבאה: לבצע גרסת מינימום של 2-3 תרגילים ולתעד RPE או מאמץ מילולי וכאב."
 
-        plan_json["days"] = days
         edit_history = list(plan_json.get("plan_edit_history") or [])
         edit_history.append(
             {
@@ -339,6 +338,8 @@ class WorkoutService:
                 "source": "chat_scoped_plan_edit",
             }
         )
+        _normalize_removed_equipment_alternatives(days, {entry.get("edit_type") for entry in edit_history})
+        plan_json["days"] = days
         plan_json["plan_edit_history"] = edit_history[-10:]
         plan.plan_json = plan_json
         self._sync_plan_rows_from_json(plan)
@@ -1518,6 +1519,21 @@ def _requires_cable(value: str) -> bool:
 
 def _without_cable(items: list[str]) -> list[str]:
     return [item for item in items if not _requires_cable(str(item))]
+
+
+def _normalize_removed_equipment_alternatives(days: list[dict[str, Any]], edit_types: set[str | None]) -> None:
+    remove_bench = "remove_bench" in edit_types
+    remove_cable = "remove_cable" in edit_types
+    if not remove_bench and not remove_cable:
+        return
+    for day in days:
+        for exercise in day.get("exercises") or []:
+            alternatives = [str(alternative) for alternative in (exercise.get("alternatives") or [])]
+            if remove_bench:
+                alternatives = _without_bench(alternatives)
+            if remove_cable:
+                alternatives = _without_cable(alternatives)
+            exercise["alternatives"] = alternatives
 
 
 def _reduce_volume_in_days(days: list[dict[str, Any]]) -> int:

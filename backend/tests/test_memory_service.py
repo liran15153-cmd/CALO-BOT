@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -8,7 +9,7 @@ from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
 from backend.app.models import MemoryFact
 from backend.app.services.context_builder import ContextBuilder
-from backend.app.services.memory_service import MemoryService
+from backend.app.services.memory_service import MemoryCandidate, MemoryService
 from backend.app.services.profile_service import ProfileService
 
 
@@ -100,6 +101,41 @@ def test_memory_service_dedups_repeated_safety_fact(tmp_path):
     assert facts[0].status == "active"
 
 
+def test_memory_service_reconcile_does_not_revive_retracted_fact(tmp_path):
+    db = make_session(tmp_path)
+    user = ProfileService(db).get_default_user()
+    retracted = add_memory_fact(db, user_id=user.id, status="retracted", text_he="אני אלרגי לבוטנים")
+
+    saved = MemoryService(db).reconcile(
+        user_id=user.id,
+        candidates=[MemoryCandidate(fact_type="allergy", text_he="אני אלרגי לבוטנים", confidence="high")],
+    )
+
+    facts = db.scalars(select(MemoryFact).order_by(MemoryFact.id)).all()
+    assert len(facts) == 2
+    assert retracted.status == "retracted"
+    assert saved[0].status == "active"
+    assert saved[0].id != retracted.id
+
+
+def test_memory_service_reconcile_does_not_reuse_superseded_fact(tmp_path):
+    db = make_session(tmp_path)
+    user = ProfileService(db).get_default_user()
+    superseded = add_memory_fact(db, user_id=user.id, status="superseded", text_he="יש לי כאב ברך")
+
+    saved = MemoryService(db).reconcile(
+        user_id=user.id,
+        candidates=[MemoryCandidate(fact_type="injury", text_he="יש לי כאב ברך", confidence="medium")],
+    )
+
+    facts = db.scalars(select(MemoryFact).order_by(MemoryFact.id)).all()
+    assert len(facts) == 2
+    assert superseded.status == "superseded"
+    assert superseded.superseded_by is None
+    assert saved[0].status == "active"
+    assert saved[0].id != superseded.id
+
+
 def test_chat_turn_stores_allergy_for_next_turn_context(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
@@ -110,6 +146,25 @@ def test_chat_turn_stores_allergy_for_next_turn_context(tmp_path):
 
     assert response.status_code == 200
     assert any("בוטנים" in fact["text_he"] for fact in context["memory_safety"])
+
+
+def add_memory_fact(db: Session, *, user_id: int, status: str, text_he: str) -> MemoryFact:
+    fact = MemoryFact(
+        user_id=user_id,
+        fact_type="allergy" if "אלרגי" in text_he else "injury",
+        status=status,
+        text_he=text_he,
+        confidence="high",
+        salience=1.0,
+        source="sync_safety",
+        valid_at=datetime.now(timezone.utc),
+        provenance_json={"test": True},
+        metadata_json={},
+    )
+    db.add(fact)
+    db.commit()
+    db.refresh(fact)
+    return fact
 
 
 def make_session(tmp_path) -> Session:
