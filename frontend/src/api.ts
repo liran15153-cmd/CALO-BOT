@@ -22,6 +22,12 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   return fetch(input, { ...init, headers });
 }
 
+function assertOk(response: Response): void {
+  if (!response.ok) {
+    throw new Error(`בקשת API נכשלה: ${response.status}`);
+  }
+}
+
 export type HealthStatus = {
   status: string;
   service: string;
@@ -354,17 +360,13 @@ export type UsageState = {
 
 export async function fetchHealth(): Promise<HealthStatus> {
   const response = await apiFetch(`${API_BASE}/api/health`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchOnboarding(): Promise<OnboardingState> {
   const response = await apiFetch(`${API_BASE}/api/onboarding`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -374,9 +376,7 @@ export async function saveOnboarding(payload: OnboardingPayload): Promise<Onboar
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -386,21 +386,17 @@ export async function sendChatMessage(message: string, sessionId?: number): Prom
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, session_id: sessionId ?? null })
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
-export async function createChatSession(title = 'Coach chat'): Promise<ChatSession> {
+export async function createChatSession(title = "צ'אט מאמן"): Promise<ChatSession> {
   const response = await apiFetch(`${API_BASE}/api/chat/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title })
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -408,9 +404,7 @@ export async function resetChatSession(sessionId: number): Promise<ChatSession> 
   const response = await apiFetch(`${API_BASE}/api/chat/sessions/${sessionId}/reset`, {
     method: 'POST'
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -420,9 +414,7 @@ export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt })
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -431,9 +423,7 @@ export async function fetchCurrentPendingAction(actionType = 'activate_workout_p
   if (response.status === 404) {
     return null;
   }
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -443,9 +433,7 @@ export async function resolvePendingAction(actionId: number, decision: 'confirm'
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decision })
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -454,9 +442,7 @@ export async function fetchCurrentWorkoutPlan(): Promise<WorkoutPlan | null> {
   if (response.status === 404) {
     return null;
   }
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -465,9 +451,7 @@ export async function fetchNextWorkout(): Promise<NextWorkout | null> {
   if (response.status === 404) {
     return null;
   }
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -478,17 +462,13 @@ export async function saveWorkoutLog(input: string | WorkoutLogInput): Promise<W
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchRecentWorkoutLogs(): Promise<WorkoutLog[]> {
   const response = await apiFetch(`${API_BASE}/api/workout-logs/recent`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -500,17 +480,13 @@ export async function uploadMealImage(note: string, file: File): Promise<Meal> {
     method: 'POST',
     body: formData
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchRecentMeals(): Promise<Meal[]> {
   const response = await apiFetch(`${API_BASE}/api/meals/recent`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -518,9 +494,7 @@ export async function analyzeMealImage(mealId: number): Promise<MealAnalysis> {
   const response = await apiFetch(`${API_BASE}/api/meals/${mealId}/analyze`, {
     method: 'POST'
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -530,33 +504,25 @@ export async function saveManualMeal(text: string): Promise<Meal> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchDashboard(): Promise<DashboardState> {
   const response = await apiFetch(`${API_BASE}/api/dashboard`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchSettings(): Promise<SettingsState> {
   const response = await apiFetch(`${API_BASE}/api/settings`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function exportSettingsData(): Promise<unknown> {
   const response = await apiFetch(`${API_BASE}/api/settings/export`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
@@ -564,17 +530,13 @@ export async function resetLocalData(): Promise<ResetResult> {
   const response = await apiFetch(`${API_BASE}/api/settings/reset`, {
     method: 'POST'
   });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
 export async function fetchUsage(): Promise<UsageState> {
   const response = await apiFetch(`${API_BASE}/api/usage`);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
+  assertOk(response);
   return response.json();
 }
 
