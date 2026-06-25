@@ -583,6 +583,31 @@ def test_chat_scoped_no_bench_edit_updates_current_plan_without_replacement(tmp_
     assert db.scalar(select(PendingAction)) is None
 
 
+def test_chat_scoped_no_bench_edit_asks_when_plan_has_no_bench(tmp_path):
+    client, db = make_client_and_db(tmp_path)
+    plan_response = client.post(
+        "/api/workout-plans",
+        json={
+            "prompt": "Create a 2-day bodyweight plan without equipment",
+            "days_per_week": 2,
+            "equipment": ["bodyweight"],
+        },
+    )
+    current_id = plan_response.json()["id"]
+
+    response = client.post("/api/chat", json={"message": "אין לי ספסל בתוכנית, תחליף רק את מה שצריך"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "local_tool"
+    assert "לא מצאתי בתוכנית" in body["response"]
+    assert "איזה תרגיל בדיוק דורש ספסל" in body["response"]
+    saved = db.get(WorkoutPlan, current_id)
+    assert saved is not None
+    assert saved.plan_json.get("plan_edit_history") in (None, [])
+    assert db.scalar(select(PendingAction)) is None
+
+
 def test_chat_plan_change_summary_uses_recent_structured_edit(tmp_path):
     client, db = make_client_and_db(tmp_path)
     client.post(

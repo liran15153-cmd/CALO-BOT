@@ -290,16 +290,34 @@ class WorkoutService:
                 }
         elif edit_type == "remove_bench":
             changed_exercises = _remove_bench_from_days(days)
-            plan.equipment_needed = _without_bench(plan.equipment_needed or [])
-            plan_json["equipment_needed"] = _without_bench(plan_json.get("equipment_needed") or [])
+            current_equipment = list(plan.equipment_needed or [])
+            plan_equipment = list(plan_json.get("equipment_needed") or [])
             decision_inputs = dict(plan_json.get("decision_inputs") or {})
-            decision_inputs["equipment"] = _without_bench(decision_inputs.get("equipment") or [])
+            decision_equipment = list(decision_inputs.get("equipment") or [])
+            next_current_equipment = _without_bench(current_equipment)
+            next_plan_equipment = _without_bench(plan_equipment)
+            next_decision_equipment = _without_bench(decision_equipment)
+            equipment_changed = (
+                next_current_equipment != current_equipment
+                or next_plan_equipment != plan_equipment
+                or next_decision_equipment != decision_equipment
+            )
+            plan.equipment_needed = next_current_equipment
+            plan_json["equipment_needed"] = next_plan_equipment
+            decision_inputs["equipment"] = next_decision_equipment
             plan_json["decision_inputs"] = decision_inputs
-            status = "updated"
+            status = "updated" if changed_exercises or equipment_changed else "needs_clarification"
             message = (
                 f"עדכנתי את התוכנית הפעילה בלי לבנות חדשה: הסרתי שימוש בספסל ועדכנתי {changed_exercises} תרגילים/חלופות. "
                 "הפעולה הבאה: באימון הקרוב לבצע את הגרסאות בלי ספסל ולתעד RPE או מאמץ מילולי וכאב."
             )
+            if not changed_exercises and not equipment_changed:
+                return {
+                    "status": status,
+                    "edit_type": edit_type,
+                    "changed_exercises": 0,
+                    "message": "לא מצאתי בתוכנית תרגיל או חלופה עם ספסל. איזה תרגיל בדיוק דורש ספסל?",
+                }
         elif edit_type == "remove_cable":
             changed_exercises = _remove_cable_from_days(days)
             current_equipment = list(plan.equipment_needed or [])
@@ -1426,11 +1444,14 @@ def _remove_bench_from_days(days: list[dict[str, Any]]) -> int:
 def _remove_bench_from_exercise(exercise: dict[str, Any]) -> bool:
     original = dict(exercise)
     name = str(exercise.get("name") or "")
+    alternatives = [str(alternative) for alternative in (exercise.get("alternatives") or [])]
+    if not _requires_bench(name) and not any(_requires_bench(alternative) for alternative in alternatives):
+        return False
+
     replacement = _no_bench_replacement(exercise)
     if replacement and _requires_bench(name):
         exercise["name"] = replacement
 
-    alternatives = [str(alternative) for alternative in (exercise.get("alternatives") or [])]
     filtered_alternatives = [alternative for alternative in alternatives if not _requires_bench(alternative)]
     current_name = str(exercise.get("name") or "")
     if replacement and replacement != current_name and replacement not in filtered_alternatives:
