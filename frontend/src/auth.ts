@@ -43,7 +43,7 @@ export async function signUpWithPassword(email: string, password: string): Promi
 
 async function requestAuth(path: string, body: Record<string, string>): Promise<SupabaseAuthSession> {
   if (!isSupabaseAuthConfigured()) {
-    throw new Error('Supabase Auth is not configured');
+    throw new Error('אימות Supabase לא מוגדר');
   }
   const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}${path}`, {
     method: 'POST',
@@ -54,11 +54,11 @@ async function requestAuth(path: string, body: Record<string, string>): Promise<
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    throw new Error(`Supabase Auth failed: ${response.status}`);
+    throw new Error(`אימות Supabase נכשל: ${response.status}`);
   }
   const payload = (await response.json()) as SupabaseAuthSession;
   if (!payload.access_token) {
-    throw new Error('Supabase Auth did not return an access token');
+    throw new Error('אימות Supabase לא החזיר טוקן גישה');
   }
   return payload;
 }
