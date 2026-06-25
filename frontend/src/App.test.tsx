@@ -28,10 +28,10 @@ describe('App shell', () => {
             status: 200,
             json: async () => ({
               current_goal: 'improve_fitness',
-              current_workout_plan: { name: 'Base plan' },
+              current_workout_plan: { name: 'תוכנית בסיס' },
               next_workout: {
                 id: 1,
-                name: 'Upper',
+                name: 'פלג גוף עליון',
                 load_signal: 'maintain',
                 scheduled_day: 'יום ראשון',
                 warmup: [],
@@ -44,8 +44,8 @@ describe('App shell', () => {
               estimated_protein_range_today: [null, null],
               current_streak: 0,
               missed_workouts: 0,
-              next_recommended_action: 'Start with one short workout.',
-              nutrition_action: 'Add one balanced meal first.'
+              next_recommended_action: 'להתחיל באימון קצר אחד.',
+              nutrition_action: 'לתעד ארוחה מאוזנת אחת.'
             })
           } as Response;
         }
@@ -76,5 +76,7 @@ describe('App shell', () => {
 
     expect(await screen.findByText(/ספק הבינה המלאכותית לא מוגדר/i)).toBeInTheDocument();
     expect(await screen.findByText(/מצב מקומי בלבד/i)).toBeInTheDocument();
+    expect(await screen.findByText(/להתחיל באימון קצר אחד/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Start with one short workout|Add one balanced meal first|Base plan|Upper/i)).not.toBeInTheDocument();
   });
 });

@@ -21,7 +21,7 @@ describe('Settings UI', () => {
             estimated_nutrition_range: null,
             current_streak: 0,
             missed_workouts: 0,
-            next_recommended_action: 'Complete onboarding.'
+            next_recommended_action: 'להשלים אונבורדינג.'
           });
         }
         if (url.endsWith('/api/settings')) {
@@ -44,7 +44,7 @@ describe('Settings UI', () => {
           return jsonResponse({ profile: null, meals: [] });
         }
         if (url.endsWith('/api/settings/reset') && init?.method === 'POST') {
-          return jsonResponse({ deleted_records: 1, message: 'Local data reset.' });
+          return jsonResponse({ deleted_records: 1, message: 'הנתונים המקומיים אופסו.' });
         }
         return jsonResponse({});
       })
