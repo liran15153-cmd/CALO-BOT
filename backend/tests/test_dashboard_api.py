@@ -95,7 +95,7 @@ def test_dashboard_next_recommended_action_reflects_available_state(tmp_path):
     )
     repeated_miss_dashboard = client.get("/api/dashboard").json()
     repeated_action = repeated_miss_dashboard["next_recommended_action"]
-    assert "הורד זמנית יום אימון אחד" in repeated_action
+    assert "להוריד זמנית יום אימון אחד" in repeated_action
     assert "שאלה אחת" in repeated_action
     assert repeated_miss_dashboard["next_workout"]["plan_adjustment"]["type"] == "reduce_plan_before_rebuild"
 

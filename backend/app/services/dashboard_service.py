@@ -152,7 +152,7 @@ class DashboardService:
             "load_signal": adaptation.get("load_signal", "maintain"),
             "signals": adaptation.get("signals", []),
             "exercise_adjustments": adaptation.get("exercise_adjustments", []),
-            "next_adjustment": adaptation.get("next_adjustment", "שמור על התוכנית הנוכחית."),
+            "next_adjustment": adaptation.get("next_adjustment", "לשמור על התוכנית הנוכחית."),
             "plan_adjustment": adaptation.get("plan_adjustment"),
             "progress_evidence": adaptation.get("progress_evidence"),
             "first_exercise": DashboardService._first_exercise_summary(execution_plan),
@@ -248,5 +248,5 @@ class DashboardService:
                 f"לבצע את {workout_name}. הלוג האחרון היה קרוב לכשל לפי RPE/RIR, אז להוריד מעט נפח או עומס. "
                 "לתעד RPE/RIR או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
             )
-        adjustment = next_workout.get("next_adjustment") or "שמור על התוכנית הנוכחית."
+        adjustment = next_workout.get("next_adjustment") or "לשמור על התוכנית הנוכחית."
         return f"לבצע את {workout_name}. {adjustment} לתעד RPE או מאמץ מילולי, כאב ומה הושלם - לא לנחש."

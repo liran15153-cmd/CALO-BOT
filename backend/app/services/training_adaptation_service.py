@@ -28,7 +28,7 @@ class TrainingAdaptationService:
                 pain_flags=pain_flags,
                 load_signal="pain_caution",
                 signals=signals,
-                next_adjustment="התאם את האימון סביב הכאב: בחר וריאציה קלה יותר, טווח נוח יותר או עומס נמוך יותר לפני התקדמות.",
+                next_adjustment="להתאים את האימון סביב הכאב: לבחור וריאציה קלה יותר, טווח נוח יותר או עומס נמוך יותר לפני התקדמות.",
                 exercise_adjustments=exercise_adjustments,
                 pain_area=pain_area,
             )
@@ -41,7 +41,7 @@ class TrainingAdaptationService:
                 pain_flags=pain_flags,
                 load_signal="recovery_needed",
                 signals=signals,
-                next_adjustment="שמור על התאוששות: הורד מעט נפח או עצימות באימון הבא ובדוק שינה, אנרגיה ותחושת מאמץ.",
+                next_adjustment="לשמור על התאוששות: להוריד מעט נפח או עצימות באימון הבא ולבדוק שינה, אנרגיה ותחושת מאמץ.",
                 exercise_adjustments=exercise_adjustments,
             )
 
@@ -55,7 +55,7 @@ class TrainingAdaptationService:
                 load_signal="adherence_risk",
                 signals=signals,
                 next_adjustment=(
-                    "התוכנית כנראה גדולה מדי כרגע: בחר גרסה קצרה והורד זמנית יום אימון אחד בשבוע או הפוך יום אחד לגרסת מינימום. "
+                    "התוכנית כנראה גדולה מדי כרגע: לבחור גרסה קצרה ולהוריד זמנית יום אימון אחד בשבוע או להפוך יום אחד לגרסת מינימום. "
                     "שאלה אחת: מה החסם שחוזר - זמן, עייפות, כאב או ציוד?"
                 ),
                 exercise_adjustments=exercise_adjustments,
@@ -76,7 +76,7 @@ class TrainingAdaptationService:
                 pain_flags=pain_flags,
                 load_signal="adherence_risk",
                 signals=signals,
-                next_adjustment="הצע גרסה קצרה וגרסת מינימום במקום להשלים את כל מה שפוספס: פחות סטים, פחות עומס, וביצוע נקי.",
+                next_adjustment="להציע גרסה קצרה וגרסת מינימום במקום להשלים את כל מה שפוספס: פחות סטים, פחות עומס, וביצוע נקי.",
                 exercise_adjustments=exercise_adjustments,
             )
 
@@ -128,7 +128,7 @@ class TrainingAdaptationService:
             pain_flags=pain_flags,
             load_signal="maintain",
             signals=signals or ["אין מספיק דפוס ברור מהלוגים האחרונים"],
-            next_adjustment="שמור על התוכנית הנוכחית ואסוף עוד לוגים לפני שינוי משמעותי.",
+            next_adjustment="לשמור על התוכנית הנוכחית ולאסוף עוד לוגים לפני שינוי משמעותי.",
             exercise_adjustments=exercise_adjustments,
         )
 

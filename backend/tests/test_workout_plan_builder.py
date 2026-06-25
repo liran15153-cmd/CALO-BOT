@@ -1,4 +1,12 @@
-from backend.app.services.workout_plan_builder import infer_duration_weeks, infer_plan_type, is_persistent_plan_type
+import re
+
+from backend.app.services.workout_plan_builder import (
+    WorkoutPlanBuilder,
+    WorkoutPlanningInput,
+    infer_duration_weeks,
+    infer_plan_type,
+    is_persistent_plan_type,
+)
 
 
 def test_infer_plan_type_uses_explicit_values_when_valid():
@@ -53,3 +61,74 @@ def test_is_persistent_plan_type_rejects_unknown_legacy_values():
     assert is_persistent_plan_type("single_workout") is False
     assert is_persistent_plan_type("custom_plan") is False
     assert is_persistent_plan_type(None) is False
+
+
+def test_generated_plan_copy_uses_neutral_hebrew_without_regex_rewrite():
+    blocked_words = [
+        "הוסף",
+        "שמור",
+        "עצור",
+        "הורד",
+        "העלה",
+        "בחר",
+        "עבוד",
+        "קח",
+        "השתמש",
+        "התאם",
+        "בצע",
+        "הפחת",
+        "חזור",
+        "התקדם",
+        "עבור",
+    ]
+    hebrew = r"\u0590-\u05ff"
+    imperative_pattern = re.compile(rf"(?<![{hebrew}])ו?(?:{'|'.join(blocked_words)})(?![{hebrew}])")
+    direct_prohibition_pattern = re.compile(rf"(?<![{hebrew}])ו?אל ת")
+    builder = WorkoutPlanBuilder()
+    goals = ["build_muscle", "improve_strength", "lose_fat", "improve_endurance", "improve_mobility"]
+    experience_levels = ["beginner", "intermediate", "advanced"]
+    equipment_modes = [["bodyweight"], ["home"], ["dumbbells"], ["gym"]]
+
+    for goal in goals:
+        for experience_level in experience_levels:
+            for equipment in equipment_modes:
+                plan = builder.build(
+                    WorkoutPlanningInput(
+                        prompt="תוכנית חודשית",
+                        goal=goal,
+                        experience_level=experience_level,
+                        days_per_week=3,
+                        duration_weeks=4,
+                        equipment=equipment,
+                        plan_type="monthly_plan",
+                    )
+                )
+                text = str(plan.model_dump())
+                leaked = [
+                    *imperative_pattern.findall(text),
+                    *direct_prohibition_pattern.findall(text),
+                ]
+                assert leaked == []
+                if goal == "build_muscle":
+                    assert "בניית שריר" in plan.name
+
+
+def test_generated_plan_copy_keeps_key_neutral_phrases_readable():
+    builder = WorkoutPlanBuilder()
+    plan = builder.build(
+        WorkoutPlanningInput(
+            prompt="תוכנית חודשית",
+            goal="build_muscle",
+            experience_level="beginner",
+            days_per_week=3,
+            duration_weeks=4,
+            equipment=["bodyweight"],
+            plan_type="monthly_plan",
+        )
+    )
+
+    text = str(plan.model_dump())
+    assert "מסגרת אימון של בערך" in text
+    assert "לעצור אם מופיעים כאב חד" in text
+    assert "להוסיף חזרות" in text
+    assert "בניית שריר" in plan.name

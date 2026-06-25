@@ -276,7 +276,7 @@ class WorkoutPlanBuilder:
             },
             source_refs=SOURCE_REFS,
         )
-        return _neutralize_plan_guidance_copy(plan)
+        return plan
 
     @staticmethod
     def _normalize_plan_type(plan_type: str | None, prompt: str) -> str:
@@ -360,13 +360,13 @@ class WorkoutPlanBuilder:
         exercises = exercises[:max_exercises]
         if spacing_reduction:
             exercises = [_reduce_exercise_for_spacing(exercise) for exercise in exercises]
-        day_notes = [f"שמור על אימון של בערך {session_length_minutes} דקות."]
+        day_notes = [f"מסגרת אימון של בערך {session_length_minutes} דקות."]
         if readiness == "yellow":
-            day_notes.append("יום צהוב: הורד 20-40% נפח או עצימות והשאר 2-3 חזרות ברזרבה.")
+            day_notes.append("יום צהוב: להוריד 20-40% נפח או עצימות ולהשאיר 2-3 חזרות ברזרבה.")
         elif readiness == "red":
-            day_notes.append("יום אדום: אל תעמיס; בחר תנועה קלה בלבד ופנה לאיש מקצוע אם יש סימן חריג.")
+            day_notes.append("יום אדום: לא להעמיס; לבחור תנועה קלה בלבד ולפנות לאיש מקצוע אם יש סימן חריג.")
         elif spacing_reduction:
-            day_notes.append("ימים צפופים: הורד סט אחד ושמור RPE 5-7 כדי לאפשר התאוששות.")
+            day_notes.append("ימים צפופים: להפחית סט אחד ולשמור RPE 5-7 כדי לאפשר התאוששות.")
         else:
             day_notes.append(variables["day_note"])
 
@@ -431,15 +431,15 @@ class WorkoutPlanBuilder:
     @staticmethod
     def _safety_notes(display_limitations: str, readiness: str, training_status: dict | None = None) -> list[str]:
         notes = [
-            "עצור אם מופיעים כאב חד, כאב בחזה, סחרחורת חריגה, עילפון או קוצר נשימה חריג.",
-            "עבוד בטווח ללא כאב ושמור טכניקה יציבה לפני הוספת עומס.",
+            "לעצור אם מופיעים כאב חד, כאב בחזה, סחרחורת חריגה, עילפון או קוצר נשימה חריג.",
+            "לעבוד בטווח ללא כאב ולשמור טכניקה יציבה לפני הוספת עומס.",
         ]
         if display_limitations:
-            notes.append(f"התאם את האימון סביב המגבלה שתועדה: {display_limitations}.")
+            notes.append(f"להתאים את האימון סביב המגבלה שתועדה: {display_limitations}.")
         if readiness == "yellow":
-            notes.append("הורד היום נפח או עצימות כדי לאפשר התאוששות לפני התקדמות.")
+            notes.append("להוריד היום נפח או עצימות כדי לאפשר התאוששות לפני התקדמות.")
         if readiness == "red":
-            notes.append("אל תתאמן חזק היום; בחר תנועה קלה בלבד ופנה לעזרה מקצועית אם יש סימני אזהרה.")
+            notes.append("ביום אדום לא להתאמן חזק; לבחור תנועה קלה בלבד ולפנות לעזרה מקצועית אם יש סימני אזהרה.")
         if training_status and training_status.get("next_adjustment"):
             notes.append(training_status["next_adjustment"])
         return notes
@@ -452,15 +452,15 @@ class WorkoutPlanBuilder:
         plan_type: str,
     ) -> str:
         note = (
-            "אם הכאב השרירי או העייפות גבוהים, הורד סט אחד מכל תרגיל או קח יום מנוחה נוסף. "
+            "אם הכאב השרירי או העייפות גבוהים, להוריד סט אחד מכל תרגיל או לקחת יום מנוחה נוסף. "
             f"{variables['recovery_note']}"
         )
         if is_single_workout_plan(plan_type):
             note += " זו תוכנית לאימון יחיד, לכן אין צורך להשלים נפח חסר היום."
         if readiness == "yellow":
-            note += " היום עדיף לשמור התאוששות: הפחת עומס וחזור להתקדמות רק כשהביצוע יציב."
+            note += " היום עדיף לשמור התאוששות: להפחית עומס ולחזור להתקדמות רק כשהביצוע יציב."
         if display_limitations:
-            note += f" עבוד סביב {display_limitations}."
+            note += f" עדיף לעבוד סביב {display_limitations}."
         return note
 
     @staticmethod
@@ -508,7 +508,7 @@ def _exercise_catalog(
     experience_level: str,
 ) -> dict[str, StructuredExercise]:
     mode = _equipment_mode(equipment)
-    limitation_note = f" כבד את {display_limitations}." if display_limitations else ""
+    limitation_note = f" להתחשב בנתון הבא: {display_limitations}." if display_limitations else ""
     source_refs = SOURCE_REFS[:5]
 
     has_bench = _has_bench_equipment(equipment)
@@ -519,18 +519,18 @@ def _exercise_catalog(
             reps_or_duration="12-25 דקות",
             rest="RPE 5-6 / אפשר לדבר במשפטים קצרים",
             notes=(
-                f"בחר {variables.get('cardio_options', 'הליכה מהירה, אופניים, אליפטיקל או חתירה קלה בקצב שיחה')}; "
-                "העלה משך או תדירות לפני עצימות."
+                f"אפשר לבחור {variables.get('cardio_options', 'הליכה מהירה, אופניים, אליפטיקל או חתירה קלה בקצב שיחה')}; "
+                "להעלות משך או תדירות לפני עצימות."
             ),
             difficulty="moderate",
             alternatives=["הליכה מהירה", "אופניים", "אליפטיקל", "מדרגות בקצב קל"],
             safety_notes=[
-                "עצור אם מופיעים סחרחורת, כאב בחזה או קוצר נשימה חריג",
-                "שמור קצב talk test במקום לרדוף אחרי מהירות",
+                "לעצור אם מופיעים סחרחורת, כאב בחזה או קוצר נשימה חריג",
+                "לשמור קצב talk test במקום לרדוף אחרי מהירות",
             ],
             movement_pattern="cardiorespiratory",
             target_muscles=["heart_lungs", "legs"],
-            progression="הוסף 5 דקות או יום קל לפני אינטרוולים.",
+            progression="להוסיף 5 דקות או יום קל לפני אינטרוולים.",
             regression="קצר ל-8-10 דקות או חלק לשני מקטעים.",
             source_refs=source_refs,
         ),
@@ -539,14 +539,14 @@ def _exercise_catalog(
             sets="1",
             reps_or_duration="5-8 דקות",
             rest="נשימה רגועה",
-            notes="עבור בין טווחים נוחים בלי כאב חד; החזק שליטה ואל תדחוף בכוח.",
+            notes="לעבור בין טווחים נוחים בלי כאב חד; להחזיק שליטה ולא לדחוף בכוח.",
             difficulty="easy",
             alternatives=["cat-cow", "90/90 ירך", "פתיחת כתפיים בקיר"],
-            safety_notes=["עצור בכאב חד", "שמור טווח נוח ולא כפוי"],
+            safety_notes=["לעצור בכאב חד", "לשמור טווח נוח ולא כפוי"],
             movement_pattern="mobility",
             target_muscles=["hips", "thoracic_spine", "shoulders"],
             progression="הארך טווח או זמן רק אם אין כאב.",
-            regression="הקטן טווח או בצע בתמיכת קיר/כיסא.",
+            regression="להקטין טווח או לבצע בתמיכת קיר/כיסא.",
             source_refs=source_refs,
         ),
         "balance_control": StructuredExercise(
@@ -554,14 +554,14 @@ def _exercise_catalog(
             sets="2",
             reps_or_duration="30-45 שניות לכל צד",
             rest="45-60 שניות",
-            notes="עבוד ליד קיר/כיסא אם צריך; המטרה היא שליטה, לא עייפות.",
+            notes="לעבוד ליד קיר/כיסא אם צריך; המטרה היא שליטה, לא עייפות.",
             difficulty="easy",
             alternatives=["הליכת עקב-אגודל", "עמידה על רגל אחת ליד קיר", "sit-to-stand איטי"],
-            safety_notes=["השתמש בתמיכה אם יש חשש נפילה", "עצור בסחרחורת או איבוד שיווי משקל"],
+            safety_notes=["להשתמש בתמיכה אם יש חשש נפילה", "לעצור בסחרחורת או איבוד שיווי משקל"],
             movement_pattern="balance",
             target_muscles=["feet", "hips", "trunk_stabilizers"],
-            progression="הקטן תמיכה או הארך זמן רק כשהשליטה יציבה.",
-            regression="הרחב בסיס עמידה, החזק קיר או בצע ישיבה-קימה איטית.",
+            progression="להקטין תמיכה או להאריך זמן רק כשהשליטה יציבה.",
+            regression="להרחיב בסיס עמידה, להחזיק קיר או לבצע ישיבה-קימה איטית.",
             source_refs=source_refs,
         ),
         "squat": StructuredExercise(
@@ -569,14 +569,14 @@ def _exercise_catalog(
             sets=variables["main_sets"],
             reps_or_duration=variables["main_reps"],
             rest=variables["main_rest"],
-            notes=f"עבוד בטווח ללא כאב ובקצב נשלט.{limitation_note}",
+            notes=f"לעבוד בטווח ללא כאב ובקצב נשלט.{limitation_note}",
             difficulty="moderate",
             alternatives=_movement_alternatives("squat", mode, experience_level),
-            safety_notes=["עצור אם מופיע כאב חד", "שמור ברכיים בקו כף הרגל"],
+            safety_notes=["לעצור אם מופיע כאב חד", "לשמור ברכיים בקו כף הרגל"],
             movement_pattern="squat",
             target_muscles=["quadriceps", "glutes", "core"],
-            progression="הוסף חזרות נקיות בתוך טווח היעד לפני הוספת עומס.",
-            regression="עבור לסקוואט לקופסה או הקטן עומק.",
+            progression="להוסיף חזרות נקיות בתוך טווח היעד לפני הוספת עומס.",
+            regression="לעבור לסקוואט לקופסה או להקטין עומק.",
             source_refs=source_refs,
         ),
         "horizontal_push": StructuredExercise(
@@ -587,11 +587,11 @@ def _exercise_catalog(
             notes=variables["effort_note"],
             difficulty="moderate",
             alternatives=_movement_alternatives("horizontal_push", mode, experience_level),
-            safety_notes=["שמור על כתפיים נוחות"],
+            safety_notes=["לשמור על כתפיים נוחות"],
             movement_pattern="horizontal_push",
             target_muscles=["chest", "triceps", "anterior shoulders"],
-            progression="הוסף חזרות, ואז הורד שיפוע או הוסף עומס קל.",
-            regression="עבור לשכיבת סמיכה בשיפוע.",
+            progression="להוסיף חזרות, ואז להוריד שיפוע או להוסיף עומס קל.",
+            regression="לעבור לשכיבת סמיכה בשיפוע.",
             source_refs=source_refs,
         ),
         "horizontal_pull": StructuredExercise(
@@ -599,10 +599,10 @@ def _exercise_catalog(
             sets=variables["upper_sets"],
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
-            notes="עצור רגע קצר בקצה התנועה.",
+            notes="עצירה קצרה בקצה התנועה.",
             difficulty="moderate",
             alternatives=_movement_alternatives("horizontal_pull", mode, experience_level),
-            safety_notes=["שמור על עמוד שדרה ניטרלי"],
+            safety_notes=["לשמור על עמוד שדרה ניטרלי"],
             movement_pattern="horizontal_pull",
             target_muscles=["upper back", "lats", "biceps"],
             progression=_horizontal_pull_progression(mode),
@@ -614,14 +614,14 @@ def _exercise_catalog(
             sets=variables["hinge_sets"],
             reps_or_duration=variables["hinge_reps"],
             rest=variables["main_rest"],
-            notes=f"התמקד בדחיפת אגן לאחור ושמור שתי חזרות ברזרבה.{limitation_note}",
+            notes=f"להתמקד בדחיפת אגן לאחור ולשמור שתי חזרות ברזרבה.{limitation_note}",
             difficulty="moderate",
             alternatives=_movement_alternatives("hinge", mode, experience_level),
-            safety_notes=["עצור אם מופיע כאב חד בגב או בירך"],
+            safety_notes=["לעצור אם מופיע כאב חד בגב או בירך"],
             movement_pattern="hip_hinge",
             target_muscles=["hamstrings", "glutes", "spinal stabilizers"],
-            progression="הוסף טווח ושליטה לפני הוספת עומס.",
-            regression="עבור לגשר ישבן או היפ הינג' עם מקל.",
+            progression="להוסיף טווח ושליטה לפני הוספת עומס.",
+            regression="לעבור לגשר ישבן או היפ הינג' עם מקל.",
             source_refs=source_refs,
         ),
         "core": StructuredExercise(
@@ -629,14 +629,14 @@ def _exercise_catalog(
             sets=variables["core_sets"],
             reps_or_duration="20-40 שניות",
             rest="60 שניות",
-            notes="שמור נשימה רגועה וצלעות נמוכות.",
+            notes="לשמור נשימה רגועה וצלעות נמוכות.",
             difficulty="easy",
             alternatives=["דד באג", "פלאנק ברכיים"],
-            safety_notes=["עצור אם מופיע כאב חד"],
+            safety_notes=["לעצור אם מופיע כאב חד"],
             movement_pattern="core_anti_extension",
             target_muscles=["abdominals", "trunk stabilizers"],
-            progression="הוסף זמן בהדרגה כל עוד הנשימה נשארת בשליטה.",
-            regression="עבור לדד באג או פלאנק ברכיים.",
+            progression="להוסיף זמן בהדרגה כל עוד הנשימה נשארת בשליטה.",
+            regression="לעבור לדד באג או פלאנק ברכיים.",
             source_refs=source_refs,
         ),
         "vertical_push": StructuredExercise(
@@ -644,14 +644,14 @@ def _exercise_catalog(
             sets=variables["accessory_sets"],
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
-            notes="שמור צלעות נמוכות ואל תדחוף דרך כאב כתף.",
+            notes="לשמור צלעות נמוכות ולא לדחוף דרך כאב כתף.",
             difficulty="moderate",
             alternatives=_movement_alternatives("vertical_push", mode, experience_level),
-            safety_notes=["עצור אם מופיע כאב חד בכתף"],
+            safety_notes=["לעצור אם מופיע כאב חד בכתף"],
             movement_pattern="vertical_push",
             target_muscles=["shoulders", "triceps", "upper chest"],
-            progression="הוסף חזרות לפני הוספת עומס.",
-            regression="עבור לטווח קל יותר או לחיצה בחצי כריעה.",
+            progression="להוסיף חזרות לפני הוספת עומס.",
+            regression="לעבור לטווח קל יותר או לחיצה בחצי כריעה.",
             source_refs=source_refs,
         ),
         "vertical_pull": StructuredExercise(
@@ -659,10 +659,10 @@ def _exercise_catalog(
             sets=variables["accessory_sets"],
             reps_or_duration=variables["upper_reps"],
             rest=variables["upper_rest"],
-            notes="משוך שכמות למטה ואחורה בלי למשוך בצוואר.",
+            notes="למשוך שכמות למטה ואחורה בלי למשוך בצוואר.",
             difficulty="moderate",
             alternatives=_movement_alternatives("vertical_pull", mode, experience_level),
-            safety_notes=["שמור צוואר וכתפיים נוחים"],
+            safety_notes=["לשמור צוואר וכתפיים נוחים"],
             movement_pattern="vertical_pull",
             target_muscles=["lats", "upper back", "biceps"],
             progression=_vertical_pull_progression(mode),
@@ -674,14 +674,14 @@ def _exercise_catalog(
             sets=variables["accessory_sets"],
             reps_or_duration="8-10 חזרות לכל צד",
             rest="75 שניות",
-            notes=f"שמור צעד קצר ונוח וטווח ללא כאב.{limitation_note}",
+            notes=f"לשמור צעד קצר ונוח וטווח ללא כאב.{limitation_note}",
             difficulty="moderate",
             alternatives=_movement_alternatives("single_leg", mode, experience_level),
-            safety_notes=["הקטן טווח אם מופיע כאב ברך"],
+            safety_notes=["להקטין טווח אם מופיע כאב ברך"],
             movement_pattern="single_leg",
             target_muscles=["quadriceps", "glutes", "adductors"],
-            progression="הוסף חזרות לכל צד לפני הוספת עומס.",
-            regression="השתמש בתמיכה או במדרגה נמוכה יותר.",
+            progression="להוסיף חזרות לכל צד לפני הוספת עומס.",
+            regression="להשתמש בתמיכה או במדרגה נמוכה יותר.",
             source_refs=source_refs,
         ),
         "glute_bridge": StructuredExercise(
@@ -689,14 +689,14 @@ def _exercise_catalog(
             sets=variables["accessory_sets"],
             reps_or_duration="10-15 חזרות",
             rest="60 שניות",
-            notes="עצור רגע למעלה בלי להקשית גב.",
+            notes="עצירה קצרה למעלה בלי להקשית גב.",
             difficulty="easy",
             alternatives=_glute_bridge_alternatives(mode),
-            safety_notes=["עצור אם מופיע כאב חד בגב"],
+            safety_notes=["לעצור אם מופיע כאב חד בגב"],
             movement_pattern="glute_bridge",
             target_muscles=["glutes", "hamstrings"],
-            progression="הוסף זמן עצירה, ואז עבור לרגל אחת או עומס.",
-            regression="עבוד בטווח קצר יותר.",
+            progression="להוסיף זמן עצירה, ואז לעבור לרגל אחת או עומס.",
+            regression="לעבוד בטווח קצר יותר.",
             source_refs=source_refs,
         ),
     }
@@ -709,7 +709,7 @@ def _exercise_catalog(
                     "לחיצת חזה בשיפוע עם משקולות",
                     "לחיצת רצפה עם משקולות",
                 ],
-                "regression": "עבור ללחיצת רצפה עם משקולות או הורד עומס.",
+                "regression": "לעבור ללחיצת רצפה עם משקולות או להוריד עומס.",
             }
         )
     return _adapt_catalog_for_limitations(catalog, mode, display_limitations, limitations_text)
@@ -807,34 +807,34 @@ def _lunge_name(mode: str, experience_level: str) -> str:
 
 def _horizontal_pull_progression(mode: str) -> str:
     if mode == "bodyweight":
-        return "הוסף חזרות, זמן עצירה או זווית קשה יותר בשליטה."
+        return "להוסיף חזרות, זמן עצירה או זווית קשה יותר בשליטה."
     if mode == "bands":
-        return "הוסף חזרות בשליטה, ואז מתח גומייה."
-    return "הוסף חזרות בשליטה, ואז עומס קטן."
+        return "להוסיף חזרות בשליטה, ואז מתח גומייה."
+    return "להוסיף חזרות בשליטה, ואז עומס קטן."
 
 
 def _horizontal_pull_regression(mode: str) -> str:
     if mode == "bodyweight":
-        return "השתמש בזווית קלה יותר, טווח קצר יותר או עצירה איזומטרית קצרה."
+        return "להשתמש בזווית קלה יותר, טווח קצר יותר או עצירה איזומטרית קצרה."
     if mode == "bands":
-        return "השתמש בגומייה קלה יותר או בטווח קצר יותר."
-    return "הורד עומס או קצר טווח בלי לאבד גב ניטרלי."
+        return "להשתמש בגומייה קלה יותר או בטווח קצר יותר."
+    return "להוריד עומס או לקצר טווח בלי לאבד גב ניטרלי."
 
 
 def _vertical_pull_progression(mode: str) -> str:
     if mode == "bodyweight":
-        return "הוסף זמן עצירה, חזרות או זווית משיכה קשה יותר בשליטה."
+        return "להוסיף זמן עצירה, חזרות או זווית משיכה קשה יותר בשליטה."
     if mode == "bands":
-        return "הוסף מתח גומייה או חזרות אחרי שליטה נקייה."
-    return "הוסף חזרות בשליטה, ואז עומס קטן."
+        return "להוסיף מתח גומייה או חזרות אחרי שליטה נקייה."
+    return "להוסיף חזרות בשליטה, ואז עומס קטן."
 
 
 def _vertical_pull_regression(mode: str) -> str:
     if mode == "bodyweight":
-        return "קצר טווח, עבור למשיכה איזומטרית קלה יותר או לחתירה אופקית."
+        return "לקצר טווח, לעבור למשיכה איזומטרית קלה יותר או לחתירה אופקית."
     if mode == "bands":
-        return "עבור לגומייה קלה יותר או חתירה אופקית."
-    return "הורד עומס או עבור לחתירה אופקית קלה יותר."
+        return "לעבור לגומייה קלה יותר או חתירה אופקית."
+    return "להוריד עומס או לעבור לחתירה אופקית קלה יותר."
 
 
 def _glute_bridge_alternatives(mode: str) -> list[str]:
@@ -985,8 +985,8 @@ def _reduce_exercise(exercise: StructuredExercise, readiness: str) -> Structured
     data = exercise.model_dump()
     data["sets"] = "1" if readiness == "red" else "2"
     data["difficulty"] = "easy" if readiness == "red" else data["difficulty"]
-    data["notes"] = f"{data.get('notes') or ''} הורד מאמץ היום ועצור הרבה לפני שהטכניקה מתפרקת.".strip()
-    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "אל תעלה עומס ביום מוכנות נמוכה."]))
+    data["notes"] = f"{data.get('notes') or ''} להוריד מאמץ היום ולעצור הרבה לפני שהטכניקה מתפרקת.".strip()
+    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "לא להעלות עומס ביום מוכנות נמוכה."]))
     return StructuredExercise(**data)
 
 
@@ -994,7 +994,7 @@ def _reduce_exercise_for_spacing(exercise: StructuredExercise) -> StructuredExer
     data = exercise.model_dump()
     data["sets"] = _reduce_set_text_once(str(data.get("sets") or "1"))
     data["notes"] = f"{data.get('notes') or ''} ימים צפופים: להפחית סט אחד ולשמור RPE 5-7.".strip()
-    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "בימים צפופים אל תוסיף נפח או עומס."]))
+    data["safety_notes"] = list(dict.fromkeys([*data.get("safety_notes", []), "בימים צפופים לא להוסיף נפח או עומס."]))
     return StructuredExercise(**data)
 
 
@@ -1007,100 +1007,6 @@ def _reduce_set_text_once(value: str) -> str:
         high = max(low, numbers[1] - 1)
         return str(low) if low == high else f"{low}-{high}"
     return str(max(1, numbers[0] - 1))
-
-
-def _neutralize_plan_guidance_copy(plan: StructuredWorkoutPlan) -> StructuredWorkoutPlan:
-    days = []
-    for day in plan.days:
-        exercises = []
-        for exercise in day.exercises:
-            exercises.append(
-                exercise.model_copy(
-                    update={
-                        "notes": _neutralize_hebrew_guidance(exercise.notes),
-                        "progression": _neutralize_hebrew_guidance(exercise.progression),
-                        "regression": _neutralize_hebrew_guidance(exercise.regression),
-                        "safety_notes": [_neutralize_hebrew_guidance(note) for note in exercise.safety_notes],
-                    }
-                )
-            )
-        days.append(
-            day.model_copy(
-                update={
-                    "warmup": [_neutralize_hebrew_guidance(note) for note in day.warmup],
-                    "notes": _neutralize_hebrew_guidance(day.notes),
-                    "exercises": exercises,
-                }
-            )
-        )
-
-    return plan.model_copy(
-        update={
-            "days": days,
-            "progression_rule": _neutralize_hebrew_guidance(plan.progression_rule),
-            "progression_model": _neutralize_hebrew_guidance(plan.progression_model),
-            "progression_schedule": [_neutralize_hebrew_guidance(note) for note in plan.progression_schedule],
-            "tracking_guidance": [_neutralize_hebrew_guidance(note) for note in plan.tracking_guidance],
-            "recovery_note": _neutralize_hebrew_guidance(plan.recovery_note),
-            "safety_notes": [_neutralize_hebrew_guidance(note) for note in plan.safety_notes],
-        }
-    )
-
-
-def _neutralize_hebrew_guidance(text: str | None) -> str | None:
-    if not text:
-        return text
-
-    phrase_replacements = [
-        ("לפני שאתה מוסיף", "לפני הוספת"),
-        ("כשאתה רענן", "כשהגוף רענן"),
-        ("להעניש את עצמך בעומס קיצוני", "ענישה בעומס קיצוני"),
-        ("להעניש את עצמך", "ענישה"),
-        ("ואל תנסה", "ולא לנסות"),
-        ("ואל תרדוף", "ולא לרדוף"),
-        ("ואל תדחוף", "ולא לדחוף"),
-        ("ואל תעמיס", "ולא להעמיס"),
-        ("ואל תתאמן", "ולא להתאמן"),
-        ("ואל תעלה", "ולא להעלות"),
-        ("אל תנסה", "לא לנסות"),
-        ("אל תרדוף", "לא לרדוף"),
-        ("אל תדחוף", "לא לדחוף"),
-        ("אל תעמיס", "לא להעמיס"),
-        ("אל תתאמן", "לא להתאמן"),
-        ("אל תעלה", "לא להעלות"),
-    ]
-    token_replacements = [
-        ("הוסף", "להוסיף"),
-        ("העלה", "להעלות"),
-        ("שמור", "לשמור"),
-        ("עצור", "לעצור"),
-        ("עבוד", "לעבוד"),
-        ("בחר", "לבחור"),
-        ("בצע", "לבצע"),
-        ("הורד", "להוריד"),
-        ("הפחת", "להפחית"),
-        ("קח", "לקחת"),
-        ("חזור", "לחזור"),
-        ("התקדם", "להתקדם"),
-        ("עבור", "לעבור"),
-        ("השתמש", "להשתמש"),
-        ("הקטן", "להקטין"),
-        ("התמקד", "להתמקד"),
-        ("משוך", "למשוך"),
-        ("התאם", "להתאים"),
-        ("אסוף", "לאסוף"),
-        ("כבד", "לכבד"),
-        ("השאר", "להשאיר"),
-    ]
-
-    neutral = text
-    for source, target in phrase_replacements:
-        neutral = neutral.replace(source, target)
-    for source, target in token_replacements:
-        neutral = re.sub(rf"(?<![\u0590-\u05ff])ו{re.escape(source)}(?![\u0590-\u05ff])", f"ו{target}", neutral)
-        neutral = re.sub(rf"(?<![\u0590-\u05ff]){re.escape(source)}(?![\u0590-\u05ff])", target, neutral)
-    neutral = neutral.replace("לכבד מדי", "כבד מדי")
-    return neutral
 
 
 def _goal_label_he(goal: str) -> str:
@@ -1168,8 +1074,8 @@ def _goal_training_variables(goal: str) -> dict[str, str]:
         "effort": "RPE 6-8, לרוב 1-3 חזרות ברזרבה.",
         "effort_note": "להשאיר 1-3 חזרות ברזרבה ולשמור טכניקה נקייה.",
         "day_note": "המטרה היא עקביות וטכניקה לפני עומס.",
-        "progression_rule": "כאשר כל הסטים מגיעים לקצה העליון של טווח החזרות בטכניקה טובה, הוסף קודם חזרות או העלה עומס מעט.",
-        "recovery_note": "שמור לפחות יום התאוששות בין אימוני כוח דומים.",
+        "progression_rule": "כאשר כל הסטים מגיעים לקצה העליון של טווח החזרות בטכניקה טובה, להוסיף קודם חזרות או להעלות עומס מעט.",
+        "recovery_note": "לשמור לפחות יום התאוששות בין אימוני כוח דומים.",
     }
     if goal == "improve_strength":
         return {
@@ -1181,15 +1087,15 @@ def _goal_training_variables(goal: str) -> dict[str, str]:
             "upper_rest": "120 שניות",
             "effort": "RPE 7-8 ברוב הסטים; בלי כשל טכני.",
             "effort_note": "להשאיר 1-2 חזרות ברזרבה, בלי כשל טכני.",
-            "day_note": "בצע את התרגילים המרכזיים בתחילת האימון כשאתה רענן.",
-            "progression_rule": "כאשר הטכניקה יציבה וכל הסטים הושלמו בלי כאב, הוסף עומס קטן לפני שאתה מוסיף נפח.",
-            "recovery_note": "אל תנסה לשבור שיא כששינה או התאוששות חלשות.",
+            "day_note": "לבצע את התרגילים המרכזיים בתחילת האימון כשהגוף רענן.",
+            "progression_rule": "כאשר הטכניקה יציבה וכל הסטים הושלמו בלי כאב, להוסיף עומס קטן לפני הוספת נפח.",
+            "recovery_note": "לא לנסות לשבור שיא כששינה או התאוששות חלשות.",
         }
     if goal == "build_muscle":
         return {
             **defaults,
-            "progression_rule": "התקדם דרך נפח: הוסף קודם חזרות בטווח, אחר כך סט נוסף או עומס קטן אם ההתאוששות טובה.",
-            "recovery_note": "שמור 1-3 חזרות ברזרבה ברוב הסטים ואל תרדוף אחרי כשל בכל אימון.",
+            "progression_rule": "להתקדם דרך נפח: להוסיף קודם חזרות בטווח, אחר כך סט נוסף או עומס קטן אם ההתאוששות טובה.",
+            "recovery_note": "לשמור 1-3 חזרות ברזרבה ברוב הסטים ולא לרדוף אחרי כשל בכל אימון.",
         }
     if goal == "lose_fat":
         return {
@@ -1199,9 +1105,9 @@ def _goal_training_variables(goal: str) -> dict[str, str]:
             "upper_rest": "60 שניות",
             "effort": "RPE 6-8; המטרה היא עקביות ושימור כוח.",
             "effort_note": "לעבוד קשה אבל בשליטה; לשמור איכות תנועה ושימור כוח.",
-            "day_note": "שמור כוח כעוגן. אם נשאר זמן ואנרגיה, הוסף 10-20 דקות הליכה או אירובי קל בקצב דיבור.",
-            "progression_rule": "שמור על כוח וטכניקה; הוסף 5-10 דקות הליכה/אירובי קל או 500-1,000 צעדים בהדרגה לפני העלאת עצימות.",
-            "recovery_note": "ירידה בשומן לא דורשת דיאטת קיצון; שמור על אוכל מספיק, חלבון, שינה והרגל אחד יציב בכל פעם.",
+            "day_note": "לשמור כוח כעוגן. אם נשאר זמן ואנרגיה, להוסיף 10-20 דקות הליכה או אירובי קל בקצב דיבור.",
+            "progression_rule": "לשמור על כוח וטכניקה; להוסיף 5-10 דקות הליכה/אירובי קל או 500-1,000 צעדים בהדרגה לפני העלאת עצימות.",
+            "recovery_note": "ירידה בשומן לא דורשת דיאטת קיצון; לשמור על אוכל מספיק, חלבון, שינה והרגל אחד יציב בכל פעם.",
         }
     if goal == "improve_endurance":
         return {
@@ -1214,8 +1120,8 @@ def _goal_training_variables(goal: str) -> dict[str, str]:
             "upper_rest": "45-60 שניות",
             "effort": "RPE 5-7 עם נשימה שנשארת בשליטה.",
             "effort_note": "לשמור קצב נשימה נשלט וטכניקה נקייה.",
-            "day_note": "שמור קצב נשימה נשלט והוסף הליכה או אירובי קל בימים נפרדים.",
-            "progression_rule": "העלה קודם משך או תדירות קלה, ורק אחר כך עצימות.",
+            "day_note": "לשמור קצב נשימה נשלט ולהוסיף הליכה או אירובי קל בימים נפרדים.",
+            "progression_rule": "להעלות קודם משך או תדירות קלה, ורק אחר כך עצימות.",
             "recovery_note": "רוב העבודה האירובית צריכה להרגיש ניתנת לשיחה, עם מעט עבודה עצימה רק אחרי בסיס עקבי.",
         }
     if goal == "improve_mobility":
@@ -1321,8 +1227,8 @@ def _mobility_training_variables(variables: dict[str, str]) -> dict[str, str]:
         "effort": "RPE 4-6; טווח, שליטה ונשימה חשובים יותר מעומס.",
         "effort_note": "לשמור מאמץ קל-בינוני, טווח נוח ונשימה רגועה.",
         "day_note": "מטרת האימון היא טווח תנועה, שליטה ונשימה לפני עומס.",
-        "progression_rule": "התקדם דרך טווח תנועה נוח, שליטה ונשימה; הוסף עומס רק אחרי תנועה יציבה וללא כאב.",
-        "recovery_note": "מוביליטי לא אמור להיות כאב חד; שמור על תחושת מתיחה או מאמץ קל-בינוני בלבד.",
+        "progression_rule": "להתקדם דרך טווח תנועה נוח, שליטה ונשימה; להוסיף עומס רק אחרי תנועה יציבה וללא כאב.",
+        "recovery_note": "מוביליטי לא אמור להיות כאב חד; לשמור על תחושת מתיחה או מאמץ קל-בינוני בלבד.",
     }
 
 
@@ -1415,7 +1321,7 @@ def _weekly_spacing_guidance(
         if days_per_week >= 4 and experience_level == "beginner":
             guidance = (
                 "פיזור שבועי: 4 ימי full-body למתחיל/ה עדיף לפזר עם יום מנוחה או יום קל בין עומסים דומים; "
-                "אם חייבים רצף, הורד סט אחד בימים 3-4 ושמור RPE 5-7."
+                "אם חייבים רצף, להפחית סט אחד בימים 3-4 ולשמור RPE 5-7."
             )
         elif days_per_week >= 3:
             guidance = "פיזור שבועי: פזר אימוני full-body כך שיהיה יום התאוששות או יום קל בין עומסים דומים."
@@ -1424,9 +1330,9 @@ def _weekly_spacing_guidance(
     elif split == "upper_lower":
         guidance = "פיזור שבועי: ב-upper/lower עדיף עליון/תחתון/מנוחה/עליון/תחתון, ולא שני ימי רגליים קשים רצוף."
     elif split == "push_pull_legs":
-        guidance = "פיזור שבועי: ב-push/pull/legs שמור יום קל או מנוחה אחרי 3 ימי עומס רצופים."
+        guidance = "פיזור שבועי: ב-push/pull/legs לשמור יום קל או מנוחה אחרי 3 ימי עומס רצופים."
     else:
-        guidance = "פיזור שבועי: אל תצמיד שני ימים קשים לאותו אזור אם הביצועים, הכאב או השינה לא יציבים."
+        guidance = "פיזור שבועי: לא להצמיד שני ימים קשים לאותו אזור אם הביצועים, הכאב או השינה לא יציבים."
 
     if consecutive:
         guidance += " ציינת ימים צפופים, לכן עדיף להפוך את היום האחרון לגרסת מינימום אם העייפות עולה."
