@@ -10728,3 +10728,49 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - No restore was needed.
 - No code change was needed for the activation status-code path.
 - Future destructive doc/database deletions should stay isolated from feature commits.
+
+## Final Merge-Readiness Local Smoke - 2026-06-26
+
+### Verification target
+
+- Prove the current branch still runs the core local product loop after the workout-plan and audit cleanup changes.
+- Keep live Supabase proof separate from local SQLite/no-auth proof.
+
+### Command run
+
+- Inline FastAPI `TestClient` smoke with file-backed SQLite under `.pytest-tmp`.
+
+### Covered flow
+
+- `GET /api/health`
+- `GET /api/readiness`
+- `POST /api/onboarding`
+- `POST /api/chat` with a workout-plan request
+- `GET /api/workout-plans/current`
+- `GET /api/workouts/next`
+- `POST /api/workout-logs`
+- `GET /api/workout-logs/recent`
+- `POST /api/meals/manual`
+- `GET /api/meals/recent`
+- `POST /api/body-metrics`
+- `GET /api/dashboard`
+- `GET /api/usage`
+- `GET /api/settings/export`
+- `POST /api/settings/reset`
+
+### Result
+
+- Smoke status: passed.
+- Key output:
+  - `health_status=ok`
+  - `chat_provider_status=local_tool`
+  - `plan_type=weekly_plan`
+  - `workout_logged_status=completed`
+  - `recent_logs=1`
+  - `meal_confidence=medium`
+  - `recent_meals=1`
+  - `dashboard_next_action_present=true`
+  - `export_has_workout_plans=true`
+  - `reset_deleted_records=32`
+  - `readiness_production_ready=false`
+- Boundary: this proves local product flow only. `npm run verify:supabase` remains the required live Supabase/RLS/Storage proof.
