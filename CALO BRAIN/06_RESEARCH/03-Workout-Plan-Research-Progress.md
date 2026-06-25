@@ -10696,3 +10696,35 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
   - whether chat can retrieve the next loggable workout from the active plan without provider;
   - whether it exposes exercise IDs and a concise workout view rather than a plan-level summary;
   - whether it gives a practical start/log action with pain and RPE tracking.
+
+## Audit Handoff P3 - Destructive Deletion and Status-Code Verification
+
+### Verification target
+
+- Confirm the legacy-memory cleanup migration is intentional and not referenced by live runtime code.
+- Confirm the documented CALO BRAIN deletions/reductions do not leave live broken references.
+- Confirm the single-workout activation status-code change to 400 does not break a client path that expects 404.
+
+### Findings
+
+- `supabase/migrations/202606230001_drop_legacy_memory_and_summaries.sql` is present and explicitly documents its destructive scope: dropping legacy `coaching_memories`, `memory_summaries`, and `weekly_summaries`.
+- `backend/tests/test_supabase_integration.py` intentionally excludes this cleanup migration from the generic non-destructive migration guard and has a dedicated test asserting the three legacy drops.
+- `rg "memory_summaries"` found only the old core schema migration, the cleanup migration, and the migration tests. No backend runtime service reads or writes `memory_summaries`.
+- `CALO BRAIN/01_PRODUCT/02-Product-Behavior.md`, `CALO BRAIN/03_REFERENCE/03-Prompt-Registry.md`, and `CALO BRAIN/06_RESEARCH/02-Coaching-Knowledge-Source.md` exist in the branch.
+- `CALO BRAIN/05_OPERATIONS/03-Session-Handoffs.md` is absent. The remaining references found by `rg` are historical report/progress-log mentions, not live code or an active runtime dependency.
+- `frontend/src/api.ts` has `activateWorkoutPlan()`, but it throws a generic error for any non-OK response and has no 404-specific activation handling.
+- `frontend/src/WorkoutsPanel.tsx` uses pending-action confirmation through `resolvePendingAction()` for candidate activation; search found no direct `activateWorkoutPlan()` caller in the panel.
+- `backend/tests/test_workout_plans_api.py::test_activate_workout_plan_rejects_single_workout_and_keeps_current_plan` explicitly expects HTTP 400 for trying to activate a single workout.
+
+### Commands run
+
+- `git ls-files "supabase/migrations/202606230001_drop_legacy_memory_and_summaries.sql" "CALO BRAIN/01_PRODUCT/02-Product-Behavior.md" "CALO BRAIN/03_REFERENCE/03-Prompt-Registry.md" "CALO BRAIN/05_OPERATIONS/03-Session-Handoffs.md" "CALO BRAIN/06_RESEARCH/02-Coaching-Knowledge-Source.md"`
+- `rg -n "02-Product-Behavior|03-Prompt-Registry|03-Session-Handoffs|02-Coaching-Knowledge-Source|202606230001_drop_legacy_memory_and_summaries|drop_legacy_memory|memory_summaries" --glob '!node_modules/**' --glob '!.git/**'`
+- `rg -n "activateWorkoutPlan|resolvePendingAction|candidate_plan|validCandidatePlan|setError|catch" frontend/src/WorkoutsPanel.tsx frontend/src/api.ts frontend/src/WorkoutsPanel.test.tsx`
+- `rg -n "404|400|single workout|single_workout|activate" frontend/src/WorkoutsPanel.test.tsx frontend/src/api.ts`
+
+### Result
+
+- No restore was needed.
+- No code change was needed for the activation status-code path.
+- Future destructive doc/database deletions should stay isolated from feature commits.
