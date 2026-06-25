@@ -1246,11 +1246,12 @@ def _apply_pain_substitution_to_days(days: list[dict[str, Any]], *, text: str, p
         elif _contains_any(normalized_text, ["כתפ", "overhead", "shoulder press", "military press"]):
             target_patterns = {"vertical_push"}
             target_terms = ["כתפ", "overhead", "shoulder press", "military press", "לנדמיין", "landmine"]
-        make_friendly = lambda exercise: _make_press_shoulder_friendly(
-            exercise,
-            target_patterns=target_patterns,
-            target_terms=target_terms,
-        )
+        def make_friendly(exercise: dict[str, Any]) -> bool:
+            return _make_press_shoulder_friendly(
+                exercise,
+                target_patterns=target_patterns,
+                target_terms=target_terms,
+            )
     elif _contains_any(normalized_area, ["גב תחתון", "גב", "מותן", "low back", "lower back", "back"]) and _contains_any(
         normalized_text,
         ["דדליפט", "הינג", "hinge", "deadlift", "rdl"],

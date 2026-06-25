@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Meal, User, UserProfile, WorkoutLog, WorkoutPlan

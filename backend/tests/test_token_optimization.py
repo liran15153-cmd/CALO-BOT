@@ -1,12 +1,12 @@
 from datetime import date
 import json
 
-from sqlalchemy import inspect, select, text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.config import get_settings
 from backend.app.db import init_db, make_engine
-from backend.app.models import ChatMessage, ChatSession, Meal, UsageEvent, WorkoutLog, WorkoutPlan
+from backend.app.models import ChatMessage, ChatSession, Meal, WorkoutLog, WorkoutPlan
 from backend.app.schemas import OnboardingPayload
 from backend.app.services.ai_provider import AIRequest, AIResult
 from backend.app.services.coaching_knowledge import CoachingKnowledgeService

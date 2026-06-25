@@ -10,7 +10,6 @@ from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
 from backend.app.models import ChatMessage, Meal, PendingAction, SafetyEvent, UsageEvent, Workout, WorkoutExercise, WorkoutLog, WorkoutPlan
-from backend.app.services.workout_service import WorkoutService
 
 
 def test_chat_endpoint_generates_beginner_workout_without_provider_key(tmp_path):
