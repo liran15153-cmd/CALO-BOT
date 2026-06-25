@@ -10980,3 +10980,23 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Full local suite after the fix: backend `586 passed`, frontend `52 passed`.
 - Build, lint, and diff check passed after the fix.
 - Frontend lint passed.
+
+## Final Schema Hebrew Validation Coverage - 2026-06-26
+
+### Verification target
+
+- Lock the Hebrew validation messages returned by workout-log and body-metric request schemas.
+- Keep the check at the schema layer because the behavior already exists and only lacked direct coverage.
+
+### Changes
+
+- Added direct schema tests for empty workout logs, empty body metrics, invalid measurement names, and invalid measurement values.
+- No production behavior changed.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_workout_schema.py backend/tests/test_body_metrics_api.py backend/tests/test_workout_logs_api.py --basetemp .pytest-tmp-schema-hebrew`
+
+### Result
+
+- Focused schema/body-metric/workout-log suite: `44 passed`.

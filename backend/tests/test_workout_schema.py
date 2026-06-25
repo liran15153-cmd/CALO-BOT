@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from backend.app.schemas import StructuredWorkoutPlan
+from backend.app.schemas import BodyMetricRequest, StructuredWorkoutPlan, WorkoutLogRequest
 
 
 def test_structured_workout_plan_validates_required_shape():
@@ -69,6 +69,34 @@ def test_structured_workout_plan_keeps_planning_decision_metadata():
     assert plan.days[0].focus == "full_body"
     assert plan.days[0].exercises[0].movement_pattern == "squat"
     assert "ACSM 2026 resistance training guidelines" in plan.source_refs
+
+
+def test_workout_log_request_requires_hebrew_log_content_message():
+    with pytest.raises(ValidationError) as exc_info:
+        WorkoutLogRequest()
+
+    assert "תיעוד אימון דורש טקסט, תרגילים מובנים, הערות או סטטוס" in str(exc_info.value)
+
+
+def test_body_metric_request_requires_hebrew_metric_content_message():
+    with pytest.raises(ValidationError) as exc_info:
+        BodyMetricRequest()
+
+    assert "מדד גוף דורש משקל, אחוז שומן או לפחות מדידה אחת" in str(exc_info.value)
+
+
+def test_body_metric_request_rejects_invalid_measurement_name_in_hebrew():
+    with pytest.raises(ValidationError) as exc_info:
+        BodyMetricRequest(measurements={"": 88.0})
+
+    assert "שם מדידה חייב להיות באורך 1-60 תווים" in str(exc_info.value)
+
+
+def test_body_metric_request_rejects_invalid_measurement_value_in_hebrew():
+    with pytest.raises(ValidationError) as exc_info:
+        BodyMetricRequest(measurements={"waist_cm": 501.0})
+
+    assert "ערך מדידה חייב להיות בין 0 ל-500" in str(exc_info.value)
 
 
 def valid_plan():
