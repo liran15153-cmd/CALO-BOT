@@ -10811,3 +10811,36 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Build, lint, diff check, and secret scan passed.
 - Merge-tree against `origin/main` returned a tree id without conflicts.
 - Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
+
+## Final Hebrew-First API Error Cleanup - 2026-06-26
+
+### Verification target
+
+- Keep API-facing error details Hebrew-first for auth, storage, pending actions, body metrics, workout plans, workout logs, and validation errors.
+- Preserve status codes and deterministic behavior; only translate the returned detail text.
+
+### Changes
+
+- Translated Supabase auth token/config error details.
+- Translated Supabase Storage required details for meal-image paths.
+- Translated pending-action and body-metric not-found details.
+- Translated workout-plan activation/deletion and workout-log reference errors.
+- Translated workout-log and body-metric validation messages.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_supabase_integration.py backend/tests/test_meal_upload_api.py backend/tests/test_workout_plans_api.py --basetemp .pytest-tmp-api-hebrew`
+- `python -m pytest backend/tests/test_body_metrics_api.py backend/tests/test_coach_engine.py backend/tests/test_workout_logs_api.py --basetemp .pytest-tmp-api-hebrew-extra`
+- `npm test`
+- `npm run lint`
+- `git diff --check`
+
+### Result
+
+- Latest pushed commit:
+  - `015bc94 Translate API error details to Hebrew`
+- Focused API tests: `81 passed`.
+- Extra backend coverage: `166 passed`.
+- Full local suite: backend `586 passed`, frontend `50 passed`.
+- Lint and diff check passed.
+- Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
