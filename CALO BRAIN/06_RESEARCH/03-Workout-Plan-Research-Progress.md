@@ -10845,6 +10845,30 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Lint and diff check passed.
 - Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
 
+## Final Frontend Auth Error Cleanup - 2026-06-26
+
+### Verification target
+
+- Remove remaining English Supabase auth runtime error strings from the frontend helper.
+
+### Changes
+
+- Translated missing-config, failed-auth, and missing-token errors in `frontend/src/auth.ts`.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run`
+- `npm --prefix frontend run lint`
+- `git diff --check`
+
+### Result
+
+- Latest pushed commit:
+  - `d86d586 Translate frontend auth errors to Hebrew`
+- Frontend tests: `50 passed`.
+- Frontend lint and diff check passed.
+- Search for the old English auth/API status strings returned no runtime matches.
+
 ## Final Hebrew-First Readiness Cleanup - 2026-06-26
 
 ### Verification target
