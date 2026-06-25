@@ -10950,3 +10950,28 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Decoded readiness issue included: `אימות Supabase לא נדרש`.
 - Decoded settings disclaimer began with Hebrew medical-safety wording.
 - Existing dev-server processes were left running because they may belong to the local workspace session.
+
+## Final Frontend API Error Test Coverage - 2026-06-26
+
+### Verification target
+
+- Ensure the shared frontend API failure helper is directly covered, not only indirectly covered by UI tests.
+- Preserve existing API-client coverage for Supabase bearer-token headers.
+
+### Changes
+
+- Expanded `frontend/src/api.test.ts` to assert the shared Hebrew API failure error.
+- Added coverage for the Hebrew default chat-session title.
+- Restored and kept the existing bearer-token header test.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run api.test.ts`
+- `npm --prefix frontend run lint`
+
+### Result
+
+- Latest pushed commit:
+  - `5b8cc88 Cover frontend API Hebrew errors`
+- API client tests: `5 passed`.
+- Frontend lint passed.
