@@ -25,6 +25,7 @@ from backend.app.models import (
     WorkoutPlan,
 )
 from backend.app.services.meal_service import MealService
+from backend.app.services.file_storage_service import FileStorageService
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.workout_service import WorkoutService
 
@@ -143,7 +144,12 @@ class SettingsService:
             ],
         }
 
-    def reset_local_data(self, upload_root: Path | None = None, user_id: int | None = None) -> int:
+    def reset_local_data(
+        self,
+        upload_root: Path | None = None,
+        user_id: int | None = None,
+        access_token: str | None = None,
+    ) -> int:
         user = ProfileService(self.db).get_default_user() if user_id is None else self.db.get(User, user_id)
         if user is None:
             return 0
@@ -152,6 +158,10 @@ class SettingsService:
             for meal in self.db.scalars(select(Meal).where(Meal.user_id == user.id, Meal.image_path.is_not(None))).all()
             if meal.image_path
         ]
+        storage = FileStorageService(upload_root or Path("data/uploads"), access_token=access_token)
+        for image_path in image_paths:
+            storage.delete_meal_image(image_path)
+
         deleted = 0
         meal_ids = [meal.id for meal in self.db.scalars(select(Meal).where(Meal.user_id == user.id)).all()]
         workout_ids = [workout.id for workout in self.db.scalars(select(Workout).where(Workout.user_id == user.id)).all()]
@@ -181,18 +191,4 @@ class SettingsService:
         self.db.delete(user)
         deleted += 1
         self.db.commit()
-        self._delete_meal_image_files(image_paths=image_paths, upload_root=upload_root or Path("data/uploads"))
         return deleted
-
-    @staticmethod
-    def _delete_meal_image_files(*, image_paths: list[str], upload_root: Path) -> None:
-        root = upload_root.resolve()
-        for raw_path in image_paths:
-            path = Path(raw_path)
-            try:
-                resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
-                resolved.relative_to(root)
-            except (OSError, ValueError):
-                continue
-            if resolved.is_file():
-                resolved.unlink()

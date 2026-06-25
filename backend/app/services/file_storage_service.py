@@ -84,6 +84,30 @@ class FileStorageService:
         finally:
             temp.close()
 
+    def delete_meal_image(self, image_path: str) -> None:
+        if self.settings.supabase_configured and self.access_token:
+            response = httpx.delete(
+                self._storage_object_url(image_path),
+                headers=self._storage_headers(),
+                timeout=20,
+            )
+            if response.status_code not in {200, 204, 404}:
+                raise ValueError("מחיקת תמונת הארוחה מ-Supabase נכשלה")
+            return
+
+        if self.settings.app_env == "production" or self.settings.supabase_auth_required:
+            raise ValueError(_SUPABASE_STORAGE_REQUIRED_MESSAGE)
+
+        root = self.upload_root.resolve()
+        path = Path(image_path)
+        try:
+            resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
+            resolved.relative_to(root)
+        except (OSError, ValueError):
+            return
+        if resolved.is_file():
+            resolved.unlink()
+
     def _upload_supabase_object(self, *, content: bytes, content_type: str, extension: str, owner_key: str) -> str:
         today = date.today().isoformat()
         object_path = f"{owner_key}/{today}/{uuid4().hex}{extension}"

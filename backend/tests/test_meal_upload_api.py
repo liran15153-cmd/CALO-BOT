@@ -128,6 +128,30 @@ def test_supabase_meal_image_path_uses_auth_user_id(tmp_path, monkeypatch):
     assert requests[0][1]["Authorization"] == "Bearer user-jwt"
 
 
+def test_supabase_meal_image_delete_uses_auth_user_token(tmp_path, monkeypatch):
+    requests = []
+    service = FileStorageService(
+        tmp_path,
+        access_token="user-jwt",
+        settings=Settings(
+            _env_file=None,
+            supabase_url="https://nexmxwvivewvgmrritqa.supabase.co",
+            supabase_publishable_key="publishable-test-key",
+        ),
+    )
+
+    def fake_delete(url: str, **kwargs):
+        requests.append((url, kwargs["headers"]))
+        return FakeStorageResponse(204)
+
+    monkeypatch.setattr("backend.app.services.file_storage_service.httpx.delete", fake_delete)
+
+    service.delete_meal_image("auth-user-abc/2026-06-26/lunch.png")
+
+    assert "/storage/v1/object/meal-images/auth-user-abc/2026-06-26/lunch.png" in requests[0][0]
+    assert requests[0][1]["Authorization"] == "Bearer user-jwt"
+
+
 def test_meal_upload_rejects_jpeg_content_type_with_invalid_magic_bytes(tmp_path):
     client, db = make_client_and_db(tmp_path)
 

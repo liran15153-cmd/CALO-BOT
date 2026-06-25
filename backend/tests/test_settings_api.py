@@ -4,9 +4,12 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.app.auth import AuthContext, get_auth_context
 from backend.app.config import get_settings
 from backend.app.db import get_db, init_db, make_engine
 from backend.app.main import app
+from backend.app.models import User
+from backend.app.services.settings_service import SettingsService
 
 
 def test_settings_returns_masked_provider_state(tmp_path, monkeypatch):
@@ -67,6 +70,28 @@ def test_settings_export_and_reset_local_data(tmp_path):
     assert client.get("/api/settings/export").json()["meals"] == []
     assert client.get("/api/settings/export").json()["memory_facts"] == []
     assert client.get("/api/settings/export").json()["pending_actions"] == []
+
+
+def test_settings_reset_passes_auth_access_token_to_storage_cleanup(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_reset(self, *, upload_root=None, user_id=None, access_token=None):
+        captured.update({"upload_root": upload_root, "user_id": user_id, "access_token": access_token})
+        return 0
+
+    monkeypatch.setattr(SettingsService, "reset_local_data", fake_reset)
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(
+        user=User(id=123, name="משתמש בדיקה"),
+        access_token="user-jwt",
+    )
+    try:
+        response = make_client(tmp_path).post("/api/settings/reset")
+    finally:
+        app.dependency_overrides.pop(get_auth_context, None)
+
+    assert response.status_code == 200
+    assert captured["user_id"] == 123
+    assert captured["access_token"] == "user-jwt"
 
 
 def make_client(tmp_path) -> TestClient:

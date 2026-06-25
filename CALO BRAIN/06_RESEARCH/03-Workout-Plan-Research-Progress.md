@@ -11058,3 +11058,26 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Failed before live proof with `invalid_credentials` from Supabase Auth sign-in.
 - No local code change was made for this because the blocker is missing/invalid live test credentials, not a failing local invariant.
 - Merge-readiness boundary remains: local tests/build/lint/merge-tree are proven; live Supabase user-isolation/storage proof still requires valid `SUPABASE_TEST_USER_*` credentials or a trusted `SUPABASE_SECRET_KEY`.
+
+## Final Reset Storage Cleanup - 2026-06-26
+
+### Verification target
+
+- Ensure reset removes uploaded meal images from the same storage backend that was used for upload.
+- Close the privacy gap where Supabase-backed meal image rows could be deleted while Storage objects remained.
+
+### Changes
+
+- Added `FileStorageService.delete_meal_image()` for local files and Supabase Storage objects.
+- Updated settings reset to pass the authenticated access token into storage cleanup before deleting user records.
+- Removed the duplicate local-only image deletion helper from `SettingsService`.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_meal_upload_api.py backend/tests/test_settings_api.py --basetemp .pytest-tmp-storage-reset`
+- `rg -n "_delete_meal_image_files|delete_meal_image|reset_local_data\\(" backend/app backend/tests -S`
+
+### Result
+
+- Focused storage/settings suite: `19 passed`.
+- Reset now uses the shared storage service; no duplicate `_delete_meal_image_files` helper remains.
