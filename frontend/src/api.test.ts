@@ -1,23 +1,45 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { clearApiAccessToken, fetchHealth, sendChatMessage, setApiAccessToken } from './api';
+import {
+  clearApiAccessToken,
+  createChatSession,
+  fetchHealth,
+  fetchSettings,
+  sendChatMessage,
+  setApiAccessToken
+} from './api';
 
-describe('API client errors', () => {
+describe('API client', () => {
   afterEach(() => {
     clearApiAccessToken();
     vi.unstubAllGlobals();
   });
 
-  it('throws Hebrew health check errors', async () => {
+  it('throws Hebrew API failure errors', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, 503)));
 
-    await expect(fetchHealth()).rejects.toThrow('503');
+    await expect(fetchSettings()).rejects.toThrow('בקשת API נכשלה: 503');
   });
 
-  it('throws Hebrew chat request errors', async () => {
+  it('throws the shared Hebrew error from health checks', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, 503)));
+
+    await expect(fetchHealth()).rejects.toThrow('בקשת API נכשלה: 503');
+  });
+
+  it('throws the shared Hebrew error from chat requests', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, 500)));
 
-    await expect(sendChatMessage('שלום')).rejects.toThrow('500');
+    await expect(sendChatMessage('שלום')).rejects.toThrow('בקשת API נכשלה: 500');
+  });
+
+  it('uses a Hebrew default chat title', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ id: 1, title: "צ'אט מאמן", is_active: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createChatSession();
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ title: "צ'אט מאמן" });
   });
 
   it('attaches a Supabase bearer token when configured', async () => {
