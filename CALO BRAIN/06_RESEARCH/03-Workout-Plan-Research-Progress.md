@@ -885,7 +885,7 @@ Status: active. Do not close this research loop until the user writes "סיים 
 - `yourself` skill diagnostics and planned run:
   - available: Reddit, Hacker News, Polymarket, GitHub, grounding.
   - unavailable/not configured: X/Twitter auth, YouTube/yt-dlp, TikTok/Instagram ScrapeCreators.
-  - a planned Reddit/grounding pass was run and saved under `CALO BRAIN/06_RESEARCH/raw/`, but top results were mostly off-target bodyweight challenges and bodybuilding contest posts, so they were not used as programming evidence.
+  - a planned Reddit/grounding pass was run, but top results were mostly off-target bodyweight challenges and bodybuilding contest posts, so raw dumps were not kept as programming evidence.
 - Israeli/Facebook/Instagram broadening:
   - Hebrew web searches and Facebook/Instagram targeted searches were attempted.
   - Facebook/Instagram were not usable as reliable content sources in this environment.

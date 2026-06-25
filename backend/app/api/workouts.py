@@ -12,7 +12,12 @@ from backend.app.services.pain_text import extract_pain_area, vague_pain_plan_cl
 from backend.app.schemas import WorkoutLogRequest
 from backend.app.services.safety_service import SafetyService
 from backend.app.services.workout_plan_builder import is_persistent_plan_type, is_single_workout_plan
-from backend.app.services.workout_service import WorkoutService
+from backend.app.services.workout_service import (
+    ActiveWorkoutPlanDeletionError,
+    SingleWorkoutActivationError,
+    WorkoutPlanNotFoundError,
+    WorkoutService,
+)
 
 router = APIRouter(prefix="/api/workout-plans", tags=["workout-plans"])
 logs_router = APIRouter(prefix="/api/workout-logs", tags=["workout-logs"])
@@ -84,9 +89,10 @@ def activate_workout_plan(
             plan_id=plan_id,
             delete_previous=True if payload is None else payload.delete_previous,
         )
-    except ValueError as exc:
-        status_code = 400 if "single workout" in str(exc).lower() else 404
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except SingleWorkoutActivationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except WorkoutPlanNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return service.serialize_plan_with_rows(plan)
 
 
@@ -99,9 +105,10 @@ def delete_workout_plan(
     service = WorkoutService(db)
     try:
         service.delete_plan(user_id=user.id, plan_id=plan_id)
-    except ValueError as exc:
-        status_code = 400 if "active" in str(exc).lower() else 404
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except ActiveWorkoutPlanDeletionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except WorkoutPlanNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(status_code=204)
 
 

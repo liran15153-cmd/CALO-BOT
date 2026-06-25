@@ -21,6 +21,18 @@ from backend.app.services.workout_plan_builder import (
 )
 
 
+class WorkoutPlanNotFoundError(ValueError):
+    pass
+
+
+class SingleWorkoutActivationError(ValueError):
+    pass
+
+
+class ActiveWorkoutPlanDeletionError(ValueError):
+    pass
+
+
 class WorkoutService:
     def __init__(self, db: Session):
         self.db = db
@@ -151,9 +163,9 @@ class WorkoutService:
     def activate_plan(self, user_id: int, plan_id: int, *, delete_previous: bool = True) -> WorkoutPlan:
         plan = self.db.get(WorkoutPlan, plan_id)
         if plan is None or plan.user_id != user_id:
-            raise ValueError("Workout plan not found")
+            raise WorkoutPlanNotFoundError("Workout plan not found")
         if is_single_workout_plan((plan.plan_json or {}).get("plan_type")):
-            raise ValueError("Cannot activate a single workout as the current plan")
+            raise SingleWorkoutActivationError("Cannot activate a single workout as the current plan")
 
         current_plans = list(
             self.db.scalars(
@@ -185,9 +197,9 @@ class WorkoutService:
     def delete_plan(self, user_id: int, plan_id: int, *, allow_current: bool = False) -> None:
         plan = self.db.get(WorkoutPlan, plan_id)
         if plan is None or plan.user_id != user_id:
-            raise ValueError("Workout plan not found")
+            raise WorkoutPlanNotFoundError("Workout plan not found")
         if plan.is_current and not allow_current:
-            raise ValueError("Cannot delete the active workout plan")
+            raise ActiveWorkoutPlanDeletionError("Cannot delete the active workout plan")
         self._delete_plan_record(plan)
         self.db.commit()
 
