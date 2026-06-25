@@ -215,15 +215,6 @@ class MealTextRequest(BaseModel):
     meal_type: str | None = None
 
 
-class MealResponse(BaseModel):
-    id: int
-    note: str | None
-    image_path: str | None
-    calories_min: int | None
-    calories_max: int | None
-    confidence: str | None
-
-
 class BodyMetricRequest(BaseModel):
     measured_on: date | None = None
     weight_kg: float | None = Field(default=None, ge=25, le=350)
@@ -286,7 +277,7 @@ class ResetResponse(BaseModel):
     deleted_records: int
     message: str
 
-    
+
 class UsageResponse(BaseModel):
     usage_date: date
     chat_requests_count: int
