@@ -21,4 +21,11 @@ describe('auth session storage', () => {
     expect(getStoredAuthSession()).toBeNull();
     expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
+
+  it('clears malformed stored sessions', () => {
+    window.localStorage.setItem(SESSION_KEY, '{not-json');
+
+    expect(getStoredAuthSession()).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
+  });
 });

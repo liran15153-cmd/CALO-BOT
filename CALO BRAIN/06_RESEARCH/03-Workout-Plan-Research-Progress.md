@@ -11120,3 +11120,8 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused frontend auth/API/app suite: `9 passed`.
+
+### Follow-up check
+
+- Added explicit malformed localStorage JSON coverage for the same auth-session cleanup path.
+- `npm --prefix frontend test -- --run auth.test.ts`: `3 passed`.
