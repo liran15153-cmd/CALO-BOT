@@ -178,24 +178,74 @@ class SafetyService:
 
     @staticmethod
     def _dangerous_substance_label(text: str) -> str | None:
-        labels = {
-            "dnp": "DNP",
-            "clenbuterol": "clenbuterol",
-            "קלנבוטרול": "קלנבוטרול",
-            "anabolic": "סטרואידים אנאבוליים",
-            "steroid": "סטרואידים",
-            "סטרואיד": "סטרואידים",
-            "סטרואידים": "סטרואידים",
-            "diuretic": "משתנים",
-            "משתן": "משתנים",
-            "משתנים": "משתנים",
-            "ephedrine": "ephedrine",
-            "אפדרין": "אפדרין",
-        }
-        for term, label in labels.items():
-            if term in text:
+        boundary = r"A-Za-z0-9_\u0590-\u05ff"
+        patterns = [
+            (rf"(?<![{boundary}])dnp(?![{boundary}])", "DNP"),
+            (rf"(?<![{boundary}])clenbuterol(?![{boundary}])", "clenbuterol"),
+            (rf"(?<![{boundary}])קלנבוטרול(?![{boundary}])", "קלנבוטרול"),
+            (rf"(?<![{boundary}])anabolic(?:s)?(?![{boundary}])", "סטרואידים אנאבוליים"),
+            (rf"(?<![{boundary}])steroids?(?![{boundary}])", "סטרואידים"),
+            (rf"(?<![{boundary}])סטרואיד(?:ים)?(?![{boundary}])", "סטרואידים"),
+            (rf"(?<![{boundary}])diuretics?(?![{boundary}])", "משתנים"),
+            (rf"(?<![{boundary}])משת(?:ן|נים)(?![{boundary}])", "משתנים"),
+            (rf"(?<![{boundary}])ephedrine(?![{boundary}])", "ephedrine"),
+            (rf"(?<![{boundary}])אפדרין(?![{boundary}])", "אפדרין"),
+        ]
+        for pattern, label in patterns:
+            for match in re.finditer(pattern, text):
+                if SafetyService._is_clear_substance_exemption(text, match):
+                    continue
                 return label
         return None
+
+    @staticmethod
+    def _is_clear_substance_exemption(text: str, match: re.Match[str]) -> bool:
+        window = text[max(0, match.start() - 48) : min(len(text), match.end() + 48)]
+        clear_markers = [
+            "is it safe to avoid",
+            "why avoid",
+            "avoid steroid",
+            "avoid steroids",
+            "avoid anabolic",
+            "avoid clenbuterol",
+            "avoid dnp",
+            "avoid diuretic",
+            "avoid diuretics",
+            "avoid ephedrine",
+            "not take steroid",
+            "not take steroids",
+            "not use steroid",
+            "not use steroids",
+            "not using steroid",
+            "not using steroids",
+            "don't take steroid",
+            "don't take steroids",
+            "dont take steroid",
+            "dont take steroids",
+            "what are steroids",
+            "what is clenbuterol",
+            "what is dnp",
+            "risks of steroids",
+            "risks of clenbuterol",
+            "להימנע מסטרואיד",
+            "להימנע מסטרואידים",
+            "להימנע מקלנבוטרול",
+            "להימנע מ-dnp",
+            "להימנע ממשתנים",
+            "להימנע מאפדרין",
+            "לא לקחת סטרואיד",
+            "לא לקחת סטרואידים",
+            "לא לקחת קלנבוטרול",
+            "לא להשתמש בסטרואיד",
+            "לא להשתמש בסטרואידים",
+            "האם זה בטוח להימנע",
+            "מה זה סטרואיד",
+            "מה זה קלנבוטרול",
+            "מה הסיכון בסטרואידים",
+            "מה הסיכון בקלנבוטרול",
+            "למה להימנע",
+        ]
+        return any(marker in window for marker in clear_markers)
 
     def record_event(self, user_id: int | None, source_text: str, result: SafetyResult) -> SafetyEvent:
         event = SafetyEvent(

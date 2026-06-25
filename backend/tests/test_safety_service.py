@@ -72,6 +72,18 @@ def test_safety_service_flags_dangerous_substance_requests(tmp_path):
     assert "DNP" in dnp_result.response
 
 
+def test_safety_service_keeps_dangerous_substances_blocked_but_allows_clear_avoidance_question(tmp_path):
+    db = make_session(tmp_path)
+    service = SafetyService(db)
+
+    blocked_result = service.classify("אני רוצה לקחת קלנבוטרול")
+    avoidance_result = service.classify("האם זה בטוח להימנע מסטרואידים?")
+
+    assert blocked_result.flagged is True
+    assert blocked_result.event_type == "dangerous_substance"
+    assert avoidance_result.flagged is False
+
+
 def test_safety_service_flags_hebrew_dangerous_symptoms(tmp_path):
     db = make_session(tmp_path)
     service = SafetyService(db)

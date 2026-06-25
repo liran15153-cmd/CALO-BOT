@@ -132,3 +132,57 @@ def test_generated_plan_copy_keeps_key_neutral_phrases_readable():
     assert "לעצור אם מופיעים כאב חד" in text
     assert "להוסיף חזרות" in text
     assert "בניית שריר" in plan.name
+
+
+def test_low_back_limitation_ignores_background_and_upper_back_mentions():
+    builder = WorkoutPlanBuilder()
+
+    for limitation in ["background noise", "תרגיל גב עליון"]:
+        plan = builder.build(
+            WorkoutPlanningInput(
+                prompt="תוכנית חודשית",
+                goal="build_muscle",
+                experience_level="beginner",
+                days_per_week=3,
+                duration_weeks=4,
+                equipment=["bodyweight"],
+                limitations=limitation,
+                plan_type="monthly_plan",
+            )
+        )
+        text = str(plan.model_dump())
+        hinge_names = [
+            exercise.name
+            for day in plan.days
+            for exercise in day.exercises
+            if exercise.movement_pattern == "hip_hinge"
+        ]
+
+        assert "היפ הינג' לקיר" not in hinge_names
+        assert "גב רגיש" not in text
+
+
+def test_low_back_limitation_detects_specific_low_back_markers():
+    builder = WorkoutPlanBuilder()
+
+    for limitation in ["כאב בגב התחתון", "מותניים"]:
+        plan = builder.build(
+            WorkoutPlanningInput(
+                prompt="תוכנית חודשית",
+                goal="build_muscle",
+                experience_level="beginner",
+                days_per_week=3,
+                duration_weeks=4,
+                equipment=["bodyweight"],
+                limitations=limitation,
+                plan_type="monthly_plan",
+            )
+        )
+        hinge_names = [
+            exercise.name
+            for day in plan.days
+            for exercise in day.exercises
+            if exercise.movement_pattern == "hip_hinge"
+        ]
+
+        assert "היפ הינג' לקיר" in hinge_names

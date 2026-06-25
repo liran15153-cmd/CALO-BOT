@@ -967,8 +967,25 @@ def _has_knee_limitation(display_limitations: str, limitations_text: str | None)
 
 
 def _has_low_back_limitation(display_limitations: str, limitations_text: str | None) -> bool:
-    text = f"{display_limitations} {limitations_text or ''}".lower()
-    return any(term in text for term in ["גב תחתון", "הגב", "גב", "מותן", "מותניים", "low back", "lower back", "back"])
+    text = (limitations_text or display_limitations).lower()
+    specific_markers = ["גב תחתון", "הגב התחתון", "מותן", "מותניים", "low back", "lower back"]
+    pain_or_limitation_markers = [
+        "כאב",
+        "כואב",
+        "רגיש",
+        "רגישה",
+        "מגבלה",
+        "מוגבל",
+        "פציעה",
+        "pain",
+        "injury",
+        "sensitive",
+        "limitation",
+        "limited",
+    ]
+    return any(term in text for term in specific_markers) or (
+        "גב" in text and any(term in text for term in pain_or_limitation_markers)
+    )
 
 
 def _low_back_sensitive_hinge_alternatives(mode: str) -> list[str]:
