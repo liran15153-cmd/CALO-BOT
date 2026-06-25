@@ -10869,6 +10869,37 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Frontend lint and diff check passed.
 - Search for the old English auth/API status strings returned no runtime matches.
 
+## Final Frontend API Error Consolidation - 2026-06-26
+
+### Verification target
+
+- Remove repeated English `API request failed` runtime errors from the shared frontend API client.
+- Keep behavior the same while reducing duplicated error handling.
+
+### Changes
+
+- Added one shared `assertOk(response)` helper in `frontend/src/api.ts`.
+- Replaced repeated per-endpoint `if (!response.ok)` blocks with the shared helper.
+- Changed the frontend API failure message to Hebrew.
+- Changed the fallback chat-session title default from `Coach chat` to `צ'אט מאמן`.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run`
+- `npm --prefix frontend run lint`
+- `npm test`
+- `npm run build`
+- `npm run lint`
+- `git diff --check`
+
+### Result
+
+- Latest pushed commit:
+  - `58e769f Centralize frontend API error handling`
+- Full local suite: backend `586 passed`, frontend `50 passed`.
+- Build, lint, and diff check passed.
+- Search for the old `API request failed` and `Coach chat` runtime strings returned no matches.
+
 ## Final Hebrew-First Readiness Cleanup - 2026-06-26
 
 ### Verification target
