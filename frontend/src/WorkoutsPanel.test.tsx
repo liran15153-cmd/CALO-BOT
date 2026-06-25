@@ -363,7 +363,7 @@ describe('Workout plan UI', () => {
             duration_weeks: 4,
             days_per_week: 2,
             session_length_minutes: 45,
-            equipment_needed: ['resistance bands', 'barbell', 'bench', 'cables', 'gym'],
+            equipment_needed: ['Resistance Bands', 'Barbell', 'Bench', 'Cables', 'Gym'],
             days: [
               {
                 name: 'יום שלישי גוף מלא',
