@@ -14,7 +14,8 @@ with expected_tables(table_name) as (
     ('body_metrics'),
     ('safety_events'),
     ('usage_events'),
-    ('pending_actions')
+    ('pending_actions'),
+    ('memory_facts')
 )
 select
   expected_tables.table_name,
@@ -37,6 +38,13 @@ from information_schema.columns
 where table_schema = 'public'
   and table_name = 'body_metrics'
   and column_name in ('body_fat_percent', 'measurements_json', 'source')
+order by column_name;
+
+select column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'memory_facts'
+  and column_name in ('type', 'status', 'text_he', 'source_message_id', 'safety_event_id', 'expired_at', 'superseded_by')
 order by column_name;
 
 select id, name, public

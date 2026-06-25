@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db import Base
@@ -214,6 +214,42 @@ class SafetyEvent(Base, TimestampMixin):
     severity: Mapped[str] = mapped_column(String(40), nullable=False)
     source_text: Mapped[str] = mapped_column(Text, nullable=False)
     response_text: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class MemoryFact(Base, TimestampMixin):
+    __tablename__ = "memory_facts"
+    __table_args__ = (
+        CheckConstraint(
+            "type in ("
+            "'allergy','medical','injury','restriction_nutrition','equipment','schedule',"
+            "'preference','goal','context_life','pattern_motivation','other'"
+            ")",
+            name="ck_memory_facts_type",
+        ),
+        CheckConstraint(
+            "status in ('active','superseded','retracted','expired')",
+            name="ck_memory_facts_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    fact_type: Mapped[str] = mapped_column("type", String(40), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
+    slot: Mapped[str | None] = mapped_column(String(80), index=True)
+    value_text: Mapped[str | None] = mapped_column(Text)
+    text_he: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    salience: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    source: Mapped[str] = mapped_column(String(40), nullable=False, default="sync_safety")
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("chat_messages.id"), index=True)
+    safety_event_id: Mapped[int | None] = mapped_column(ForeignKey("safety_events.id"), index=True)
+    valid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invalid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    superseded_by: Mapped[int | None] = mapped_column(ForeignKey("memory_facts.id"))
+    provenance_json: Mapped[dict] = mapped_column(JSON, default=dict)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 

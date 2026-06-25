@@ -98,9 +98,12 @@ export type WorkoutPlan = {
       reps_or_duration: string;
       rest: string;
       notes?: string | null;
+      alternatives?: string[];
     }>;
   }>;
   progression_rule: string;
+  progression_schedule?: string[];
+  tracking_guidance?: string[];
   recovery_note?: string | null;
 };
 
@@ -227,6 +230,7 @@ export type WorkoutLog = {
     sets?: number | WorkoutSetLogInput[];
     rpe?: number | null;
     rir?: number | null;
+    effort_signal?: 'underloaded' | 'too_hard' | 'controlled' | string;
     notes?: string | null;
     reps?: number[];
     weight?: string;
@@ -285,14 +289,28 @@ export type MealAnalysis = {
 
 export type DashboardState = {
   current_goal: string | null;
-  current_workout_plan: { name: string } | null;
+  current_workout_plan: WorkoutPlan | null;
   next_workout: {
     id?: number | null;
     name?: string | null;
     plan_id?: number | null;
     plan_name?: string | null;
     load_signal?: string | null;
+    signals?: string[];
+    exercise_adjustments?: TrainingAdaptation['exercise_adjustments'];
+    progress_evidence?: string | null;
+    plan_adjustment?: Record<string, unknown> | null;
     next_adjustment?: string | null;
+    first_exercise?: {
+      name?: string | null;
+      sets?: string | null;
+      reps_or_duration?: string | null;
+      rest?: string | null;
+    } | null;
+    progression_gate?: {
+      exercise_name?: string | null;
+      action?: string | null;
+    } | null;
   } | null;
   completed_workouts_this_week: number;
   meals_logged_this_week: number;

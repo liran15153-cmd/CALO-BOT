@@ -34,6 +34,7 @@ describe('Onboarding UI', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: /פרופיל/i }));
+    expect(screen.getByRole('option', { name: /שיפור מוביליטי/i })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/שם/i), { target: { value: 'Lior' } });
     fireEvent.change(screen.getByLabelText(/מטרה מרכזית/i), { target: { value: 'build_muscle' } });
     fireEvent.change(screen.getByLabelText(/רמת ניסיון/i), { target: { value: 'beginner' } });

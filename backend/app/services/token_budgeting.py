@@ -12,12 +12,58 @@ _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9\u0590-\u05FF]+|[^\sA-Za-z0-9\u0590-\u05
 _PROFILE_KEYS = {"goal": "main_goal", "level": "experience_level", "location": "training_location", "equipment": "available_equipment", "days_per_week": "weekly_availability", "minutes": "session_length_minutes", "limitations": "limitations", "nutrition": "nutrition_preference", "style": "coaching_style"}
 _PLAN_KEYS = {"name": "name", "goal": "goal", "type": "plan_type", "weeks": "duration_weeks", "days_per_week": "days_per_week", "split": "training_split", "minutes": "session_length_minutes", "equipment": "equipment_needed"}
 _PLAN_TRIMS = {"progression": ("progression_rule", 140), "recovery": ("recovery_note", 140)}
+_PLAN_LISTS = {"progression_schedule": ("progression_schedule", 2, 160), "tracking_guidance": ("tracking_guidance", 2, 170)}
 _WORKOUT_KEYS = {"date": "date", "status": "status", "pain": "pain_flag"}
 _WORKOUT_TRIMS = {"notes": ("notes", 90)}
 _MEAL_KEYS = {"date": "date", "calories": "calories_range", "confidence": "confidence"}
 _MEAL_TRIMS = {"note": ("note", 90)}
-_KNOWLEDGE_LIMITS = {"rules": (3, 160), "safety_boundaries": (2, 180), "trainer_skill_domains": (3, 90), "programming_model": (2, 130), "progression_regression": (2, 140), "program_design_summary": (2, 140), "technique_cues_summary": (2, 120), "deload_rules": (1, 160), "intent_focus": (2, 150), "practical_nutrition_summary": (3, 130), "sports_nutrition_summary": (2, 150), "body_composition_summary": (1, 150), "sources": (5, 60)}
-_RETRIEVED_LIMITS = {"summary": (2, 150), "recommendations": (2, 150), "safety": (1, 150), "sources": (3, 80)}
+_MEMORY_KEYS = {"type": "type", "text": "text_he", "confidence": "confidence"}
+_KNOWLEDGE_LIMITS = {
+    "rules": (2, 150),
+    "safety_boundaries": (2, 150),
+    "trainer_skill_domains": (3, 90),
+    "programming_model": (2, 110),
+    "progression_regression": (1, 130),
+    "program_design_summary": (2, 140),
+    "exercise_prescription_summary": (1, 150),
+    "technique_cues_summary": (2, 120),
+    "deload_rules": (1, 160),
+    "intent_focus": (2, 150),
+    "coaching_behavior": (1, 160),
+    "plan_horizon_summary": (1, 150),
+    "weekly_structure_summary": (1, 150),
+    "volume_progression_summary": (1, 150),
+    "equipment_substitution_summary": (1, 150),
+    "session_structure_summary": (1, 150),
+    "readiness_recovery_summary": (1, 150),
+    "load_prescription_summary": (1, 150),
+    "program_adaptation_summary": (1, 150),
+    "periodization_summary": (1, 150),
+    "concurrent_training_summary": (1, 150),
+    "goal_programming_summary": (2, 150),
+    "profile_programming_summary": (1, 150),
+    "limitation_adaptation_summary": (1, 150),
+    "cardio_programming_summary": (1, 150),
+    "cardiorespiratory_summary": (1, 150),
+    "warmup_mobility_summary": (1, 150),
+    "mobility_balance_summary": (1, 150),
+    "assessment_tracking_summary": (1, 150),
+    "exercise_library_summary": (1, 150),
+    "adherence_coaching_summary": (1, 150),
+    "practical_nutrition_summary": (3, 130),
+    "sports_nutrition_summary": (2, 150),
+    "body_composition_summary": (1, 150),
+    "sources": (5, 60),
+}
+_RETRIEVED_LIMITS = {
+    "guidance": (2, 150),
+    "action": (2, 150),
+    "avoid": (1, 150),
+    "summary": (2, 150),
+    "recommendations": (2, 150),
+    "safety": (1, 150),
+    "sources": (3, 80),
+}
 
 
 def build_legacy_chat_request(*, context: dict[str, Any], user_message: str, max_output_tokens: int = 320):
@@ -70,10 +116,11 @@ def build_optimized_chat_request(*, context: dict[str, Any], user_message: str, 
 def compact_provider_context(*, context: dict[str, Any], user_message: str) -> dict[str, Any]:
     compact = {
         "profile": _pick(context.get("profile") or {}, _PROFILE_KEYS),
-        "current_workout_plan": _pick(context.get("current_workout_plan") or {}, _PLAN_KEYS, _PLAN_TRIMS),
+        "current_workout_plan": _compact_workout_plan(context.get("current_workout_plan") or {}),
         "recent_workouts": _records(context.get("recent_workouts") or [], _WORKOUT_KEYS, _WORKOUT_TRIMS),
         "training_status": _drop_empty(context.get("training_status") or {}),
         "recent_meals": _records(context.get("recent_meals") or [], _MEAL_KEYS, _MEAL_TRIMS),
+        "memory_safety": _records(context.get("memory_safety") or [], _MEMORY_KEYS, limit=20),
         "recent_chat": _compact_recent_chat(context.get("recent_chat") or [], user_message=user_message),
         "coaching_knowledge": _compact_coaching_knowledge(context.get("coaching_knowledge") or {}),
     }
@@ -226,6 +273,58 @@ def _compact_retrieved_knowledge(items: list[dict[str, Any]]) -> list[dict[str, 
             compact[key] = _compact_text_list(item.get(key) or [], limit=limit, max_chars=max_chars)
         compact_items.append(_drop_empty(compact))
     return compact_items
+
+
+def _compact_workout_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    compact = _pick(plan, _PLAN_KEYS, _PLAN_TRIMS)
+    for output_key, (source_key, limit, max_chars) in _PLAN_LISTS.items():
+        compact[output_key] = _compact_text_list(plan.get(source_key) or [], limit=limit, max_chars=max_chars)
+    outline = _compact_plan_outline(plan.get("workout_outline") or [])
+    if outline:
+        compact["outline"] = outline
+    recent_edits = _compact_plan_edits(plan.get("recent_plan_edits") or [])
+    if recent_edits:
+        compact["recent_edits"] = recent_edits
+    return _drop_empty(compact)
+
+
+def _compact_plan_outline(days: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    compact_days = []
+    for day in days[:3]:
+        first_exercise = day.get("first_exercise") or {}
+        compact_days.append(
+            _drop_empty(
+                {
+                    "name": _trim(day.get("name"), max_chars=80),
+                    "workout_id": day.get("workout_id"),
+                    "first": _drop_empty(
+                        {
+                            "exercise_id": first_exercise.get("exercise_id"),
+                            "name": _trim(first_exercise.get("name"), max_chars=80),
+                            "sets": first_exercise.get("sets"),
+                            "reps": first_exercise.get("reps_or_duration"),
+                        }
+                    ),
+                }
+            )
+        )
+    return [day for day in compact_days if day]
+
+
+def _compact_plan_edits(edits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    compact_edits = []
+    for edit in edits[-2:]:
+        compact_edits.append(
+            _drop_empty(
+                {
+                    "date": edit.get("date"),
+                    "type": edit.get("edit_type"),
+                    "summary": _trim(edit.get("summary"), max_chars=100),
+                    "changed": edit.get("changed_exercises"),
+                }
+            )
+        )
+    return [edit for edit in compact_edits if edit]
 
 
 def _pick(source: dict[str, Any], keys: dict[str, str], trims: dict[str, tuple[str, int]] | None = None) -> dict[str, Any]:

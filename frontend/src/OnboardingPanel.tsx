@@ -81,6 +81,7 @@ export function OnboardingPanel() {
             <option value="improve_consistency">שיפור עקביות</option>
             <option value="improve_strength">שיפור כוח</option>
             <option value="improve_endurance">שיפור סבולת</option>
+            <option value="improve_mobility">שיפור מוביליטי</option>
           </select>
         </label>
 

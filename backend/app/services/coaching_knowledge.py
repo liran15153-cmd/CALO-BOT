@@ -18,12 +18,12 @@ class CoachingKnowledgeService:
             "non_certification_note": context["non_certification_note"],
             "professional_scope": context["professional_scope"][:1],
             "trainer_skill_domains": context["trainer_skill_domains"][:5],
-            "rules": context["rules"][:4],
+            "rules": context["rules"][:3],
             "programming_model": context["programming_model"][:3],
             "program_design_summary": [
-                "Audit: מטרה/פרופיל/ציוד/זמן/מגבלות -> דפוסים, נפח ותדירות ברי ביצוע.",
+                "Audit: מטרה/דפוסים/נפח לפי ציוד/זמן/כאב.",
                 "עומס וחזרות לפי מטרה; טכניקה בלי כאב לפני התקדמות.",
-                "סדר: מורכבים קודם; FITT-VP משנה משתנה אחד ושומר התאוששות/עקביות.",
+                "FITT-VP: משתנה אחד והתאוששות.",
             ],
             "progression_regression": context["progression_regression"],
             "deload_rules": context["deload_rules"][:2],
@@ -37,11 +37,11 @@ class CoachingKnowledgeService:
                 "כאב בחזה, עילפון, קוצר נשימה חריג או כאב חד דורשים עצירה והפניה מקצועית.",
             ],
             "referral_rules": context["referral_rules"][:2],
-            "safety_boundaries": context["safety_boundaries"][:3],
+            "safety_boundaries": context["safety_boundaries"][:2],
             "coaching_behavior": [
-                "עברית ישראלית טבעית: RPE/RIR/DOMS; סטים/חזרות לא מערכות/הישנויות; דילואד/progressive overload; RPE8≈2RIR; בלי bullet.",
-                "תן סיבה קצרה, פעולה אחת, ושאלת המשך אחת רק כשחסר מידע.",
-                "בלי אשמה או שפת חובה; אחרי פספוס מציעים גרסת מינימום ובחירה.",
+                "עברית ישראלית טבעית: RPE/RIR/DOMS; סטים/חזרות≠מערכות; דילואד/progressive overload; קל/כבד/בשליטה=מאמץ מילולי לא מספר; בשליטה=שימור; שער החלפה:RPE 1-10+כאב; לא לנחש; בלי bullet.",
+                "סיבה קצרה; פעולה אחת; שאלה כשחסר.",
+                "בלי אשמה/חובה; פספוס: מינימום ובחירה.",
             ],
             "goal_playbook_summary": [
                 "שריר/כוח: נפח או עומס לפי מטרה, התאוששות לפני כשל.",
@@ -128,19 +128,29 @@ class CoachingKnowledgeService:
                 "fasted cardio לא עדיף לירידת שומן אם סך האימון/האוכל דומה; כוח לא הופך נשים ל׳מנופחות׳ לבד.",
             ]
         if intent in {"workout_plan", "workout_log"}:
+            if intent == "workout_plan":
+                provider_context["plan_horizon_summary"] = [
+                    "horizon: single_workout=אימון יחיד; two_week=שבועיים; monthly_plan=4w; כאב מעורפל?שאל.",
+                ]
+                provider_context["plan_horizon_summary"] = [
+                    "horizon ids: single_workout=אימון יחיד, weekly_plan=1w, two_week_plan=שבועיים, monthly_plan=4w; כאב מעורפל? ask.",
+                ]
+                provider_context["plan_state_summary"] = [
+                    "state:today=one-off;new=מועמדת;scoped=עריכת פעילה.",
+                ]
             provider_context["instruction_coaching_summary"] = [
                 "הוראה: show-tell-do; cue קצר, brace ונשיפה.",
                 "feedback: פחות עם עצמאות; setup/safety pins; חימום/cool 5-10 דק׳.",
             ]
             provider_context["weekly_structure_summary"] = [
-                "2-3: גוף מלא/full-body; כל שריר פעמיים בשבוע.",
+                "2-3: full-body; שריר פעמיים; 4 למתחיל לא AB.",
                 "4: upper/lower או עליון/תחתון עם התאוששות.",
                 "5-6: push/pull/legs רק אם לוגים והתאוששות מחזיקים.",
             ]
             provider_context["volume_progression_summary"] = [
                 "נפח: 4->10+ סטים/שריר כשמתאוששים; specialization רק זמני.",
                 "Progression: סוף טווח/2-for-2 -> 2-10%; plateau -> שנה משתנה.",
-                "RIR/RPE: לרוב 1-3 RIR; failure מעט ובתרגיל בטוח.",
+                "RIR/RPE: RIR 0=כשל;1-3=יעד;4+=קל מדי->עומס/קצב.",
             ]
             provider_context["equipment_substitution_summary"] = [
                 "החלף לפי דפוס וציוד: סקוואט/hinge/דחיפה/משיכה/ליבה.",
@@ -158,7 +168,7 @@ class CoachingKnowledgeService:
                 "מחלה/נסיעה: maintenance/גרסת מינימום; כאב חד/חזה/סחרחורת -> safety.",
             ]
             provider_context["load_prescription_summary"] = [
-                "בחר עומס לפי RIR יעד; מתחילים שומרים מרווח.",
+                "עומס לפי RIR: 1-3 לרוב, 2-4 למתחיל/חדש.",
                 "RPE גבוה/טכניקה יורדת -> שמור/הורד; קל מדי -> חזרות נקיות.",
                 "יעד חזרות נקי -> 2-10% או קפיצה קטנה באימון הבא.",
                 "e1RM הוא טווח מלוג נקי; בלי 1RM למתחיל/כאב.",
@@ -187,7 +197,7 @@ class CoachingKnowledgeService:
             ]
             provider_context["limitation_adaptation_summary"] = [
                 "ברך: הקטן טווח/עומס; סקוואט לקופסה או step-up נמוך.",
-                "גב: low-impact, glute bridge/dead bug; בלי עומס מכאיב.",
+                "גב: low-impact, glute bridge/dead bug; דדליפט כאוב -> הינג׳ לקיר.",
                 "כתף/שורש יד: שיפוע/אחיזה ניטרלית ושכמות/rotator cuff.",
             ]
             provider_context["special_population_summary"] = [
@@ -229,11 +239,16 @@ class CoachingKnowledgeService:
                 "baseline: מטרה + כוח/אירובי/תנועה/היקפים רק אם משנים החלטה.",
                 "2-4 שבועות: לוגים/RPE/כאב/פספוסים; משקל=מגמה, בחר פעולה אחת.",
             ]
-            provider_context["program_adaptation_summary"] = [
+            program_adaptation_summary = [
                 "התקדם רק כשהלוגים יציבים: טכניקה טובה, RPE סביר, בלי כאב; שנה משתנה אחד.",
                 "RPE/עייפות גבוהים או ביצועים יורדים: שמור או הורד נפח/עצימות.",
                 "plateau: בדוק עקביות ועומס, ואז שנה נפח/תרגיל/בלוק; פספוס: חזור קצר.",
             ]
+            if intent == "workout_log":
+                program_adaptation_summary.append(
+                    "בלוג כאב: שמור אזור כאב אם ידוע, חזור לאימון בזהירות וצמצם חלופות לתנועה בטווח ללא כאב."
+                )
+            provider_context["program_adaptation_summary"] = program_adaptation_summary
             provider_context["exercise_library_summary"] = [
                 "סקוואט/step-up: quads/ארבע ראשי+גלוטס, ברכיים; hinge/hip thrust/גשר: המסטרינג+גלוטס.",
                 "דחיפה אופקית/אנכית: חזה/כתפיים/טרייספס; משיכה אופקית/אנכית: גב/שכמות/בייספס.",
@@ -787,6 +802,14 @@ _TOPIC_ALIASES = {
         "נתקעתי",
         "לא מתקדם",
     ],
+    "program_adaptation_protocols.logged_pain_next_workout": [
+        "כאב ברך",
+        "כואבת הברך",
+        "כאבה לי הברך",
+        "knee pain",
+        "pain log",
+        "כאב בלוג",
+    ],
     "exercise_library.squat": [
         "סקוואט",
         "squat",
@@ -869,23 +892,37 @@ _OPTIONAL_PROVIDER_KEYS_BY_INTENT = {
         "fitness_myths_summary",
     ],
     "workout_plan": [
+        "professional_scope",
+        "preparticipation_screening",
+        "referral_rules",
+        "load_monitoring_summary",
+        "goal_playbook_summary",
+        "population_adjustment_summary",
+        "instruction_coaching_summary",
         "field_assessment_summary",
+        "special_population_summary",
+        "cardiorespiratory_summary",
+        "profile_programming_summary",
         "mobility_balance_summary",
         "warmup_mobility_summary",
-        "cardiorespiratory_summary",
         "periodization_summary",
-        "special_population_summary",
-        "profile_programming_summary",
         "goal_programming_summary",
     ],
     "workout_log": [
+        "professional_scope",
+        "preparticipation_screening",
+        "referral_rules",
+        "load_monitoring_summary",
+        "goal_playbook_summary",
+        "population_adjustment_summary",
+        "instruction_coaching_summary",
         "field_assessment_summary",
+        "special_population_summary",
+        "cardiorespiratory_summary",
+        "profile_programming_summary",
         "mobility_balance_summary",
         "warmup_mobility_summary",
-        "cardiorespiratory_summary",
         "periodization_summary",
-        "special_population_summary",
-        "profile_programming_summary",
         "goal_programming_summary",
     ],
     "meal_log": [
@@ -954,6 +991,247 @@ _BASE_CONTEXT = {
         "מנוחה: קצרה יותר לסבולת/זמן מוגבל, ארוכה יותר לכוח או תרגילים מורכבים כבדים.",
         "התקדמות: שנה משתנה אחד בכל פעם, ואז בדוק ביצוע, כאב, עייפות ועקביות.",
     ],
+    "plan_horizon_protocols": {
+        "single_workout": {
+            "use_when": ["המשתמש מבקש אימון להיום, עכשיו, אימון קצר, אימון אחד או בקשה חד-פעמית."],
+            "rules": [
+                "לבנות סשן אחד בלבד: חימום קצר, 3-5 תרגילים, סטים/חזרות/מנוחה/RPE, תחליפים, בטיחות והנחיית תיעוד.",
+                "לא להחליף תוכנית פעילה ולא להבטיח התקדמות רב-שבועית מתוך אימון יחיד.",
+                "גם ניסוח קצר בלי פועל כמו 'אימון להיום 20 דקות בלי ציוד' הוא בקשת אימון יחיד, לא general chat.",
+                "אימון יחיד לא מאשר ולא דוחה מועמדת החלפה פתוחה; הוא נשמר בנפרד כ-one-off.",
+                "אם חסר מידע, לשאול רק על כאב/מגבלה או ציוד אם אי אפשר להסיק בבטחה.",
+            ],
+            "source_refs": ["ACSM 2026 Resistance Training Position Stand", "HPRC/NSCA Exercise Order"],
+        },
+        "weekly_plan": {
+            "use_when": ["המשתמש מבקש שבוע אימונים, תוכנית שבועית או השבוע הקרוב."],
+            "rules": [
+                "לתכנן 1-7 ימים לפי זמינות, לרוב 2-4 אימוני כוח למתחיל/בינוני ועוד הליכה/אירובי לפי מטרה.",
+                "לשמור פיזור התאוששות, כיסוי דפוסי תנועה וגרסת מינימום ליום עמוס.",
+                "לא להעמיס periodization; השבוע הוא יחידת ביצוע ומעקב.",
+            ],
+            "source_refs": [
+                "CDC Adult Physical Activity Guidelines",
+                "NSCA Resistance Training Frequency",
+                "HPRC/NSCA Exercise Order",
+                "NASM Resistance Training Frequency",
+                "Schoenfeld et al. 2019 Frequency Meta-analysis",
+            ],
+        },
+        "two_week_plan": {
+            "use_when": ["המשתמש מבקש תוכנית לשבועיים, שני שבועות או בלוק קצר."],
+            "rules": [
+                "שבוע 1 קובע בסיס בר ביצוע; שבוע 2 חוזר עם התקדמות קטנה אחת רק אם RPE/RIR, כאב והשלמות יציבים.",
+                "למתחילים שבוע 2 מוסיף חזרה נקייה או שומר עומס; למתקדמים אפשר להוסיף עומס קטן או סט עזר אחד בלבד.",
+                "להתקדם בחזרות נקיות, עומס קטן או סט בודד רק אם טכניקה, RPE/RIR וכאב מאפשרים; מאמץ מילולי לבד אומר לשמור ולתעד טוב יותר.",
+                "לשמור אותו split כדי שהמשתמש ילמד את התנועות ולא יקבל תוכנית חדשה לגמרי בכל שבוע.",
+            ],
+            "source_refs": ["ACSM Progression Models in Resistance Training", "Grgic et al. 2022 Training to Failure Review"],
+        },
+        "monthly_plan": {
+            "use_when": ["המשתמש מבקש חודש, 4 שבועות או תוכנית רב-שבועית כללית."],
+            "rules": [
+                "לבנות 4 שבועות סביב בסיס יציב: שבוע 1 כיול, שבועות 2-3 התקדמות קטנה, שבוע 4 שמירה/בדיקה/הורדה לפי התאוששות.",
+                "למתחיל לא להוסיף סטים לפני שבוע 3 וגם אז רק לתרגיל מרכזי אחד אם הלוגים יציבים.",
+                "לשנות משתנה אחד בכל פעם: חזרות, עומס, סטים, מנוחה או צפיפות, לא הכל יחד.",
+                "לכלול מעקב: RPE/RIR, כאב, פספוסים וביצוע כדי להתאים את החודש הבא; מאמץ מילולי לבד אינו סיבה להעלות עומס.",
+                "שבוע 4 אינו דילואד אוטומטי: הוא בדיקה/שימור, והורדת 20-40% נפח מגיעה כשעייפות, כאב, ירידת ביצועים או פספוסים מצדיקים זאת.",
+            ],
+            "source_refs": [
+                "ACSM 2026 Resistance Training Position Stand",
+                "Schoenfeld et al. 2021 Loading Recommendations",
+                "Deloading Strength and Physique Sports Review",
+            ],
+        },
+        "critical_info_policy": {
+            "use_when": ["לפני יצירת כל תוכנית."],
+            "rules": [
+                "מידע קריטי: מטרה, ציוד/מיקום, זמינות ימים, משך אימון, רמת ניסיון וכאב/מגבלה.",
+                "אם פריט לא קריטי חסר, להסיק ברירת מחדל שמרנית ולציין אותה במקום לפתוח שאלון.",
+                "בקשה קצרה כמו 'תבנה לי תוכנית' מספיקה ליצירת תוכנית שמרנית בהקשר מאמן הכושר, כל עוד אין תזונה/תפריט או שאלה הסברית.",
+                "אם יש כאב אבל לא ברור איפה הוא או אם הוא חד/מחמיר, שאל שאלת בטיחות אחת לפני יצירת תוכנית.",
+                "באימון יחיד חסר משך זמן אינו סיבה לשאלה; הנח 30 דקות, משקל גוף, RPE מתון, ותן אפשרות לקצר.",
+                "כאשר אין פרופיל או שהבקשה כללית מדי, לשמור את ההנחות ב-decision_inputs ולהציג למשתמש רק 1-2 הנחות קצרות בעברית.",
+                "כאב חד, כאב חזה, סחרחורת, עילפון או קוצר נשימה חריג עוצרים את ההתקדמות ודורשים תגובה בטיחותית.",
+            ],
+            "source_refs": [
+                "ACSM Preparticipation Screening Algorithm",
+                "ODPHP Physical Activity Guidelines Safe Physical Activity",
+                "Exercise is Medicine Low Back Pain",
+                "Mayo Clinic Exercise Warning Symptoms",
+            ],
+        },
+        "tracking_guidance_policy": {
+            "use_when": ["בכל תוכנית שנשמרת, כדי שהמשתמש יידע איך לתעד ולהתקדם."],
+            "rules": [
+                "לשמור הנחיות מעקב מובנות: הושלם/חלקי/פוספס, RPE/RIR, כאב/מגבלה, חזרות/משקל בתרגיל המרכזי והערה קצרה.",
+                "להשתמש בשפה טבעית של מאמן: לא לנחש מה עשית באימון הקודם; לרשום בפועל את התרגיל המרכזי כדי שאפשר יהיה להתקדם.",
+                "להתאים את המעקב לאופק: אימון יחיד מסכם ביצוע, שבוע בודק עקביות, שבועיים בודקים התקדמות בשבוע 2 וגם סיכום סוף שבוע 2, חודש בודק מגמה שבועית.",
+                "התקדמות מותרת רק אם הלוגים מצביעים על טכניקה, RPE/RIR וכאב יציבים; מאמץ מילולי לבד אומר לשמר או להוריד עומס.",
+            ],
+            "source_refs": [
+                "CDC Physical Activity Intensity",
+                "NSCA Resistance Training Frequency",
+                "ACSM 2026 Resistance Training Position Stand",
+                "Precision Nutrition Exercise Progressions",
+                "OneBody FBW Gym Plan",
+            ],
+        },
+        "progression_fallback_policy": {
+            "use_when": ["כאשר תוכנית של שבועיים או חודש מגיעה לנקודת התקדמות."],
+            "rules": [
+                "שבועיים: שבוע 2 מתקדם רק אם שבוע 1 הושלם ברובו, RPE/RIR נשלט, אין כאב חד והטכניקה יציבה.",
+                "שבועיים: אם יש רק מאמץ מילולי כמו 'בשליטה', לשמר עומס ולבקש RPE/RIR במקום להתקדם.",
+                "שבועיים: אם שבוע 1 לא יציב, לשמר עומס או להוריד מעט נפח במקום להוסיף חזרות, משקל או סטים.",
+                "חודש: שבועות 2-3 יכולים להתקדם במשתנה אחד בלבד; שבוע 4 הוא בדיקה/שימור או הורדת עומס לפי הלוגים.",
+                "חודש: אם RPE עולה, ביצועים יורדים, כאב מצטבר או יש פספוסים, להוריד כ-20-40% נפח לפני שמתחילים בלוק נוסף.",
+            ],
+            "source_refs": [
+                "ACSM Progression Models in Resistance Training",
+                "NSCA Guide to Program Design",
+                "Training to Failure Meta-analysis",
+            ],
+        },
+        "plan_replacement_policy": {
+            "use_when": ["כאשר למשתמש כבר יש תוכנית פעילה והוא מבקש תוכנית חדשה או שינוי גדול."],
+            "rules": [
+                "תוכנית חדשה מול תוכנית פעילה נשמרת כמועמדת, לא מחליפה אוטומטית.",
+                "ניסוחים כמו 'תחליף לי את כל התוכנית', 'תוכנית חדשה במקום הקיימת' או 'תעדכן לי את התוכנית לתוכנית של 4 ימים' הם החלפה מלאה: לבנות מועמדת ולא לבצע scoped edit.",
+                "החלפה דורשת אישור ברור וקצר כמו 'כן להחליף' או פעולה מפורשת של החלפה/מחיקה.",
+                "אמירה עמומה כמו 'כן אבל...' או 'לא בטוח...' אינה אישור ואינה דחייה.",
+                "אם המשתמש דוחה, למחוק את המועמדת ולהשאיר את התוכנית הפעילה.",
+            ],
+            "source_refs": [
+                "ACSM CPT Behavior Change Competencies",
+                "Baretta et al. 2019 Physical Activity App Goal Re-evaluation",
+                "Nielsen Norman Group 10 Usability Heuristics",
+            ],
+        },
+        "scoped_plan_edit_policy": {
+            "implementation_rules": [
+                "After scoped plan edits, sync Workout and WorkoutExercise rows to plan_json.",
+                "If an edited plan removes a day, detach WorkoutLog.workout_id instead of deleting log history.",
+                "Post-edit change-summary questions should answer from plan_edit_history and include one next tracking action.",
+            ],
+            "use_when": ["כאשר המשתמש מבקש שינוי קטן בתוכנית הפעילה: ציוד חסר, החלפת תרגיל, הורדת נפח או שינוי יום מסוים."],
+            "rules": [
+                "שינוי נקודתי אינו תוכנית חדשה: לא ליצור מועמדת ולא להריץ מחדש את כל הבילדר אם אפשר לערוך את התוכנית הפעילה.",
+                "ציוד חסר כמו ספסל: להחליף רק תרגילים/חלופות שדורשים את הציוד, תוך שמירה על אותו דפוס תנועה.",
+                "כבל או פולי חסרים: להסיר רק שמות/חלופות שדורשים כבל, לבחור חלופה לפי דפוס התנועה, ולא למחוק את יום האימון או לבנות תוכנית חדשה.",
+                "ציוד חסר בתרגיל בשם, למשל מכונת חתירה: לשמור דפוס משיכה אופקית ולהחליף לחתירת משקולת, כבל, גומייה או חתירה נתמכת במקום למחוק את יום הגב.",
+                "תרגיל קשה מדי אך ללא כאב, למשל שכיבות סמיכה: לבחור regression של אותו דפוס כמו קיר/שיפוע/ברכיים, להוריד סט אם צריך, ולתת שער התקדמות פשוט.",
+                "בקשת החלפה בלי סיבה, למשל 'תחליף לי את הדדליפט': לא לנחש חלופה; שאל שאלה אחת על ציוד, כאב, קושי או העדפה לפני שינוי התוכנית.",
+                "אחרי החלפה או regression, לא מחזירים אוטומטית לגרסה קשה יותר; דורשים לוג נקי עם השלמה, RPE 8 ומטה וללא כאב, ואז מתקדמים שלב אחד בלבד. מאמץ מילולי נשמר אבל לא מספיק להעלאת שלב בלי RPE/כאב; לא לנחש מה היה בסטים.",
+                "אם הלוג הנקי הוא לוג תרגיל עם חזרות/RPE אחרי regression בגלל קושי, אפשר לנקוב בשם השלב הבא מתוך החלופות; אם זו החלפה בגלל כאב או ציוד, לשמור הנחיה כללית של שלב אחד ולא לנקוב בחלופה קשה יותר.",
+                "אם זה לוג כללי, לומר רק שלב אחד ולבקש לוג תרגיל בפעם הבאה.",
+                "עייפות או עומס גבוה: להוריד קודם סט אחד מתרגילים קיימים או לצמצם אביזרים, לא להחליף את כל התוכנית.",
+                "בקשה עמומה כמו 'תשנה לי את התוכנית' חסרה יעד עריכה; שאל שאלה אחת: תרגיל/ציוד, נפח או יום מסוים.",
+                "שינוי בגלל כאב נשאר תחת כללי בטיחות: לעבוד בטווח ללא כאב ולעצור בסימנים חריגים.",
+                "כאב ברור בתרגיל בתוכנית, למשל ברך בסקוואט: לערוך רק את תרגיל ה-squat הרלוונטי, לשמור דפוס תנועה, להוריד סט/טווח, ולהציע סקוואט לקופסה או ישיבה-קימה במקום בניית תוכנית חדשה.",
+                "כאב כתף ברור בלחיצה: לערוך רק את דפוס ה-push שהמשתמש ציין, לשנות זווית או טווח כמו landmine press, לחיצה בשיפוע, שכיבת סמיכה בשיפוע או לחיצת רצפה באחיזה ניטרלית, ולהוריד סט לפני שמחליפים תוכנית.",
+                "כאב גב תחתון ברור בדדליפט או hinge: לערוך רק את דפוס ה-hip hinge, לרדת להיפ הינג' לקיר או גשר ישבן, לשמור עמוד שדרה ניטרלי ועומס קל, ולעצור בהקרנה, נימול, חולשה או כאב חד.",
+                "כאב ללא אזור או בלי תרגיל יעד ברור: לא לשנות את התוכנית עדיין; שאל שאלה בטיחותית אחת על מיקום הכאב והאם הוא חד/מחמיר.",
+                "כאב חזה, סחרחורת, עילפון, קוצר נשימה חריג או כאב חד/מחמיר אינם scoped edit רגיל; להעביר לשכבת safety.",
+            ],
+            "source_refs": [
+                "ACSM 2026 Resistance Training Position Stand",
+                "HPRC/NSCA Exercise Selection",
+                "FitStreet Hebrew Workout Plan Building",
+                "Nielsen Norman Group 10 Usability Heuristics",
+                "Mayo Clinic Patellofemoral Pain Syndrome",
+                "AAFP Management of Patellofemoral Pain Syndrome",
+                "Men's Health Box Squat Coaching Reference",
+                "Men's Health Landmine Press Coaching Reference",
+                "GQ Deadlift Expert Trainers",
+                "Verywell Health Deadlift Back Pain",
+                "Mayo Clinic Back Pain Guidance",
+                "Women's Health Fundamental Movement Patterns",
+                "SELF Inverted Row Coaching Reference",
+                "Mayo Clinic Weight Training Technique",
+                "Barbell Medicine Pain in Training",
+                "ACE Exercise Library Equipment Filters",
+                "Runner's World Strength Equipment Coach Reference",
+            ],
+        },
+    },
+    "goal_specific_plan_protocols": {
+        "hypertrophy": {
+            "use_when": ["בניית שריר, מסה, היפרטרופיה או גדילה."],
+            "rules": [
+                "העוגן הוא נפח שבועי בר התאוששות, לרוב התקדמות לכיוון כ-10 סטים לשריר רק כשהלוגים תומכים בכך.",
+                "טווחי 6-12 חזרות יעילים ופרקטיים, אך אפשר לגדול בטווח רחב אם המאמץ מספיק והטכניקה נשמרת.",
+                "כשל אינו חובה; רוב הסטים סביב 1-3 RIR, וכשל רק מעט ובתרגילים בטוחים אם בכלל.",
+                "מנוחות ו-RPE צריכים לשמור ביצוע איכותי; לא מוסיפים נפח אם ההתאוששות יורדת.",
+            ],
+            "source_refs": ["ACSM 2026 Resistance Training Position Stand", "Schoenfeld et al. 2021 Loading Recommendations", "Grgic et al. 2022 Failure Meta-analysis"],
+        },
+        "strength": {
+            "use_when": ["כוח, להתחזק, שיפור 1RM או ביצועים בתרגילים מרכזיים."],
+            "rules": [
+                "לתעדף תרגילים מרכזיים בתחילת האימון, עומס גבוה יחסית, מנוחות ארוכות יותר סביב 2-3 דקות וטכניקה עקבית.",
+                "למתחילים לא צריך 1RM; משתמשים ב-RPE/RIR ומשאירים מרווח בטיחות.",
+                "התקדמות דרך עומס קטן רק אחרי שכל הסטים נקיים וללא כאב.",
+            ],
+            "source_refs": ["ACSM 2026 Resistance Training Position Stand", "Schoenfeld et al. 2021 Loading Recommendations"],
+        },
+        "fat_loss_support": {
+            "use_when": ["חיטוב, ירידה בשומן או ירידה במשקל."],
+            "rules": [
+                "התוכנית לא שורפת שומן נקודתית; היא שומרת כוח, מסת שריר, צעדים ואירובי קל לצד תזונה מתונה.",
+                "לא להוסיף HIIT או נפח קיצוני כעונש; להעדיף כוח עקבי, הליכה, חלבון והרגל תיעוד אחד.",
+                "בגרעון קלורי, עדיף לשמור ביצוע והתאוששות לפני העלאת נפח, ולא לקצר מנוחות עד פגיעה בביצוע.",
+            ],
+            "source_refs": ["CDC Adult Physical Activity Guidelines", "ACSM 2026 Resistance Training Position Stand"],
+        },
+        "endurance": {
+            "use_when": ["סיבולת, לב ריאה, cardio או שיפור כושר אירובי."],
+            "rules": [
+                "לבנות בסיס קל-בינוני עם talk test/RPE 5-7 ומנוחות קצרות יותר לפני אינטרוולים עצימים.",
+                "כאשר המשתמש מבקש תוכנית סבולת/לב-ריאה, לכלול עבודה אירובית אמיתית כמו הליכה מהירה, אופניים, אליפטיקל או חתירה, ולא רק כוח בטווח חזרות גבוה.",
+                "להוסיף קודם משך או תדירות, ורק אחר כך עצימות.",
+                "אם משלבים כוח ואירובי, המטרה העיקרית קובעת סדר ועדיפות התאוששות.",
+            ],
+            "source_refs": [
+                "CDC Adult Physical Activity Guidelines",
+                "CDC Physical Activity Intensity and Talk Test",
+                "Runner's World Run/Walk Beginner Endurance Coaching",
+                "NSCA Resistance Training Frequency",
+            ],
+        },
+        "mobility": {
+            "use_when": ["מוביליטי, גמישות, תנועתיות או תחושת נוקשות."],
+            "rules": [
+                "מוביליטי הוא שליטה בטווח שימושי, RPE קל-בינוני, ופחות סטים; לא מתיחה בכאב.",
+                "תוכנית מוביליטי צריכה לכלול תרגול טווח/שליטה ושיווי משקל או העברת משקל כשזה רלוונטי, ולא רק גרסת כוח איטית.",
+                "לשלב חימום דינמי, תרגילי טווח נשלטים ועומס קל רק אם התנועה יציבה.",
+                "התקדמות דרך טווח, שליטה ונשימה לפני משקל או נפח.",
+            ],
+            "source_refs": [
+                "ACSM Exercise Testing and Prescription",
+                "CDC Older Adult Activity and Balance Guidance",
+                "Tom's Guide Physical Therapist Mobility and Balance Exercises",
+                "Exercise is Medicine Low Back Pain",
+            ],
+        },
+        "equipment_constraints": {
+            "use_when": ["בית, משקל גוף, משקולות יד, גומיות או חדר כושר."],
+            "rules": [
+                "להחליף לפי דפוס תנועה: squat, hinge, push, pull, core, carry/cardio.",
+                "משקל גוף מתקדם דרך טווח, קצב, עצירה, חד-צדדי וחזרות; משקולות יד דרך עומס, אחיזה וטווח.",
+                "חדר כושר יכול להשתמש במכונות ליציבות ובטיחות, אבל לא חובה כדי להתקדם.",
+            ],
+            "source_refs": ["ACSM 2026 Resistance Training Position Stand", "HPRC/NSCA Exercise Order"],
+        },
+        "experience_level": {
+            "use_when": ["כאשר רמת ניסיון ידועה או ניתנת להסקה מהבקשה."],
+            "rules": [
+                "מתחיל: תרגילים יציבים, לרוב 2 סטים בתרגילים מרכזיים, RPE 5-7 ו-2-4 RIR לפני העלאת עומס.",
+                "בינוני: 2-3 סטים ברוב התרגילים, upper/lower כשיש 4 ימים, והתקדמות לפי לוגים.",
+                "מתקדם: 3-4 סטים בתרגילים מרכזיים ומורכבות או חד-צדדי רק אם ההתאוששות והטכניקה מחזיקות.",
+            ],
+            "source_refs": ["NSCA Resistance Training Frequency", "ACSM 2026 Resistance Training Position Stand", "Grgic et al. 2022 Failure Meta-analysis"],
+        },
+    },
     "program_quality_audit_protocols": {
         "goal_fit_check": {
             "use_when": ["כאשר המשתמש מבקש חוות דעת על תוכנית קיימת או כשנוצרת תוכנית חדשה."],
@@ -991,7 +1269,13 @@ _BASE_CONTEXT = {
                 "הוסף יום מנוחה או הורד נפח אם יש עומס חוזר על אותו אזור.",
             ],
             "avoid": ["לא להוסיף עוד יום אימון לפני שמוודאים שהימים הקיימים מבוצעים."],
-            "source_refs": ["ACSM 2026 Resistance Training Position Stand", "ACSM Progression Models in Resistance Training"],
+            "source_refs": [
+                "ACSM 2026 Resistance Training Position Stand",
+                "ACSM Progression Models in Resistance Training",
+                "HPRC/NSCA Exercise Order",
+                "NASM Resistance Training Frequency",
+                "Schoenfeld et al. 2019 Frequency Meta-analysis",
+            ],
         },
         "movement_pattern_coverage": {
             "use_when": ["כאשר בודקים אם תוכנית כוח מכסה את הגוף באופן שימושי."],
@@ -1548,12 +1832,21 @@ _BASE_CONTEXT = {
                 "הצע גרסה קצרה של 10-20 דקות עם דפוסי תנועה מרכזיים.",
                 "הזז את האימון הבא בלי להכפיל נפח.",
                 "קבע פעולת מינימום כדי להחזיר רצף לפני הוספת עומס.",
+                "אם שניים או יותר אימונים פוספסו/קוצרו לאחרונה, הקטן זמנית יום אימון אחד בשבוע או הפוך יום אחד לגרסת מינימום לפני בניית תוכנית חדשה.",
             ],
             "avoid": [
                 "לא לתת אימון פיצוי ארוך.",
                 "לא להעניש בתוספת אירובי או דיאטה.",
             ],
             "next_check": "בדוק אם הגרסה הקצרה בוצעה ומה החסם הבא.",
+            "source_refs": [
+                "CDC Overcoming Barriers to Physical Activity",
+                "NSCA Overtraining",
+                "GQ / Raglin and Mateo missed-workout coaching",
+                "Peng et al. 2022 Planning Interventions Meta-analysis",
+                "Kompf 2020 Implementation Intentions Review",
+                "Schoenfeld et al. 2017 Weekly Volume Dose-response",
+            ],
         },
         "exercise_substitution": {
             "trigger": ["תרגיל לא נוח", "ציוד חסר", "טכניקה לא יציבה", "כאב לא חד אך תנועה לא מרגישה טוב"],
@@ -1573,6 +1866,24 @@ _BASE_CONTEXT = {
             ],
             "next_check": "בדוק בלוג של נוחות, טכניקה ו-RPE בוריאציה החדשה.",
         },
+        "logged_pain_next_workout": {
+            "trigger": ["לוג עם pain_flag", "כאב באזור ידוע", "כאב ברך/כתף/גב בזמן תרגיל", "אימון חלקי בגלל כאב"],
+            "coach_assessment": [
+                "זהה אזור כאב מתוך הערות הלוג או הערות התרגיל בלי לאבחן פציעה.",
+                "השאר את האימון הבא קרוב לדפוס המקורי רק אם אפשר לבצע אותו בטווח ללא כאב.",
+                "אם האזור הוא ברך, צמצם חלופות סקוואט/לאנג׳/מדרגה לגרסאות נשלטות כמו סקוואט לקופסה או ישיבה-קימה.",
+            ],
+            "adjustment_options": [
+                "הורד סט אחד או עומס, שמור RPE בינוני והעדף טווח קצר ללא כאב.",
+                "בחר וריאציה יציבה יותר לפני שמחליפים את כל התוכנית.",
+                "אם הכאב חד, מחמיר או מגביל תפקוד: עצור את התרגיל והפעל שכבת safety.",
+            ],
+            "avoid": [
+                "לא להשאיר חלופות אגרסיביות כמו לאנג׳ עמוק או עלייה למדרגה כאשר הלוג אומר כאב ברך.",
+                "לא להסיק אבחנה רפואית מאזור הכאב.",
+            ],
+            "next_check": "בלוג הבא חייב לכלול RPE, כאב/ללא כאב, ומה קרה בוריאציה שנבחרה.",
+        },
         "return_after_break": {
             "trigger": ["הפסקה של שבועיים או יותר", "חזרה ממחלה קלה", "ירידה בכושר", "אימון ראשון אחרי תקופה עמוסה"],
             "coach_assessment": [
@@ -1582,6 +1893,7 @@ _BASE_CONTEXT = {
             ],
             "adjustment_options": [
                 "התחל בנפח נמוך: פחות סטים, פחות עומס או פחות תדירות לשבוע הראשון.",
+                "אחרי הפסקה של כמה שבועות, חזור בערך ל-60-80% מהנפח או העומס הקודם, ואז התקדם לפי 2-3 לוגים נקיים.",
                 "שמור 2-4 חזרות ברזרבה ו-RPE 5-7 עד שהרצף חוזר.",
                 "העלה בהדרגה רק אחרי 2-3 אימונים ללא כאב חריג או עייפות חריגה.",
             ],
@@ -1590,6 +1902,14 @@ _BASE_CONTEXT = {
                 "לא למדוד הצלחה לפי כאבי שרירים חזקים.",
             ],
             "next_check": "בדוק אם המשתמש התאושש תוך 24-48 שעות ואם אפשר לחזור לתוכנית הרגילה בהדרגה.",
+            "source_refs": [
+                "ACSM Progression Models in Resistance Training",
+                "ODPHP Physical Activity Guidelines Safe Physical Activity",
+                "Halonen et al. 2024 Continuous vs Periodic Resistance Training",
+                "Ogasawara et al. 2013 Continuous vs Periodic Strength Training",
+                "Blocquiaux et al. 2020 Detraining and Retraining in Older Men",
+                "Hwang et al. 2017 Short-term Detraining in Trained Men",
+            ],
         },
     },
     "program_lifecycle_protocols": {
@@ -2371,6 +2691,12 @@ _BASE_CONTEXT = {
             "source_refs": ["ACSM Body Composition Assessment", "NASM Beyond the Number on the Scale"],
         },
         "adherence_dashboard_review": {
+            "implementation_rules": [
+                "Dashboard current_workout_plan and next_workout must serialize from the synced Workout/WorkoutExercise rows, not stale plan_json alone.",
+                "After scoped edits, dashboard next action should reference the edited exercise row and keep loggable workout_id/exercise_id values available.",
+                "Provider context should include compact workout_outline and recent_plan_edits, not full chat history or the full workout plan.",
+                "Current-plan chat summaries should use the saved structured plan, show a short outline, and avoid dumping the full monthly plan into chat.",
+            ],
             "use_when": ["כאשר בונים weekly summary, dashboard next action או תגובה אחרי שבוע לא עקבי."],
             "measures": [
                 "אימונים שהושלמו, פספוסים, אימונים חלקיים, ארוחות מתועדות, streak וזמן בפועל.",
@@ -2383,9 +2709,10 @@ _BASE_CONTEXT = {
             "decision_rules": [
                 "בחר next action/פעולה אחת: אימון קצר, הזזה בלו״ז, הורדת נפח או לוג פשוט.",
                 "אם פספוסים חוזרים: הקטן תוכנית לפני שמוסיפים מורכבות.",
+                "אחרי החלפה או regression עם לוג נקי: dashboard next action צריך להציג שער התקדמות קצר, שלב אחד בלבד, RPE 8 ומטה, ללא כאב ולא לנחש את נתוני האימון.",
             ],
             "avoid": ["לא להפוך dashboard למנגנון אשמה; לא להציג רצף כאילו הוא חשוב יותר מהתאוששות."],
-            "source_refs": ["CDC Physical Activity Tracking", "Community Guide Behavior Change Programs"],
+            "source_refs": ["CDC Physical Activity Tracking", "Community Guide Behavior Change Programs", "ACE Ask-Offer-Ask"],
         },
         "reassessment_decision": {
             "use_when": ["בסוף בלוק, אחרי 2-4 שבועות, אחרי plateau או כשמחליטים אם לשנות תוכנית."],
@@ -2650,6 +2977,7 @@ _BASE_CONTEXT = {
             "rules": [
                 "שקף את הלוג בקצרה: מה קרה, מה עבד, ומה חסם את הביצוע.",
                 "מהלוג בחר התאמה אחת לאימון/ארוחה הבאה: לשמור, להקטין, להזיז, או להחליף.",
+                "בשער התקדמות אחרי החלפה או regression, הלוג חייב לכלול RPE וסימון כאב אם הופיע; בלי זה אין מספיק מידע להעלות שלב.",
                 "אם אותו חסם חוזר, עדכן את if-then plan או fallback במקום להאשים את המשתמש.",
             ],
             "decision_gate": ["יש לוג או דיווח שמספיק לקבלת החלטה קטנה."],
@@ -2685,6 +3013,8 @@ _BASE_CONTEXT = {
             "rules": [
                 "RPE נשאר RPE ומוסבר בקצרה כ'דירוג מאמץ מ-1 עד 10' כאשר המשתמש לא מכיר.",
                 "RIR נשאר RIR ומוסבר כ'כמה חזרות נקיות נשארו לך במיכל'.",
+                "אם המשתמש אומר 'קל מדי', 'כבד מדי' או 'בשליטה', אל תכפה מספר RPE/RIR; שמור מאמץ מילולי ותן פעולה אחת.",
+                "'בשליטה' בלי RPE/RIR או דפוס חוזר אומר לשמור את הגרסה הנוכחית ולבקש תיעוד מאמץ/כאב, לא להעלות עומס אוטומטית.",
                 "DOMS יוצג כ'כאבי שרירים מאוחרים (DOMS)' או 'שרירים תפוסים אחרי אימון', לא כ'דומס' לבד.",
                 "כתוב חזרות, סטים, אימון, התאוששות וקלוריות; לא 'רפס', לא מערכות/הישנויות ולא תרגום מילולי של every fitness term.",
             ],
@@ -3869,10 +4199,19 @@ _BASE_CONTEXT = {
             "structure_rules": [
                 "למתחילים או חזרה אחרי הפסקה: 2-3 ימי גוף מלא/full-body בשבוע, לרוב לא רצופים.",
                 "כל אימון כולל דפוסי בסיס: סקוואט/ברך, hinge/ירך, דחיפה, משיכה, ליבה ונשיאה או אירובי קל.",
+                "ב-3 ימי גוף מלא, אפשר לסובב דגש בין יום מאוזן, יום דגש רגליים ויום דגש פלג עליון בלי לוותר על דחיפה, משיכה ודפוס ירך/ברך.",
+                "אם מתחיל מבקש 4 ימי full-body צפופים, להפחית סט אחד בפועל בימים 3-4 ולשמור RPE 5-7 במקום רק לכתוב הערת התאוששות.",
                 "שמור 1-3 ימים בין אימוני כוח לפי התאוששות, אבל אל תפתח פער גדול מדי שמפרק עקביות.",
             ],
             "progression_gate": ["המשתמש מסיים את רוב האימונים בטכניקה יציבה, RPE סביר וללא כאב חד."],
-            "avoid": ["לא לפצל מוקדם מדי לימים רבים כאשר המשתמש עדיין צריך הרגל בסיסי ותדירות פשוטה."],
+            "avoid": ["לא לפצל מוקדם מדי ל-AB/ABC או לימים רבים כאשר המשתמש עדיין צריך הרגל בסיסי ותדירות פשוטה."],
+            "source_refs": [
+                "NSCA Resistance Training Frequency",
+                "ACSM Progression Models in Resistance Training",
+                "Wingate Strength Training and Healthy Longevity",
+                "Fitnessophy FBW and AB Plans",
+                "Stronger Gym Workout Plans",
+            ],
         },
         "intermediate_upper_lower": {
             "use_when": ["למשתמש ביניים עם כ-4 ימי אימון זמינים או צורך ביותר נפח בלי להעמיס אותו אזור ברצף."],
@@ -3949,6 +4288,7 @@ _BASE_CONTEXT = {
                 "RIR מתאר כמה חזרות נקיות נשארו לפני כשל טכני; RPE מתאר כמה הסט הרגיש קשה.",
                 "ככלל פשוט, RPE 8 דומה לכ-2 RIR, RPE 9 לכ-1 RIR ו-RPE 10 לכשל או 0 RIR.",
                 "לרוב אימוני כוח/שריר שמור 1-3 RIR; בתרגילים מורכבים או נפח גבוה אפשר להשאיר יותר רזרבה.",
+                "בלוג תרגיל עם RIR 0 הוא כשל/קרוב מדי לכשל ולכן שער התאוששות; RIR 1-3 תומך בהתקדמות קטנה; RIR 4+ מסמן עומס קל מדי, אז מעלים מעט עומס או מאטים קצב לכיוון RIR 1-3.",
                 "מתחילים צריכים להשתמש בטווחי מאמץ רחבים ושמרניים עד שהערכת RIR/RPE שלהם משתפרת.",
             ],
             "decision_gate": ["המשתמש מדווח RIR/RPE באופן עקבי והביצועים בפועל תואמים בערך את הדיווח."],
@@ -4075,6 +4415,10 @@ _BASE_CONTEXT = {
                 "RIR הוא מספר החזרות הנקיות שנשארו לפני כשל טכני; RPE מתאר כמה הסט הרגיש קשה.",
                 "כלל שימושי: RPE 8 קרוב ל-2 RIR, RPE 9 קרוב ל-1 RIR, ו-RPE 10 הוא כשל או 0 RIR.",
                 "כיול RPE/RIR טוב יותר אצל משתמשים עם ניסיון; אצל מתחילים השתמש גם בטכניקה ובמהירות חזרות.",
+                "בפרשנות לוגים: RIR 0 אינו שער התקדמות, RIR 1-3 הוא מאמץ נשלט, ו-RIR 4+ אומר שהעומס קל מדי וצריך תיקון קטן ולא קפיצה גדולה.",
+                "בלוג חופשי או מאמץ מילולי שמכוון לשער התקדמות וחסר בו RPE או כאב כן/לא: לשמור את הלוג, אבל לשאול שאלה אחת על מאמץ 1-10 וכאב לפני שמעלים שלב.",
+                "לוג אימון מלא עם RPE 8 ומטה ובלי כאב מפורש יכול לפתוח שער התקדמות של שלב אחד, אבל לוג תרגיל עם חזרות עדיין עדיף כשיש אותו.",
+                "כאשר פותחים שער התקדמות מלוג כללי בלבד, אמור שזה לוג כללי ובקש שבאימון הבא יתעדו חזרות/RPE לתרגיל הרלוונטי.",
             ],
             "decision_gate": ["הדיווח חוזר בעקביות ומתאים לביצוע בפועל במשך כמה סטים או אימונים."],
             "avoid": ["לא לקבל RIR/RPE כמדידה מדויקת אם המשתמש חדש או אם הטכניקה משתנה מאוד."],
@@ -4717,6 +5061,10 @@ _BASE_CONTEXT = {
             "בנה בסיס הדרגתי: רוב העבודה קלה-בינונית, מעט עצימה רק אחרי עקביות.",
             "מדוד משך, תחושת מאמץ, דופק אם זמין והתאוששות.",
         ],
+        "improve_mobility": [
+            "בנה טווח תנועה שימושי דרך חימום דינמי, שליטה, נשימה ושיווי משקל לפני עומס.",
+            "סטטיקת גמישות מתאימה יותר אחרי חימום או כסשן נפרד; לא לדחוף לכאב חד.",
+        ],
         "improve_consistency": [
             "בחר מינימום ביצוע שבועי שאפשר לעמוד בו גם בשבוע עמוס.",
             "השתמש באימון קצר, הליכה או סטים ביתיים כדי לשמור רצף במקום לשבור שגרה.",
@@ -4736,6 +5084,7 @@ _BASE_CONTEXT = {
             "programming_notes": [
                 "תעדף לימוד תנועה, טווח ללא כאב והרגל שבועי לפני וריאציות מורכבות.",
                 "העלה רק משתנה אחד בכל פעם: חזרות, סטים, עומס, תדירות או מורכבות.",
+                "רמת ניסיון משנה מינון ומורכבות, אבל לא מחליפה talk test בסיבולת או טווח/שליטה במוביליטי.",
             ],
         },
         "strength": {
@@ -4791,6 +5140,17 @@ _BASE_CONTEXT = {
             "programming_notes": [
                 "שמור כוח כעוגן, והוסף צעדים או אירובי נגיש בהדרגה.",
                 "ירידה בשומן נשענת על הרגלים ותזונה בטוחה, לא על דיאטת קיצון.",
+            ],
+        },
+        "mobility": {
+            "goal": "שיפור טווח תנועה שימושי, שליטה ושיווי משקל בלי להפוך את האימון למבחן כאב.",
+            "set_range": ["1-3 סבבים של תרגילי מוביליטי/שיווי משקל", "1-2 תרגילי כוח איטיים כתמיכה בטווח"],
+            "rep_range": ["5-10 חזרות נשלטות לתרגיל דינמי", "20-45 שניות כאשר עובדים לפי זמן או איזון"],
+            "rest_guidance": ["נשימה רגועה או 30-60 שניות לפי שליטה ועייפות"],
+            "intensity_guidance": ["RPE 4-6", "תחושת מתיחה/מאמץ נוחה, לא כאב חד"],
+            "programming_notes": [
+                "התחל בחימום קל ודינמי, ואז בחר מפרקים רלוונטיים כמו ירך, קרסול, עמוד שדרה חזי וכתף.",
+                "התקדמות היא יותר טווח נוח, שליטה או זמן; עומס חיצוני מגיע רק אחרי תנועה יציבה.",
             ],
         },
     },
@@ -5357,6 +5717,21 @@ _BASE_CONTEXT = {
             "organization": "NSCA Guide to Program Design",
         },
         {
+            "organization": "Wingate Strength Training and Healthy Longevity",
+        },
+        {
+            "organization": "Wingate Muscle Fatigue and Training Efficiency",
+        },
+        {
+            "organization": "FitStreet Hebrew Workout Plan Building",
+        },
+        {
+            "organization": "Fitnessophy Hebrew Workout Plans",
+        },
+        {
+            "organization": "Stronger Hebrew Gym Workout Plans",
+        },
+        {
             "organization": "ACSM Aerobic Intensity Guidance",
         },
         {
@@ -5474,6 +5849,9 @@ _BASE_CONTEXT = {
             "organization": "ACE",
         },
         {
+            "organization": "ACE Ask-Offer-Ask",
+        },
+        {
             "organization": "ACE Client-Centered Assessments",
         },
         {
@@ -5487,6 +5865,9 @@ _BASE_CONTEXT = {
         },
         {
             "organization": "ACE Exercise Library - Expanded Patterns",
+        },
+        {
+            "organization": "Runner's World Strength Equipment Coach Reference",
         },
         {
             "organization": "ACE IFT / Mover Method",

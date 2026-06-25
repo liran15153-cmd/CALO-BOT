@@ -36,11 +36,11 @@ class DashboardService:
         missed = sum(1 for log in workouts if log.status == "skipped")
         next_workout = workout_service.next_workout(user_id=user.id) if plan else None
         next_workout_summary = self._next_workout_summary(next_workout)
-        current_goal = profile.main_goal if profile else (plan.goal if plan else None)
+        current_goal = plan.goal if plan else (profile.main_goal if profile else None)
 
         return {
             "current_goal": current_goal,
-            "current_workout_plan": WorkoutService.serialize_plan(plan) if plan else None,
+            "current_workout_plan": workout_service.serialize_plan_with_rows(plan) if plan else None,
             "next_workout": next_workout_summary,
             "completed_workouts_this_week": completed,
             "meals_logged_this_week": len(meals),
@@ -143,14 +143,54 @@ class DashboardService:
             return None
         adaptation = next_workout.get("adaptation") or {}
         plan = next_workout.get("plan") or {}
+        execution_plan = next_workout.get("execution_plan") or {}
         return {
             "id": next_workout.get("id"),
             "name": next_workout.get("name"),
             "plan_id": next_workout.get("plan_id"),
             "plan_name": plan.get("name"),
             "load_signal": adaptation.get("load_signal", "maintain"),
+            "signals": adaptation.get("signals", []),
+            "exercise_adjustments": adaptation.get("exercise_adjustments", []),
             "next_adjustment": adaptation.get("next_adjustment", "שמור על התוכנית הנוכחית."),
+            "plan_adjustment": adaptation.get("plan_adjustment"),
+            "progress_evidence": adaptation.get("progress_evidence"),
+            "first_exercise": DashboardService._first_exercise_summary(execution_plan),
+            "progression_gate": DashboardService._progression_gate_summary(execution_plan),
         }
+
+    @staticmethod
+    def _first_exercise_summary(execution_plan: dict[str, Any]) -> dict[str, Any] | None:
+        exercises = execution_plan.get("adjusted_exercises") or []
+        if not exercises:
+            return None
+        first = exercises[0]
+        return {
+            "name": first.get("name"),
+            "sets": first.get("sets"),
+            "reps_or_duration": first.get("reps_or_duration"),
+            "rest": first.get("rest"),
+        }
+
+    @staticmethod
+    def _progression_gate_summary(execution_plan: dict[str, Any]) -> dict[str, Any] | None:
+        for exercise in execution_plan.get("adjusted_exercises") or []:
+            if exercise.get("adjustment") != "substitution_progression_gate":
+                continue
+            exercise_name = exercise.get("name") or "תרגיל שהוחלף"
+            execution_note = exercise.get("execution_note")
+            if execution_note:
+                action = f"ב{exercise_name}: {execution_note}"
+            else:
+                action = (
+                    f"ב{exercise_name}: להתקדם שלב אחד בלבד רק אם אין כאב והמאמץ נשאר עד RPE 8; "
+                    "לתעד RPE וכאב אחרי הסטים - לא לנחש."
+                )
+            return {
+                "exercise_name": exercise_name,
+                "action": action,
+            }
+        return None
 
     @staticmethod
     def _next_recommended_action(
@@ -166,5 +206,47 @@ class DashboardService:
         if not next_workout:
             return "לבדוק את תוכנית האימון הפעילה לפני תיעוד נוסף."
         workout_name = next_workout.get("name") or "האימון הבא"
+        progression_gate = next_workout.get("progression_gate")
+        if progression_gate:
+            return f"לבצע את {workout_name}. {progression_gate['action']}"
+        if next_workout.get("load_signal") == "progress_candidate" and any(
+            adjustment.get("reason") == "qualitative_underload"
+            for adjustment in next_workout.get("exercise_adjustments") or []
+            if isinstance(adjustment, dict)
+        ):
+            return (
+                f"לבצע את {workout_name}. הלוג האחרון תיאר שהמאמץ היה קל מדי, אז להעלות עומס קטן או להאט קצב בלי קפיצה גדולה. "
+                "לתעד מאמץ/כאב ומה הושלם - לא לנחש."
+            )
+        if next_workout.get("load_signal") == "progress_candidate" and any(
+            adjustment.get("reason") == "high_rir_underload"
+            for adjustment in next_workout.get("exercise_adjustments") or []
+            if isinstance(adjustment, dict)
+        ):
+            return (
+                f"לבצע את {workout_name}. הלוג האחרון השאיר יותר מדי חזרות ברזרבה, אז להעלות עומס קטן או להאט קצב כדי לכוון ל-RIR 1-3. "
+                "לתעד RPE/RIR או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+            )
+        if next_workout.get("load_signal") == "progress_candidate" and next_workout.get("progress_evidence") == "exercise_log":
+            return (
+                f"לבצע את {workout_name}. אפשר התקדמות קטנה במשתנה אחד בלבד כי הלוג האחרון כלל חזרות ו-RPE/RIR בשליטה. "
+                "לתעד RPE/RIR או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+            )
+        if next_workout.get("load_signal") == "recovery_needed" and any(
+            adjustment.get("reason") == "qualitative_high_effort"
+            for adjustment in next_workout.get("exercise_adjustments") or []
+            if isinstance(adjustment, dict)
+        ):
+            return (
+                f"לבצע את {workout_name}. הלוג האחרון תיאר מאמץ כבד מדי, אז להוריד מעט נפח או עומס. "
+                "לתעד מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+            )
+        if next_workout.get("load_signal") == "recovery_needed" and any(
+            "RPE/RIR" in str(signal) for signal in next_workout.get("signals") or []
+        ):
+            return (
+                f"לבצע את {workout_name}. הלוג האחרון היה קרוב לכשל לפי RPE/RIR, אז להוריד מעט נפח או עומס. "
+                "לתעד RPE/RIR או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+            )
         adjustment = next_workout.get("next_adjustment") or "שמור על התוכנית הנוכחית."
-        return f"לבצע את {workout_name}. {adjustment}"
+        return f"לבצע את {workout_name}. {adjustment} לתעד RPE או מאמץ מילולי, כאב ומה הושלם - לא לנחש."

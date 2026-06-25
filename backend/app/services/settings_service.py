@@ -13,6 +13,7 @@ from backend.app.models import (
     Meal,
     MealImageAnalysis,
     MealItem,
+    MemoryFact,
     PendingAction,
     SafetyEvent,
     UsageEvent,
@@ -61,6 +62,7 @@ class SettingsService:
         logs = self.db.scalars(select(WorkoutLog).where(WorkoutLog.user_id == user.id)).all()
         meals = self.db.scalars(select(Meal).where(Meal.user_id == user.id)).all()
         body_metrics = self.db.scalars(select(BodyMetric).where(BodyMetric.user_id == user.id)).all()
+        memory_facts = self.db.scalars(select(MemoryFact).where(MemoryFact.user_id == user.id)).all()
         safety_events = self.db.scalars(select(SafetyEvent).where(SafetyEvent.user_id == user.id)).all()
         pending_actions = self.db.scalars(select(PendingAction).where(PendingAction.user_id == user.id)).all()
 
@@ -105,6 +107,17 @@ class SettingsService:
                     "note": metric.note,
                 }
                 for metric in body_metrics
+            ],
+            "memory_facts": [
+                {
+                    "id": fact.id,
+                    "type": fact.fact_type,
+                    "status": fact.status,
+                    "text_he": fact.text_he,
+                    "confidence": fact.confidence,
+                    "source": fact.source,
+                }
+                for fact in memory_facts
             ],
             "safety_events": [
                 {
@@ -151,6 +164,7 @@ class SettingsService:
             deleted += result.rowcount or 0
         for model in (
             UsageEvent,
+            MemoryFact,
             SafetyEvent,
             BodyMetric,
             Meal,

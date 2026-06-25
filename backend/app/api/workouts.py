@@ -8,8 +8,10 @@ from backend.app.db import get_db
 from backend.app.models import User
 from backend.app.schemas import ActivateWorkoutPlanRequest, WorkoutPlanRequest
 from backend.app.services.pending_action_service import PendingActionService
+from backend.app.services.pain_text import extract_pain_area, vague_pain_plan_clarification_response
 from backend.app.schemas import WorkoutLogRequest
 from backend.app.services.safety_service import SafetyService
+from backend.app.services.workout_plan_builder import is_persistent_plan_type, is_single_workout_plan
 from backend.app.services.workout_service import WorkoutService
 
 router = APIRouter(prefix="/api/workout-plans", tags=["workout-plans"])
@@ -23,11 +25,30 @@ def create_workout_plan(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    safety_source = _workout_plan_safety_source(payload)
+    safety_result = SafetyService(db).classify(safety_source)
+    if safety_result.event_type:
+        SafetyService(db).record_event(user_id=user.id, source_text=safety_source, result=safety_result)
+    if safety_result.flagged:
+        raise HTTPException(status_code=400, detail=safety_result.response)
+    planning_payload = payload
+    if safety_result.event_type == "pain_signal" and not payload.limitations:
+        pain_area = extract_pain_area(safety_source)
+        if pain_area is None:
+            raise HTTPException(status_code=400, detail=vague_pain_plan_clarification_response())
+        planning_payload = payload.model_copy(update={"limitations": f"רגישות ב{pain_area}"})
+
     service = WorkoutService(db)
     current_before = service.current_plan(user_id=user.id)
-    plan = service.generate_plan(user_id=user.id, request=payload)
+    plan = service.generate_plan(user_id=user.id, request=planning_payload)
     response = service.serialize_plan_with_rows(plan)
-    if current_before is not None and current_before.id != plan.id and not plan.is_current and response.get("plan_type") == "multi_week":
+    if (
+        current_before is not None
+        and not is_single_workout_plan((current_before.plan_json or {}).get("plan_type"))
+        and current_before.id != plan.id
+        and not plan.is_current
+        and is_persistent_plan_type(response.get("plan_type"))
+    ):
         pending = PendingActionService(db).create_workout_plan_replacement(
             user_id=user.id,
             candidate_plan_id=plan.id,
@@ -64,7 +85,8 @@ def activate_workout_plan(
             delete_previous=True if payload is None else payload.delete_previous,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 400 if "single workout" in str(exc).lower() else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return service.serialize_plan_with_rows(plan)
 
 
@@ -136,3 +158,8 @@ def _workout_log_safety_source(payload: WorkoutLogRequest, *, pain_flag: bool) -
     if source_text:
         return source_text
     return "כאב דווח בתיעוד אימון מובנה" if pain_flag else ""
+
+
+def _workout_plan_safety_source(payload: WorkoutPlanRequest) -> str:
+    parts = [payload.prompt, payload.limitations]
+    return " ".join(part.strip() for part in parts if part and part.strip()).strip()

@@ -19,6 +19,16 @@ def test_intent_service_detects_feminine_hebrew_workout_plan_requests():
     assert intent.name == "workout_plan"
 
 
+def test_intent_service_detects_natural_hebrew_want_plan_requests():
+    service = CoachIntentService()
+
+    assert service.classify("תבנה לי תוכנית").name == "workout_plan"
+    assert service.classify("תן לי תכנית").name == "workout_plan"
+    assert service.classify("אני רוצה תוכנית אימונים לחודש").name == "workout_plan"
+    assert service.classify("בא לי תוכנית אימון קצרה").name == "workout_plan"
+    assert service.classify("תן לי תוכנית תזונה").name != "workout_plan"
+
+
 def test_intent_service_detects_hebrew_training_week_creation_as_workout_plan():
     service = CoachIntentService()
 
@@ -27,8 +37,75 @@ def test_intent_service_detects_hebrew_training_week_creation_as_workout_plan():
     assert service.classify("תבנה לי תוכנית קצרה לשבוע הקרוב, 20 דקות ביום").name == "workout_plan"
     assert service.classify("Build me a beginner workout").name == "workout_plan"
     assert service.classify("Give me a short workout for today").name == "workout_plan"
+    assert service.classify("תן לי סשן אחד קצר עכשיו").name == "workout_plan"
+    assert service.classify("בנה לי שבוע אימונים לשבוע הבא").name == "workout_plan"
+    assert service.classify("תן לי תוכנית לחודש הקרוב במכון").name == "workout_plan"
+    assert service.classify("תוכנית לשבועיים שמתחילה היום").name == "workout_plan"
+    assert service.classify("תוכנית חודשית לבית בבקשה").name == "workout_plan"
+    assert service.classify("מה ההבדל בין תוכנית שבועית לחודשית?").name != "workout_plan"
+    assert service.classify("כמה זמן תוכנית חודשית צריכה לקחת?").name != "workout_plan"
+    assert service.classify("Give me the difference between a weekly plan and a monthly plan").name != "workout_plan"
+    assert service.classify("How to build a weekly workout plan?").name != "workout_plan"
 
 
+def test_intent_service_detects_scoped_active_plan_edits():
+    service = CoachIntentService()
+
+    assert service.classify("אין לי ספסל בתוכנית, תחליף רק את מה שצריך").name == "workout_plan_edit"
+    assert service.classify("תוריד נפח מהתוכנית השבוע, אני עייף").name == "workout_plan_edit"
+    assert service.classify("תשנה לי את התוכנית").name == "workout_plan_edit"
+    assert service.classify("כואבת לי הברך בסקוואט שבתוכנית, תחליף רק את זה").name == "workout_plan_edit"
+    assert service.classify("כואבת לי הכתף בלחיצת כתפיים שבתוכנית, תחליף רק את זה").name == "workout_plan_edit"
+    assert service.classify("כואב לי הגב התחתון בדדליפט שבתוכנית, תחליף רק את זה").name == "workout_plan_edit"
+    assert service.classify("אין לי מכונה לחתירה בתוכנית, תחליף רק את זה").name == "workout_plan_edit"
+    assert service.classify("אין לי כבלים בתוכנית, תחליף רק את מה שצריך").name == "workout_plan_edit"
+    assert service.classify("שכיבות סמיכה קשות מדי בתוכנית, תן לי גרסה קלה יותר").name == "workout_plan_edit"
+    assert service.classify("תחליף לי את הדדליפט בתוכנית").name == "workout_plan_edit"
+
+
+
+
+def test_intent_service_detects_plan_change_summary_questions():
+    service = CoachIntentService()
+
+    assert service.classify("מה השתנה לי בתוכנית?").name == "workout_plan_change_summary"
+    assert service.classify("מה שינית בתוכנית").name == "workout_plan_change_summary"
+    assert service.classify("what changed in my plan?").name == "workout_plan_change_summary"
+
+
+def test_intent_service_detects_current_plan_summary_questions():
+    service = CoachIntentService()
+
+    assert service.classify("תראה לי את התוכנית שלי").name == "current_workout_plan_summary"
+    assert service.classify("מה התוכנית הפעילה שלי?").name == "current_workout_plan_summary"
+    assert service.classify("show me my current plan").name == "current_workout_plan_summary"
+
+
+def test_intent_service_detects_next_workout_summary_questions():
+    service = CoachIntentService()
+
+    assert service.classify("פתח לי את האימון הבא").name == "next_workout_summary"
+    assert service.classify("מה האימון הבא שלי?").name == "next_workout_summary"
+    assert service.classify("start my next workout").name == "next_workout_summary"
+    assert service.classify("אימון להיום 20 דקות בלי ציוד").name != "next_workout_summary"
+
+
+def test_intent_service_routes_full_plan_replacement_to_plan_builder():
+    service = CoachIntentService()
+
+    assert service.classify("תחליף לי את כל התוכנית לתוכנית חודשית חדשה במכון").name == "workout_plan"
+    assert service.classify("תעדכן לי את התוכנית לתוכנית של 4 ימים בשבוע").name == "workout_plan"
+    assert service.classify("תבנה לי תוכנית חדשה במקום התוכנית הקיימת").name == "workout_plan"
+    assert service.classify("אין לי ספסל בתוכנית, תחליף רק את מה שצריך").name == "workout_plan_edit"
+    assert service.classify("תחליף לי את הדדליפט בתוכנית").name == "workout_plan_edit"
+
+
+def test_intent_service_detects_bare_hebrew_today_workout_request():
+    service = CoachIntentService()
+
+    assert service.classify("אימון להיום 20 דקות בלי ציוד").name == "workout_plan"
+    assert service.classify("אימון עכשיו בבית").name == "workout_plan"
+    assert service.classify("אימון היום היה קשה").name != "workout_plan"
 
 
 def test_intent_service_detects_hebrew_workout_and_meal_logs():
@@ -56,6 +133,11 @@ def test_intent_service_detects_common_hebrew_equipment_and_missed_workout_guida
 
     assert service.classify("אני מתחיל ויש לי רק גומייה. איזה תרגיל גב לעשות במקום חתירה במכונה?").name == "equipment_substitution_guidance"
     assert service.classify("פספסתי שני אימונים השבוע. תן לי דרך לחזור בלי להרגיש שאני מתחיל מאפס.").name == "missed_workout_guidance"
+    assert service.classify("לא התאמנתי חודש, איך לחזור לחדר כושר?").name == "return_after_break_guidance"
+    assert service.classify("חוזרת אחרי הפסקה של שלושה שבועות, מה לעשות באימון הראשון?").name == "return_after_break_guidance"
+    assert service.classify("תבנה לי תוכנית חזרה אחרי חודש הפסקה בבית").name == "workout_plan"
+    assert service.classify("תבנה לי תוכנית חיטוב ביתית לשבוע").name == "workout_plan"
+    assert service.classify("תבנה לי תוכנית חיטוב עם תפריט").name != "workout_plan"
 
 
 def test_intent_service_detects_nutrition_guidance_without_logging_meal():
@@ -118,13 +200,37 @@ def test_intent_service_routes_missed_workout_questions_about_logging_to_workout
 
     assert service.classify("פספסתי אימון אתמול, איך לתעד?").name == "workout_log"
     assert service.classify("פספסתי אימון אתמול, איך להמשיך?").name == "missed_workout_guidance"
+    assert service.classify("I skipped workout yesterday, how should I continue?").name == "missed_workout_guidance"
+    assert service.classify("I skipped workout yesterday, record it").name == "workout_log"
+
+
+def test_intent_service_routes_negated_recent_workout_to_guidance_not_log():
+    service = CoachIntentService()
+
+    assert service.classify("I did not work out yesterday, how should I continue?").name == "missed_workout_guidance"
+    assert service.classify("I did not do legs yesterday, how should I continue?").name != "workout_log"
+    assert (
+        service.classify(
+            "\u05dc\u05d0 \u05d4\u05ea\u05d0\u05de\u05e0\u05ea\u05d9 \u05d0\u05ea\u05de\u05d5\u05dc, \u05d0\u05d9\u05da \u05dc\u05d4\u05de\u05e9\u05d9\u05da?"
+        ).name
+        == "missed_workout_guidance"
+    )
+    assert service.classify("I did not work out for a month, how should I come back?").name != "missed_workout_guidance"
 
 
 def test_intent_service_prefers_meal_log_over_nutrition_guidance_when_food_is_eaten():
     service = CoachIntentService()
 
     assert service.classify("אכלתי חלבון לפני אימון").name == "meal_log"
+    assert service.classify("I had rice and chicken for lunch").name == "meal_log"
     assert service.classify("מה לאכול לפני אימון ערב?").name == "nutrition_guidance"
+
+
+def test_intent_service_does_not_treat_non_food_i_had_as_meal_log():
+    service = CoachIntentService()
+
+    assert service.classify("I had knee pain during squats").name != "meal_log"
+    assert service.classify("I had low energy during training").name != "meal_log"
 
 
 def test_intent_service_keeps_bare_creatine_mentions_in_general_chat():

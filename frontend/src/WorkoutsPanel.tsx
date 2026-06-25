@@ -17,6 +17,7 @@ import {
   type WorkoutPlan
 } from './api';
 import { formatAdjustmentExplanation } from './formatters';
+import { formatPlanType, formatWorkoutPlanDuration } from './planFormatters';
 
 type WorkoutStatus = 'completed' | 'partial' | 'skipped' | 'modified';
 
@@ -34,6 +35,13 @@ const STATUS_OPTIONS: Array<{ value: WorkoutStatus; label: string }> = [
   { value: 'partial', label: 'חלקי' },
   { value: 'skipped', label: 'פוספס' },
   { value: 'modified', label: 'שונה' }
+];
+
+const PLAN_REQUEST_TEMPLATES = [
+  { label: 'אימון יחיד', prompt: 'תן לי אימון יחיד להיום, 30 דקות, לפי הפרופיל והציוד שלי.' },
+  { label: 'שבוע', prompt: 'תבנה לי תוכנית שבועית לפי הזמינות, הציוד והמטרה שלי.' },
+  { label: 'שבועיים', prompt: 'תבנה לי תוכנית לשבועיים עם התקדמות זהירה לפי RPE וכאב.' },
+  { label: 'חודש', prompt: 'תבנה לי תוכנית חודשית לפי הזמינות, הציוד והמטרה שלי.' }
 ];
 
 export function WorkoutsPanel() {
@@ -172,7 +180,16 @@ export function WorkoutsPanel() {
     event.preventDefault();
     if (!nextWorkout) return;
     setStructuredLogError(null);
-    const validationError = validateStructuredLog(workoutStatus, exerciseInputs, overallRpe, overallRir, painFlag, generalNotes);
+    const executionExercises = executionExercisesFor(nextWorkout);
+    const validationError = validateStructuredLog(
+      workoutStatus,
+      exerciseInputs,
+      overallRpe,
+      overallRir,
+      painFlag,
+      generalNotes,
+      executionExercises
+    );
     if (validationError) {
       setStructuredLogError(validationError);
       return;
@@ -184,7 +201,7 @@ export function WorkoutsPanel() {
       exercises:
         workoutStatus === 'skipped'
           ? []
-          : executionExercisesFor(nextWorkout).flatMap((exercise) => {
+          : executionExercises.flatMap((exercise) => {
               const exerciseId = executionExerciseId(exercise);
               if (exerciseId === null) return [];
               const input = exerciseInputs[exerciseId] ?? emptyExerciseInput();
@@ -314,6 +331,11 @@ export function WorkoutsPanel() {
                   return (
                     <fieldset className="exercise-log-fields" key={exerciseId}>
                       <legend>{exercise.name}</legend>
+                      {needsProgressionGateTracking(exercise) ? (
+                        <p className="adjustment-explanation">
+                          שער התקדמות: RPE 1-10 נדרש רק כדי להתקדם; מאמץ מילולי נשמר, אבל בלי RPE נשמור את הגרסה הנוכחית.
+                        </p>
+                      ) : null}
                       <label>
                         חזרות לפי סט - {exercise.name}
                         <input
@@ -361,6 +383,7 @@ export function WorkoutsPanel() {
                         <textarea
                           value={input.notes}
                           onChange={(event) => updateExerciseInput(exerciseId, { notes: event.target.value })}
+                          placeholder="למשל: קל מדי, כבד מדי, בשליטה או כאב בברך"
                         />
                       </label>
                     </fieldset>
@@ -382,7 +405,11 @@ export function WorkoutsPanel() {
                 </label>
                 <label className="notes-field">
                   הערות כלליות
-                  <textarea value={generalNotes} onChange={(event) => setGeneralNotes(event.target.value)} />
+                  <textarea
+                    value={generalNotes}
+                    onChange={(event) => setGeneralNotes(event.target.value)}
+                    placeholder="למשל: האימון היה בשליטה, קל מדי או כבד מדי"
+                  />
                 </label>
               </div>
 
@@ -406,6 +433,13 @@ export function WorkoutsPanel() {
 
       <form className="composer" onSubmit={handleGenerate}>
         <label htmlFor="plan-request">בקשת תוכנית</label>
+        <div className="plan-template-row" aria-label="אופק תוכנית">
+          {PLAN_REQUEST_TEMPLATES.map((template) => (
+            <button className="ghost-button" type="button" key={template.label} onClick={() => setPrompt(template.prompt)}>
+              {template.label}
+            </button>
+          ))}
+        </div>
         <div className="composer-row">
           <textarea
             id="plan-request"
@@ -440,12 +474,21 @@ export function WorkoutsPanel() {
         </div>
       )}
 
+      {plan && isOneOffPlan(plan) && (
+        <div className="plan-replacement-panel" role="status">
+          <div>
+            <strong>זה אימון יחיד, לא תוכנית פעילה.</strong>
+            <p>התוכנית הפעילה והאימון הבא לא הוחלפו.</p>
+          </div>
+        </div>
+      )}
+
       {plan && (
         <div className="plan-view">
           <div className="plan-summary">
             <h4>{plan.name}</h4>
             {formatPlanType(plan.plan_type) && <span>{formatPlanType(plan.plan_type)}</span>}
-            {formatPlanDuration(plan) && <span>{formatPlanDuration(plan)}</span>}
+            {formatWorkoutPlanDuration(plan) && <span>{formatWorkoutPlanDuration(plan)}</span>}
             <span>{formatDaysPerWeek(plan.days_per_week)}</span>
             <span>{formatEquipment(plan.equipment_needed)}</span>
           </div>
@@ -460,11 +503,33 @@ export function WorkoutsPanel() {
                     <span>{formatSetCount(exercise.sets)}</span>
                     <span>{exercise.reps_or_duration}</span>
                     <span>{exercise.rest}</span>
+                    {exercise.notes ? <small>{exercise.notes}</small> : null}
+                    {exercise.alternatives?.length ? <small>חלופות: {exercise.alternatives.slice(0, 2).join(' / ')}</small> : null}
                   </div>
                 ))}
               </div>
             </article>
           ))}
+          {(plan.progression_schedule?.length || plan.tracking_guidance?.length) ? (
+            <section className="plan-guidance" aria-label="מעקב והתקדמות">
+              {plan.progression_schedule?.length ? (
+                <div>
+                  <strong>התקדמות לפי שבוע</strong>
+                  <ul>
+                    {plan.progression_schedule.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+              {plan.tracking_guidance?.length ? (
+                <div>
+                  <strong>מה לתעד</strong>
+                  <ul>
+                    {plan.tracking_guidance.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           <p className="plan-note">{plan.progression_rule}</p>
         </div>
       )}
@@ -478,7 +543,7 @@ export function WorkoutsPanel() {
               id="workout-log"
               value={logText}
               onChange={(event) => setLogText(event.target.value)}
-              placeholder='עשיתי 3 סטים של לחיצת חזה 10, 8, 7 חזרות עם 50 ק"ג.'
+              placeholder='עשיתי 3 סטים של לחיצת חזה 10, 8, 7 חזרות עם 50 ק"ג. היה קל מדי בלי כאב.'
             />
             <button className="primary-button icon-button" type="submit" disabled={logStatus === 'saving' || !logText.trim()}>
               שמירת תיעוד אימון
@@ -585,6 +650,10 @@ function validCandidatePlan(action: PendingAction | null): WorkoutPlan | null {
   return action.candidate_plan;
 }
 
+function isOneOffPlan(plan: WorkoutPlan): boolean {
+  return !plan.is_current && (plan.plan_type === 'single_workout' || plan.plan_type === 'single_session');
+}
+
 function executionExercisesFor(workout: NextWorkout): ExecutionPlanExercise[] {
   if (workout.execution_plan?.adjusted_exercises?.length) {
     return workout.execution_plan.adjusted_exercises;
@@ -638,13 +707,25 @@ function exerciseStatus(workoutStatus: WorkoutStatus, input: ExerciseFormState):
   return workoutStatus;
 }
 
+function needsProgressionGateTracking(exercise: ExecutionPlanExercise): boolean {
+  return exercise.adjustment === 'substitution_progression_gate';
+}
+
+const VERBAL_EFFORT_TERMS = ['קל מדי', 'כבד מדי', 'בשליטה', 'מאמץ', 'קשה', 'קל', 'כבד'];
+
+function hasVerbalEffortText(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return VERBAL_EFFORT_TERMS.some((term) => normalized.includes(term));
+}
+
 function validateStructuredLog(
   workoutStatus: WorkoutStatus,
   exerciseInputs: Record<number, ExerciseFormState>,
   overallRpe: string,
   overallRir: string,
   painFlag: boolean,
-  generalNotes: string
+  generalNotes: string,
+  executionExercises: ExecutionPlanExercise[] = []
 ): string | null {
   const inputs = Object.values(exerciseInputs);
   const painNotes = inputs.some((input) => input.notes.trim()) || Boolean(generalNotes.trim());
@@ -666,8 +747,24 @@ function validateStructuredLog(
     const rirError = rangeError(input.rir, 0, 10, 'RIR לתרגיל');
     if (rirError) return rirError;
   }
+  const missingGateRpe = executionExercises.some((exercise) => {
+    if (!needsProgressionGateTracking(exercise)) return false;
+    const exerciseId = executionExerciseId(exercise);
+    if (exerciseId === null) return false;
+    const input = exerciseInputs[exerciseId];
+    const attemptedGateExercise = workoutStatus === 'completed' || Boolean(input && hasExerciseInput(input));
+    const effortEvidence =
+      input?.rpe.trim() ||
+      overallRpe.trim() ||
+      hasVerbalEffortText(input?.notes ?? '') ||
+      hasVerbalEffortText(generalNotes);
+    return attemptedGateExercise && !effortEvidence;
+  });
+  if (workoutStatus !== 'skipped' && missingGateRpe) {
+    return 'שער התקדמות דורש RPE 1-10 כדי להתקדם; אם אינך יודע RPE, כתוב מאמץ מילולי ונשמור את הגרסה הנוכחית.';
+  }
   if (workoutStatus !== 'skipped' && inputs.length > 0 && !inputs.some(hasExerciseInput) && !overallRpe.trim() && !overallRir.trim() && !generalNotes.trim()) {
-    return 'כדי לשמור ביצוע מובנה, מלא לפחות חזרות לתרגיל אחד, RPE/RIR כללי או הערה קצרה.';
+    return 'כדי לשמור ביצוע מובנה, מלא לפחות חזרות לתרגיל אחד, RPE/RIR כללי או הערת מאמץ כמו קל מדי/כבד מדי/בשליטה.';
   }
   return null;
 }
@@ -683,17 +780,6 @@ function rangeError(value: string, min: number, max: number, label: string): str
 
 function formatDaysPerWeek(days: number): string {
   return days === 1 ? 'יום אחד בשבוע' : `${days} ימים בשבוע`;
-}
-
-function formatPlanType(planType?: string | null): string | null {
-  if (planType === 'single_session') return 'אימון יחיד';
-  if (planType === 'multi_week') return 'תוכנית רב-שבועית';
-  return null;
-}
-
-function formatPlanDuration(plan: WorkoutPlan): string | null {
-  const duration = plan.session_length_minutes ?? plan.days[0]?.estimated_duration_minutes;
-  return duration ? `${duration} דקות` : null;
 }
 
 function formatSetCount(sets: string): string {
@@ -731,5 +817,10 @@ function formatLoggedExercise(result: WorkoutLog['exercise_results'][number]): s
   const setEntries = Array.isArray(result.sets) ? result.sets : [];
   const reps = result.reps?.join(', ') || setEntries.map((set) => set.reps).filter((value) => value != null).join(', ');
   const weight = result.weight ?? setEntries.find((set) => set.weight)?.weight ?? '';
-  return [name, reps, weight].filter(Boolean).join(' ');
+  const effort = formatEffortSignal(result.effort_signal);
+  return [name, reps, weight, effort].filter(Boolean).join(' ');
+}
+
+function formatEffortSignal(signal?: string): string {
+  return { underloaded: 'קל מדי', too_hard: 'כבד מדי', controlled: 'בשליטה' }[signal ?? ''] ?? '';
 }

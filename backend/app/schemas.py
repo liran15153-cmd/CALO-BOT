@@ -12,11 +12,19 @@ Goal = Literal[
     "improve_consistency",
     "improve_strength",
     "improve_endurance",
+    "improve_mobility",
 ]
 Experience = Literal["beginner", "intermediate", "advanced"]
 TrainingLocation = Literal["home", "gym", "outdoors", "mixed"]
 CoachingStyle = Literal["direct", "supportive", "strict", "minimal", "detailed"]
-WorkoutPlanType = Literal["multi_week", "single_session"]
+WorkoutPlanType = Literal[
+    "single_workout",
+    "weekly_plan",
+    "two_week_plan",
+    "monthly_plan",
+    "multi_week",
+    "single_session",
+]
 ReadinessLevel = Literal["green", "yellow", "red"]
 WorkoutLogStatus = Literal["completed", "partial", "skipped", "modified"]
 
@@ -147,7 +155,7 @@ class StructuredWorkoutDay(BaseModel):
 class StructuredWorkoutPlan(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     goal: str = Field(min_length=1, max_length=120)
-    plan_type: WorkoutPlanType = "multi_week"
+    plan_type: WorkoutPlanType = "monthly_plan"
     training_split: str = Field(default="full_body", max_length=80)
     experience_level: str = Field(default="beginner", max_length=40)
     duration_weeks: int = Field(ge=1, le=4)
@@ -157,6 +165,8 @@ class StructuredWorkoutPlan(BaseModel):
     days: list[StructuredWorkoutDay] = Field(min_length=1)
     progression_rule: str = Field(min_length=1, max_length=1000)
     progression_model: str | None = Field(default=None, max_length=500)
+    progression_schedule: list[str] = Field(default_factory=list, max_length=4)
+    tracking_guidance: list[str] = Field(default_factory=list, max_length=6)
     recovery_note: str | None = Field(default=None, max_length=1000)
     safety_notes: list[str] = Field(default_factory=list)
     decision_inputs: dict[str, Any] = Field(default_factory=dict)

@@ -10,6 +10,7 @@
     "build": "npm --prefix frontend run build",
     "test": "node scripts/test.mjs",
     "test:backend": "python -m pytest backend/tests",
+    "test:memory-eval": "python -m backend.tests.eval.run_memory_gold_set",
     "test:frontend": "npm --prefix frontend test -- --run",
     "scan:secrets": "python scripts/secret_scan.py",
     "verify:supabase": "python scripts/verify_supabase_live.py",

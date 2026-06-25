@@ -1,10 +1,12 @@
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.db import init_db, make_engine
-from backend.app.models import ChatMessage, ChatSession, WorkoutLog
+from backend.app.models import ChatMessage, ChatSession, WorkoutLog, WorkoutPlan
 from backend.app.schemas import OnboardingPayload
+from backend.app.schemas import WorkoutPlanRequest
 from backend.app.services.context_builder import ContextBuilder
 from backend.app.services.profile_service import ProfileService
+from backend.app.services.workout_service import WorkoutService
 
 
 def test_context_builder_uses_compact_context_not_full_chat_history(tmp_path):
@@ -87,7 +89,6 @@ def test_context_builder_includes_training_status_from_recent_logs(tmp_path):
 def test_context_builder_includes_current_workout_plan_metadata(tmp_path):
     db = make_session(tmp_path)
     profile = ProfileService(db).upsert_onboarding(valid_payload())
-    from backend.app.models import WorkoutPlan
 
     db.add(
         WorkoutPlan(
@@ -98,10 +99,12 @@ def test_context_builder_includes_current_workout_plan_metadata(tmp_path):
             days_per_week=4,
             equipment_needed=["dumbbells"],
             plan_json={
-                "plan_type": "multi_week",
+                "plan_type": "monthly_plan",
                 "training_split": "upper_lower",
                 "experience_level": "intermediate",
                 "session_length_minutes": 50,
+                "progression_schedule": ["Week 1: calibrate"],
+                "tracking_guidance": ["Log RPE and pain after each workout."],
                 "source_refs": ["ACSM 2026 resistance training guidelines: https://acsm.org/resistance-training-guidelines-update-2026/"],
                 "decision_inputs": {"duration_weeks": 4},
             },
@@ -115,11 +118,65 @@ def test_context_builder_includes_current_workout_plan_metadata(tmp_path):
     context = ContextBuilder(db).build(user_id=profile.user_id, intent="workout_plan")
 
     plan = context["current_workout_plan"]
-    assert plan["plan_type"] == "multi_week"
+    assert plan["plan_type"] == "monthly_plan"
     assert plan["duration_weeks"] == 4
     assert plan["training_split"] == "upper_lower"
     assert plan["session_length_minutes"] == 50
+    assert plan["progression_schedule"] == ["Week 1: calibrate"]
+    assert plan["tracking_guidance"] == ["Log RPE and pain after each workout."]
     assert plan["source_refs"]
+
+
+def test_context_builder_includes_edited_plan_outline_and_recent_edits(tmp_path):
+    db = make_session(tmp_path)
+    profile = ProfileService(db).upsert_onboarding(valid_payload())
+    workout_service = WorkoutService(db)
+    workout_service.generate_plan(
+        user_id=profile.user_id,
+        request=WorkoutPlanRequest(
+            prompt="Create a 2-day dumbbell plan with bench",
+            days_per_week=2,
+            equipment=["dumbbells", "bench"],
+        ),
+    )
+    edit = workout_service.apply_scoped_plan_edit(
+        user_id=profile.user_id,
+        text="no bench in my plan, replace only what needs it",
+    )
+    assert edit["status"] == "updated"
+
+    context = ContextBuilder(db).build(user_id=profile.user_id, intent="general_chat")
+
+    plan = context["current_workout_plan"]
+    assert plan["workout_outline"]
+    assert plan["workout_outline"][0]["workout_id"]
+    assert plan["workout_outline"][0]["first_exercise"]["exercise_id"]
+    assert plan["recent_plan_edits"][-1]["edit_type"] == "remove_bench"
+    assert "bench" in plan["recent_plan_edits"][-1]["summary"]
+
+
+def test_context_builder_ignores_legacy_single_workout_marked_current(tmp_path):
+    db = make_session(tmp_path)
+    profile = ProfileService(db).upsert_onboarding(valid_payload())
+    db.add(
+        WorkoutPlan(
+            user_id=profile.user_id,
+            name="One-off workout",
+            goal="general_fitness",
+            duration_weeks=1,
+            days_per_week=1,
+            equipment_needed=["bodyweight"],
+            plan_json={"plan_type": "single_workout", "days": []},
+            progression_rule="Log only.",
+            recovery_note="Recover.",
+            is_current=True,
+        )
+    )
+    db.commit()
+
+    context = ContextBuilder(db).build(user_id=profile.user_id, intent="workout_plan")
+
+    assert context["current_workout_plan"] == {}
 
 
 def test_context_builder_includes_program_adaptation_summary_for_workout_log(tmp_path):

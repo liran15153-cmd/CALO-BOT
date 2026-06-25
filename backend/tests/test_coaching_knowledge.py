@@ -60,6 +60,9 @@ def test_workout_provider_context_keeps_prompt_budget_headroom():
     assert "nutrition_coaching_rules" not in workout_log_context
     assert "nutrition_coaching_rules" in general_context
     assert "nutrition_coaching_rules" in meal_context
+    assert any("לא לנחש" in item for item in workout_context["coaching_behavior"])
+    assert any("מאמץ מילולי" in item and "לא מספר" in item for item in workout_context["coaching_behavior"])
+    assert any("שער החלפה" in item and "RPE 1-10" in item and "כאב" in item for item in workout_context["coaching_behavior"])
     assert len(str(workout_context)) < 8350
     assert len(str(workout_log_context)) < 8350
 
@@ -71,9 +74,11 @@ def test_coaching_knowledge_contains_goal_and_scenario_playbooks():
     assert "improve_strength" in context["goal_playbooks"]
     assert "lose_fat" in context["goal_playbooks"]
     assert "improve_endurance" in context["goal_playbooks"]
+    assert "improve_mobility" in context["goal_playbooks"]
     assert any("נפח" in rule for rule in context["goal_playbooks"]["build_muscle"])
     assert any("כבד" in rule or "4-6" in rule for rule in context["goal_playbooks"]["improve_strength"])
     assert any("דיאטת קיצון" in rule for rule in context["goal_playbooks"]["lose_fat"])
+    assert any("טווח תנועה" in rule or "מוביליטי" in rule for rule in context["goal_playbooks"]["improve_mobility"])
     assert "missed_workout" in context["scenario_adjustments"]
     assert "short_time" in context["scenario_adjustments"]
     assert "low_sleep" in context["scenario_adjustments"]
@@ -93,6 +98,7 @@ def test_coaching_knowledge_contains_goal_specific_programming_rules():
         "muscular_endurance",
         "power",
         "fat_loss_support",
+        "mobility",
     ]:
         assert key in programming
         entry = programming[key]
@@ -104,11 +110,13 @@ def test_coaching_knowledge_contains_goal_specific_programming_rules():
         assert entry["programming_notes"]
 
     assert any("12-20" in item for item in programming["beginner_foundation"]["rep_range"])
+    assert any("talk test" in item and "מוביליטי" in item for item in programming["beginner_foundation"]["programming_notes"])
     assert any("1-5" in item for item in programming["strength"]["rep_range"])
     assert any("6-12" in item for item in programming["hypertrophy"]["rep_range"])
     assert any("12-20" in item for item in programming["muscular_endurance"]["rep_range"])
     assert any("8-10" in item for item in programming["power"]["rep_range"])
     assert any("צעדים" in item or "אירובי" in item for item in programming["fat_loss_support"]["programming_notes"])
+    assert any("טווח" in item for item in programming["mobility"]["programming_notes"])
     assert any(source["organization"] == "ACSM 2026 Resistance Training Position Stand" for source in context["sources"])
     assert any(source["organization"] == "NASM OPT Model" for source in context["sources"])
 
@@ -594,6 +602,8 @@ def test_coaching_knowledge_contains_weekly_structure_protocols():
         assert entry["avoid"]
 
     assert any("2-3" in item and ("גוף מלא" in item or "full-body" in item) for item in protocols["beginner_full_body"]["structure_rules"])
+    assert any("דגש רגליים" in item and "פלג עליון" in item for item in protocols["beginner_full_body"]["structure_rules"])
+    assert any("4 ימי full-body" in item and "ימים 3-4" in item and "RPE 5-7" in item for item in protocols["beginner_full_body"]["structure_rules"])
     assert any("upper/lower" in item or "עליון/תחתון" in item for item in protocols["intermediate_upper_lower"]["structure_rules"])
     assert any("push" in item and "pull" in item and "legs" in item for item in protocols["advanced_split"]["structure_rules"])
     assert any("48" in item or "יומיים" in item for item in protocols["recovery_spacing"]["structure_rules"])
@@ -628,6 +638,7 @@ def test_coaching_knowledge_contains_volume_progression_protocols():
     assert any("2-for-2" in item or ("2" in item and "שבועות" in item) for item in protocols["double_progression"]["progression_rules"])
     assert any("2-10%" in item or "2–10%" in item for item in protocols["double_progression"]["progression_rules"])
     assert any("RIR" in item and "RPE" in item for item in protocols["rir_rpe_autoregulation"]["progression_rules"])
+    assert any("RIR 0" in item and "RIR 4+" in item and "RIR 1-3" in item for item in protocols["rir_rpe_autoregulation"]["progression_rules"])
     assert any("חזרות" in item and "עומס" in item for item in protocols["progression_decision_order"]["progression_rules"])
     assert any(source["organization"] == "ACSM Progression Models in Resistance Training" for source in context["sources"])
     assert any(source["organization"] == "Schoenfeld Weekly Volume Meta-analysis" for source in context["sources"])
@@ -814,6 +825,19 @@ def test_coaching_knowledge_contains_load_prescription_protocols():
 
     assert any("RIR" in item for item in protocols["starting_load_selection"]["rules"])
     assert any("RPE" in item and "RIR" in item for item in protocols["rir_rpe_calibration"]["rules"])
+    assert any("RIR 0" in item and "RIR 4+" in item and "RIR 1-3" in item for item in protocols["rir_rpe_calibration"]["rules"])
+    assert any(
+        "לוג חופשי" in item and "מאמץ מילולי" in item and "שער התקדמות" in item and "כאב" in item
+        for item in protocols["rir_rpe_calibration"]["rules"]
+    )
+    assert any(
+        "RPE 8" in item and "בלי כאב" in item and "לוג תרגיל" in item
+        for item in protocols["rir_rpe_calibration"]["rules"]
+    )
+    assert any(
+        "לוג כללי" in item and "חזרות/RPE" in item
+        for item in protocols["rir_rpe_calibration"]["rules"]
+    )
     assert any("סט" in item and ("עומס" in item or "חזרות" in item) for item in protocols["set_to_set_adjustment"]["rules"])
     assert any("2-10%" in item or "2–10%" in item for item in protocols["next_session_load_decision"]["rules"])
     assert any("e1RM" in item or "1RM" in item for item in protocols["submax_strength_estimation"]["rules"])
@@ -831,6 +855,7 @@ def test_provider_context_includes_compact_load_prescription_summary_for_workout
     assert "load_prescription_summary" in workout_context
     summary = workout_context["load_prescription_summary"]
     assert any("RIR" in item and "עומס" in item for item in summary)
+    assert any("1-3" in item and "2-4" in item for item in summary)
     assert any("RPE" in item and ("שמור" in item or "הורד" in item) for item in summary)
     assert any("2-10%" in item or "קפיצה קטנה" in item for item in summary)
     assert any("e1RM" in item or "1RM" in item for item in summary)
@@ -1441,6 +1466,7 @@ def test_coaching_knowledge_contains_program_adaptation_protocols():
         "performance_plateau",
         "missed_sessions",
         "exercise_substitution",
+        "logged_pain_next_workout",
         "return_after_break",
     ]:
         assert key in protocols
@@ -1455,8 +1481,16 @@ def test_coaching_knowledge_contains_program_adaptation_protocols():
     assert any("RPE" in item or "sRPE" in item for item in protocols["high_effort_or_fatigue"]["trigger"])
     assert any("ביצועים" in item for item in protocols["performance_plateau"]["trigger"])
     assert any("גרסה קצרה" in item for item in protocols["missed_sessions"]["adjustment_options"])
+    assert any("שניים או יותר" in item and "גרסת מינימום" in item for item in protocols["missed_sessions"]["adjustment_options"])
+    assert any("NSCA Overtraining" in item for item in protocols["missed_sessions"]["source_refs"])
+    assert any("Planning Interventions" in item for item in protocols["missed_sessions"]["source_refs"])
     assert any("וריאציה" in item for item in protocols["exercise_substitution"]["adjustment_options"])
+    assert any("pain_flag" in item for item in protocols["logged_pain_next_workout"]["trigger"])
+    assert any("ברך" in item and "סקוואט לקופסה" in item for item in protocols["logged_pain_next_workout"]["coach_assessment"])
     assert any("נפח" in item and "נמוך" in item for item in protocols["return_after_break"]["adjustment_options"])
+    assert any("60-80%" in item for item in protocols["return_after_break"]["adjustment_options"])
+    assert any("Halonen" in item for item in protocols["return_after_break"]["source_refs"])
+    assert any("ACSM Progression" in item for item in protocols["return_after_break"]["source_refs"])
     assert any(source["organization"] == "ACSM Training Load Monitoring" for source in context["sources"])
     assert any(source["organization"] == "NSCA Overtraining and Recovery" for source in context["sources"])
     assert any(source["organization"] == "NASM Overtraining Signs" for source in context["sources"])
@@ -1481,6 +1515,7 @@ def test_provider_context_includes_compact_program_adaptation_summary_for_workou
     assert any("משתנה אחד" in item for item in summary)
     assert any("RPE" in item or "עייפות" in item for item in summary)
     assert any("plateau" in item or "ביצועים" in item for item in summary)
+    assert any("כאב" in item and "חלופות" in item for item in summary)
     assert "program_adaptation_protocols" not in workout_context
     assert "program_adaptation_summary" not in general_context
     assert len(str(workout_context)) < 8500
@@ -1780,16 +1815,122 @@ def test_provider_context_includes_compact_full_coach_summaries_for_workout_plan
     context = CoachingKnowledgeService().for_provider_context("workout_plan")
 
     assert "exercise_prescription_summary" in context
+    assert "plan_horizon_summary" in context
+    assert "plan_state_summary" in context
     assert "periodization_summary" in context
     assert "cardiorespiratory_summary" in context
     assert "warmup_mobility_summary" in context
     assert "adherence_coaching_summary" in context
     assert any("FITT-VP" in item for item in context["exercise_prescription_summary"])
+    assert any("אימון יחיד" in item and "שבועיים" in item for item in context["plan_horizon_summary"])
+    assert any("single_workout" in item and "monthly_plan" in item for item in context["plan_horizon_summary"])
+    assert any("כאב מעורפל" in item for item in context["plan_horizon_summary"])
+    assert any("one-off" in item and "מועמדת" in item and "עריכת פעילה" in item for item in context["plan_state_summary"])
     assert any("מזו" in item or "מיקרו" in item for item in context["periodization_summary"])
     assert any("talk test" in item or "RPE" in item for item in context["cardiorespiratory_summary"])
     assert any("חימום" in item for item in context["warmup_mobility_summary"])
     assert any("חסמים" in item for item in context["adherence_coaching_summary"])
     assert len(str(context)) < 9500
+
+
+def test_coaching_knowledge_contains_plan_horizon_protocols():
+    context = CoachingKnowledgeService().for_intent("workout_plan")
+    protocols = context["plan_horizon_protocols"]
+
+    assert {
+        "single_workout",
+        "weekly_plan",
+        "two_week_plan",
+        "monthly_plan",
+        "critical_info_policy",
+        "tracking_guidance_policy",
+        "progression_fallback_policy",
+        "plan_replacement_policy",
+        "scoped_plan_edit_policy",
+    } <= set(protocols)
+    assert any("לא להחליף תוכנית פעילה" in item for item in protocols["single_workout"]["rules"])
+    assert any("אימון להיום 20 דקות בלי ציוד" in item and "אימון יחיד" in item for item in protocols["single_workout"]["rules"])
+    assert any("מועמדת החלפה" in item and "one-off" in item for item in protocols["single_workout"]["rules"])
+    assert any("שבוע 2" in item for item in protocols["two_week_plan"]["rules"])
+    assert any("RPE/RIR" in item and "מאמץ מילולי לבד" in item for item in protocols["two_week_plan"]["rules"])
+    assert any("שבוע 4" in item for item in protocols["monthly_plan"]["rules"])
+    assert any("מתחיל" in item and "סטים" in item for item in protocols["monthly_plan"]["rules"])
+    assert any("דילואד אוטומטי" in item and "20-40%" in item for item in protocols["monthly_plan"]["rules"])
+    assert any("כאב" in item for item in protocols["critical_info_policy"]["rules"])
+    assert any("תבנה לי תוכנית" in item and "תזונה" in item for item in protocols["critical_info_policy"]["rules"])
+    assert any("לא ברור איפה" in item and "שאל שאלת בטיחות אחת" in item for item in protocols["critical_info_policy"]["rules"])
+    assert any("30 דקות" in item and "אימון יחיד" in item for item in protocols["critical_info_policy"]["rules"])
+    assert any("ACSM Preparticipation" in item for item in protocols["critical_info_policy"]["source_refs"])
+    assert any("RPE/RIR" in item for item in protocols["tracking_guidance_policy"]["rules"])
+    assert any("מאמץ מילולי לבד" in item and "לשמר" in item for item in protocols["tracking_guidance_policy"]["rules"])
+    assert any("סוף שבוע 2" in item for item in protocols["tracking_guidance_policy"]["rules"])
+    fallback_rules = protocols["progression_fallback_policy"]["rules"]
+    assert any("שבוע 2" in item and "שבוע 1" in item for item in fallback_rules)
+    assert any("מאמץ מילולי" in item and "RPE/RIR" in item for item in fallback_rules)
+    assert any("20-40%" in item and "נפח" in item for item in fallback_rules)
+    replacement_rules = protocols["plan_replacement_policy"]["rules"]
+    assert any("מועמדת" in item and "לא מחליפה אוטומטית" in item for item in replacement_rules)
+    assert any("תחליף לי את כל התוכנית" in item and "scoped edit" in item for item in replacement_rules)
+    assert any("כן להחליף" in item for item in replacement_rules)
+    assert any("לא בטוח" in item for item in replacement_rules)
+    edit_rules = protocols["scoped_plan_edit_policy"]["rules"]
+    assert any("שינוי נקודתי" in item and "תוכנית חדשה" in item for item in edit_rules)
+    assert any("ספסל" in item and "דפוס תנועה" in item for item in edit_rules)
+    assert any("כבל" in item and "דפוס התנועה" in item and "תוכנית חדשה" in item for item in edit_rules)
+    assert any("מכונת חתירה" in item and "משיכה אופקית" in item for item in edit_rules)
+    assert any("שכיבות סמיכה" in item and "regression" in item for item in edit_rules)
+    assert any("דדליפט" in item and "לא לנחש" in item for item in edit_rules)
+    assert any("RPE 8" in item and "שלב אחד" in item and "מאמץ מילולי" in item and "לא לנחש" in item for item in edit_rules)
+    assert any("לוג תרגיל" in item and "כאב או ציוד" in item and "חלופה קשה יותר" in item for item in edit_rules)
+    assert any("לוג כללי" in item and "לוג תרגיל" in item for item in edit_rules)
+    assert any("תשנה לי את התוכנית" in item for item in edit_rules)
+    assert any("ברך" in item and "סקוואט לקופסה" in item for item in edit_rules)
+    assert any("כתף" in item and "landmine press" in item for item in edit_rules)
+    assert any("גב תחתון" in item and "hip hinge" in item for item in edit_rules)
+    assert any("כאב ללא אזור" in item and "לא לשנות" in item for item in edit_rules)
+    assert any("כאב חזה" in item and "safety" in item for item in edit_rules)
+    implementation_rules = protocols["scoped_plan_edit_policy"]["implementation_rules"]
+    assert any("WorkoutExercise" in item and "plan_json" in item for item in implementation_rules)
+    assert any("WorkoutLog.workout_id" in item and "log history" in item for item in implementation_rules)
+    assert any("plan_edit_history" in item and "tracking action" in item for item in implementation_rules)
+    edit_sources = protocols["scoped_plan_edit_policy"]["source_refs"]
+    assert any("Mayo Clinic" in item for item in edit_sources)
+    assert any("AAFP" in item for item in edit_sources)
+    assert any("Landmine Press" in item for item in edit_sources)
+    assert any("Deadlift" in item for item in edit_sources)
+    assert any("Barbell Medicine" in item for item in edit_sources)
+    assert any("ACE Exercise Library" in item for item in edit_sources)
+    assert any("Runner's World" in item for item in edit_sources)
+    assert any("Movement Patterns" in item for item in edit_sources)
+    assert any("Inverted Row" in item for item in edit_sources)
+    assert any(source["organization"] == "Runner's World Strength Equipment Coach Reference" for source in context["sources"])
+
+
+def test_coaching_knowledge_contains_goal_specific_plan_protocols():
+    context = CoachingKnowledgeService().for_intent("workout_plan")
+    protocols = context["goal_specific_plan_protocols"]
+
+    assert {
+        "hypertrophy",
+        "strength",
+        "fat_loss_support",
+        "endurance",
+        "mobility",
+        "equipment_constraints",
+        "experience_level",
+    } <= set(protocols)
+    assert any("10 סטים" in item or "סטים לשריר" in item for item in protocols["hypertrophy"]["rules"])
+    assert any("1-3 RIR" in item or "כשל" in item for item in protocols["hypertrophy"]["rules"])
+    assert any("RPE" in item or "RIR" in item for item in protocols["strength"]["rules"])
+    assert any("לא שורפת שומן נקודתית" in item for item in protocols["fat_loss_support"]["rules"])
+    assert any("מנוחות" in item and "פגיעה בביצוע" in item for item in protocols["fat_loss_support"]["rules"])
+    assert any("talk test" in item or "RPE" in item for item in protocols["endurance"]["rules"])
+    assert any("מנוחות" in item and "RPE 5-7" in item for item in protocols["endurance"]["rules"])
+    assert any("טווח" in item and "כאב" in item for item in protocols["mobility"]["rules"])
+    assert any("מוביליטי" in item and "RPE" in item for item in protocols["mobility"]["rules"])
+    assert any("דפוס תנועה" in item for item in protocols["equipment_constraints"]["rules"])
+    assert any("מתחיל" in item and "2 סטים" in item and "RPE 5-7" in item for item in protocols["experience_level"]["rules"])
+    assert any("2-3 דקות" in item for item in protocols["strength"]["rules"])
 
 
 def test_provider_context_includes_compact_adherence_summary_for_general_chat():
@@ -1831,6 +1972,10 @@ def test_coaching_knowledge_contains_adherence_micro_protocols():
     assert any("אם" in item and "אז" in item for item in protocols["implementation_intention"]["rules"])
     assert any("2-10" in item or "מינימום" in item for item in protocols["minimum_viable_workout"]["rules"])
     assert any("לוג" in item and ("הבא" in item or "התאמה" in item) for item in protocols["self_monitoring_feedback"]["rules"])
+    assert any(
+        "שער התקדמות" in item and "RPE" in item and "כאב" in item
+        for item in protocols["self_monitoring_feedback"]["rules"]
+    )
     assert any("פספוס" in item and "עונש" in item for item in protocols["relapse_recovery"]["avoid"])
     assert any("אפשרויות" in item or "בחירה" in item for item in protocols["autonomy_choice"]["rules"])
     assert any(source["organization"] == "Motivational Interviewing Network of Trainers" for source in context["sources"])
@@ -1878,6 +2023,7 @@ def test_coaching_knowledge_contains_hebrew_coach_language_protocols():
     terminology_rules = protocols["terminology_register"]["rules"]
     assert any("RPE" in item and "1" in item and "10" in item for item in terminology_rules)
     assert any("RIR" in item and "חזרות" in item for item in terminology_rules)
+    assert any("קל מדי" in item and "כבד מדי" in item and "מאמץ מילולי" in item for item in terminology_rules)
     assert any("DOMS" in item and "כאבי שרירים" in item for item in terminology_rules)
     assert any("רפס" in item and "חזרות" in item for item in terminology_rules)
     assert any("סטים" in item and "חזרות" in item and "מערכות" in item for item in terminology_rules)
@@ -2027,10 +2173,23 @@ def test_provider_context_includes_compact_volume_progression_summary_for_workou
     assert any("10" in item and "סטים" in item for item in summary)
     assert any("2-for-2" in item or "2-10%" in item or "2–10%" in item for item in summary)
     assert any("RIR" in item and "RPE" in item for item in summary)
+    assert any("RIR 0" in item and "4+" in item for item in summary)
     assert "volume_progression_protocols" not in workout_context
     assert "volume_progression_summary" not in general_context
     assert "volume_progression_summary" not in meal_context
     assert len(str(workout_context)) < 8500
+
+
+def test_provider_context_includes_hebrew_beginner_split_guardrail_and_sources():
+    context = CoachingKnowledgeService().for_intent("workout_plan")
+    protocols = context["weekly_structure_protocols"]
+    workout_context = CoachingKnowledgeService().for_provider_context("workout_plan")
+
+    assert any("AB" in item for item in protocols["beginner_full_body"]["avoid"])
+    assert "Wingate Strength Training and Healthy Longevity" in protocols["beginner_full_body"]["source_refs"]
+    assert any("4" in item and "AB" in item for item in workout_context["weekly_structure_summary"])
+    assert any(source["organization"] == "Wingate Strength Training and Healthy Longevity" for source in context["sources"])
+    assert any(source["organization"] == "Fitnessophy Hebrew Workout Plans" for source in context["sources"])
 
 
 def test_coaching_knowledge_contains_advanced_strength_hypertrophy_protocols():
@@ -2200,9 +2359,19 @@ def test_coaching_knowledge_contains_progress_measurement_protocols():
     assert any("talk test" in item or "RPE" in item for item in protocols["cardio_progress"]["measures"])
     assert any("משקל" in item and "מגמה" in item for item in protocols["body_composition_trends"]["interpretation"])
     assert any("next action" in item or "פעולה" in item for item in protocols["adherence_dashboard_review"]["decision_rules"])
+    assert any(
+        "dashboard next action" in item and "RPE 8" in item and "שלב אחד" in item and "לא לנחש" in item
+        for item in protocols["adherence_dashboard_review"]["decision_rules"]
+    )
+    dashboard_implementation = protocols["adherence_dashboard_review"]["implementation_rules"]
+    assert any("WorkoutExercise" in item and "plan_json" in item for item in dashboard_implementation)
+    assert any("workout_id" in item and "exercise_id" in item for item in dashboard_implementation)
+    assert any("workout_outline" in item and "recent_plan_edits" in item for item in dashboard_implementation)
+    assert any("Current-plan chat summaries" in item and "full monthly plan" in item for item in dashboard_implementation)
     assert any("2-4" in item for item in protocols["reassessment_decision"]["decision_rules"])
     assert any(source["organization"] == "ACSM Fitness Assessment Manual" for source in context["sources"])
     assert any(source["organization"] == "ACE Client-Centered Assessments" for source in context["sources"])
+    assert any(source["organization"] == "ACE Ask-Offer-Ask" for source in context["sources"])
     assert any(source["organization"] == "CDC Physical Activity Tracking" for source in context["sources"])
     assert any(source["organization"] == "Resistance Training Monitoring Review" for source in context["sources"])
 

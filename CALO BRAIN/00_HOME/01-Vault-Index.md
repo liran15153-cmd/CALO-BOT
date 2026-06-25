@@ -48,6 +48,7 @@ notes: >-
   - [01-Pattern-Sources](01-Pattern-Sources.md)
   - [02-CALO-BRAIN-Specific-Decisions](02-CALO-BRAIN-Specific-Decisions.md)
   - [01-AI-Usage-Budget-Hardening-Plan](01-AI-Usage-Budget-Hardening-Plan.md)
+  - [03-Workout-Plan-Research-Progress](03-Workout-Plan-Research-Progress.md)
 - [07_DELIVERY](./07_DELIVERY)
   - [01-Release-Checklist](01-Release-Checklist.md)
   - [02-Definition-of-Done](02-Definition-of-Done.md)

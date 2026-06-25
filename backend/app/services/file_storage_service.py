@@ -60,8 +60,14 @@ class FileStorageService:
         if not self.settings.supabase_configured or not self.access_token:
             if self.settings.app_env == "production" or self.settings.supabase_auth_required:
                 raise ValueError(_SUPABASE_STORAGE_REQUIRED_MESSAGE)
+            root = self.upload_root.resolve()
             path = Path(image_path)
-            return path if path.is_absolute() else self.upload_root.resolve() / path
+            resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
+            try:
+                resolved.relative_to(root)
+            except (OSError, ValueError) as exc:
+                raise ValueError("תמונת הארוחה לא נמצאה") from exc
+            return resolved
 
         response = httpx.get(
             self._storage_object_url(image_path),

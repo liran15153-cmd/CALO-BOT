@@ -88,6 +88,20 @@ def test_meal_image_download_rejects_local_file_fallback_in_production(tmp_path)
         raise AssertionError("local download fallback should be rejected in production")
 
 
+def test_meal_image_download_rejects_local_paths_outside_upload_root(tmp_path):
+    service = FileStorageService(
+        tmp_path / "uploads",
+        settings=Settings(_env_file=None),
+    )
+
+    try:
+        service.download_meal_image("../outside.jpg")
+    except ValueError as exc:
+        assert "תמונת הארוחה לא נמצאה" in str(exc)
+    else:
+        raise AssertionError("local download path traversal should be rejected")
+
+
 def test_supabase_meal_image_path_uses_auth_user_id(tmp_path, monkeypatch):
     requests = []
     service = FileStorageService(

@@ -2,6 +2,7 @@ import { CalendarCheck, Dumbbell, Flame, NotebookText, Utensils } from 'lucide-r
 import { useEffect, useState } from 'react';
 
 import { fetchDashboard, type DashboardState } from './api';
+import { formatPlanSessionLength, formatPlanType, formatPlanWeeks } from './planFormatters';
 
 export function DashboardPanel() {
   const [dashboard, setDashboard] = useState<DashboardState | null>(null);
@@ -42,12 +43,13 @@ export function DashboardPanel() {
   }
 
   const nutritionRange = formatNutritionRange(dashboard.estimated_nutrition_range);
+  const currentPlanSummary = formatCurrentPlanSummary(dashboard.current_workout_plan);
 
   return (
     <section className="panel dashboard-panel">
       <div className="panel-heading">
         <h3>{formatGoal(dashboard.current_goal)}</h3>
-        <p>{dashboard.current_workout_plan?.name ?? 'השלם פרופיל כדי ליצור את התוכנית הראשונה שלך.'}</p>
+        <p>{currentPlanSummary ?? 'השלם פרופיל כדי ליצור את התוכנית הראשונה שלך.'}</p>
       </div>
 
       <div className="metric-grid" aria-label="מדדים שבועיים">
@@ -88,6 +90,7 @@ export function DashboardPanel() {
               <span className="next-action-signal">{formatLoadSignal(dashboard.next_workout.load_signal)}</span>
             </div>
           ) : null}
+          {dashboard.next_workout?.first_exercise ? <p>{formatFirstExercise(dashboard.next_workout.first_exercise)}</p> : null}
           <p>{dashboard.next_recommended_action}</p>
         </div>
       </div>
@@ -123,6 +126,16 @@ function formatProteinRange(range: DashboardState['estimated_protein_range_today
   return `${range[0]}-${range[1]} גרם חלבון`;
 }
 
+function formatCurrentPlanSummary(plan: DashboardState['current_workout_plan']): string | null {
+  if (!plan) return null;
+  const details = [
+    formatPlanType(plan.plan_type),
+    formatPlanWeeks(plan.plan_type, plan.duration_weeks),
+    formatPlanSessionLength(plan.plan_type, plan.session_length_minutes)
+  ].filter(Boolean);
+  return details.length ? `${plan.name} | ${details.join(' | ')}` : plan.name;
+}
+
 function formatMealCountToday(value: number): string {
   return value === 1 ? 'ארוחה אחת היום' : `${value} ארוחות היום`;
 }
@@ -139,6 +152,13 @@ function formatLoadSignal(signal?: string | null): string {
   );
 }
 
+function formatFirstExercise(exercise: NonNullable<NonNullable<DashboardState['next_workout']>['first_exercise']>): string {
+  const prescription = [exercise.sets, exercise.reps_or_duration, exercise.rest ? `מנוחה ${exercise.rest}` : null].filter(Boolean);
+  return prescription.length
+    ? `פותחים: ${exercise.name ?? 'התרגיל הראשון'} | ${prescription.join(' | ')}`
+    : `פותחים: ${exercise.name ?? 'התרגיל הראשון'}`;
+}
+
 function formatGoal(goal: string | null): string {
   if (!goal) return 'לא הוגדרה מטרה';
   return (
@@ -149,7 +169,8 @@ function formatGoal(goal: string | null): string {
       maintain_health: 'שמירה על בריאות',
       improve_consistency: 'שיפור עקביות',
       improve_strength: 'שיפור כוח',
-      improve_endurance: 'שיפור סבולת'
+      improve_endurance: 'שיפור סבולת',
+      improve_mobility: 'שיפור מוביליטי'
     }[goal] ?? 'מטרה לא מוכרת'
   );
 }

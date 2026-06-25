@@ -634,6 +634,17 @@ button {
   gap: 10px;
 }
 
+.plan-template-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.plan-template-row .ghost-button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .composer textarea {
   width: 100%;
   min-height: 72px;
@@ -866,6 +877,34 @@ button {
 .exercise-row small.adjustment-explanation {
   color: var(--accent-strong);
   font-weight: 500;
+}
+
+.plan-guidance {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.plan-guidance div {
+  display: grid;
+  gap: 6px;
+}
+
+.plan-guidance strong {
+  font-size: 14px;
+}
+
+.plan-guidance ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--muted);
+}
+
+.plan-guidance li {
+  line-height: 1.45;
 }
 
 .inline-section {

@@ -17,5 +17,6 @@ function run(command, args) {
 }
 
 run('python', ['scripts/secret_scan.py']);
+run('python', ['-m', 'backend.tests.eval.run_memory_gold_set']);
 run('python', ['-m', 'pytest', 'backend/tests', '--basetemp=.pytest-tmp']);
 run('npm', ['--prefix', 'frontend', 'test', '--', '--run']);

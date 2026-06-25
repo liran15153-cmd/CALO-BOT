@@ -66,7 +66,7 @@ Manual API user-isolation check:
 
 1. Create two Supabase Auth users.
 2. Run the backend with `SUPABASE_AUTH_REQUIRED=true`, `SUPABASE_URL`, `SUPABASE_JWKS_URL`, `SUPABASE_PUBLISHABLE_KEY`, and Supabase Postgres `DATABASE_URL`.
-3. Sign in as user A and create onboarding, chat, workout log, meal log, body metric, and memory summary.
+3. Sign in as user A and create onboarding, chat, workout log, meal log, and body metric.
 4. Sign in as user B and confirm user A data is not returned by API routes or by direct Data API requests with user B's JWT.
 
 ## Security Notes
@@ -78,5 +78,5 @@ Manual API user-isolation check:
 - Supabase is used backend-only for CALO data tables. Do not add direct client-side Data API table access without a separate RLS/grants/user-isolation review.
 - Supabase Auth access tokens are validated locally against `SUPABASE_JWKS_URL`; the JWKS URL must belong to the same project ref as `SUPABASE_URL`.
 - Supabase Storage meal images must stay in a private bucket under `<auth_user_id>/<date>/<uuid>.<ext>`. Browser access should use short-lived signed URLs through the backend, not public object URLs.
-- Coach intent routing, safety rules, workout planning, meal estimation, memory extraction, and usage limits remain backend services.
+- Coach intent routing, safety rules, workout planning, meal estimation, safety memory facts, context assembly, and usage limits remain backend services.
 - Local meal-image file storage is a development fallback for SQLite/no-auth mode only. Production or `SUPABASE_AUTH_REQUIRED=true` must use the private Supabase `meal-images` bucket.

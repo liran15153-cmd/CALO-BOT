@@ -16,17 +16,27 @@ from backend.app.services.language_guard import (
     repair_hebrew_coach_response,
 )
 from backend.app.services.meal_service import MealService
+from backend.app.services.memory_service import MemoryService
 from backend.app.services.pending_action_service import PendingActionService
-from backend.app.services.pain_text import extract_pain_area
+from backend.app.services.pain_text import extract_pain_area, has_explicit_pain_status, vague_pain_plan_clarification_response
 from backend.app.services.profile_service import ProfileService
 from backend.app.services.safety_service import SafetyService
 from backend.app.services.token_budgeting import build_optimized_chat_request
 from backend.app.services.usage_service import UsageService
+from backend.app.services.workout_plan_builder import is_persistent_plan_type, is_single_workout_plan
 from backend.app.services.workout_service import WorkoutService
 
 
 COACH_CHAT_MAX_OUTPUT_TOKENS = 320
 ToolResult = str | tuple[str, dict[str, Any]]
+_PLAN_EDIT_RESPONSE_SUMMARIES = {
+    "remove_bench": "הסרתי שימוש בספסל והחלפתי תרגילים או חלופות שדרשו ספסל.",
+    "remove_cable": "הסרתי שימוש בכבל/פולי והחלפתי תרגילים או חלופות שדרשו כבל.",
+    "replace_row_machine": "החלפתי חתירה במכונה לחלופת משיכה שמתאימה לציוד זמין.",
+    "regress_pushup": "העברתי שכיבות סמיכה לגרסה קלה יותר מאותו דפוס תנועה.",
+    "pain_substitution": "עדכנתי רק את התרגילים הרלוונטיים סביב הכאב, בלי לאבחן ובלי לבנות תוכנית חדשה.",
+    "reduce_volume": "הורדתי נפח בתוכנית הפעילה בלי לשנות את כל המבנה.",
+}
 
 
 class CoachEngine:
@@ -50,9 +60,16 @@ class CoachEngine:
         )
 
         safety = SafetyService(self.db)
+        memory = MemoryService(self.db)
         safety_result = safety.classify(payload.message)
         if safety_result.flagged:
-            safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
+            safety_event = safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
+            memory.process_user_message(
+                user_id=user.id,
+                text=payload.message,
+                source_message_id=user_message.id,
+                safety_event_id=safety_event.id,
+            )
             UsageService(self.db).record(
                 user_id=user.id,
                 task="chat",
@@ -81,9 +98,17 @@ class CoachEngine:
         # carry the pain area forward so downstream paths (plan generation, response
         # wrappers) can acknowledge it and adapt rather than refusing.
         pain_area: str | None = None
+        safety_event_id: int | None = None
         if safety_result.event_type == "pain_signal":
-            safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
+            safety_event = safety.record_event(user_id=user.id, source_text=payload.message, result=safety_result)
+            safety_event_id = safety_event.id
             pain_area = extract_pain_area(payload.message)
+        memory.process_user_message(
+            user_id=user.id,
+            text=payload.message,
+            source_message_id=user_message.id,
+            safety_event_id=safety_event_id,
+        )
 
         pending_tool_response = self._handle_pending_plan_action(
             user_id=user.id,
@@ -111,7 +136,9 @@ class CoachEngine:
             user_message_id=user_message.id,
             intent_name=intent.name,
             payload_text=intent.payload_text,
+            raw_text=payload.message,
             pain_area=pain_area,
+            pain_signal=safety_result.event_type == "pain_signal",
         )
         if tool_response is not None:
             response_text, response_metadata = _unpack_tool_result(tool_response)
@@ -410,9 +437,16 @@ class CoachEngine:
         user_message_id: int,
         intent_name: str,
         payload_text: str,
+        raw_text: str | None = None,
         pain_area: str | None = None,
+        pain_signal: bool = False,
     ) -> ToolResult | None:
         if intent_name == "workout_plan":
+            if pain_signal and pain_area is None:
+                return (
+                    vague_pain_plan_clarification_response(),
+                    {"missing_critical_info": "pain_area"},
+                )
             limitations = f"רגישות ב{pain_area}" if pain_area else None
             workout_service = WorkoutService(self.db)
             current_before = workout_service.current_plan(user_id=user_id)
@@ -423,9 +457,10 @@ class CoachEngine:
             serialized = WorkoutService.serialize_plan(plan)
             is_replacement_candidate = (
                 current_before is not None
+                and not is_single_workout_plan((current_before.plan_json or {}).get("plan_type"))
                 and current_before.id != plan.id
                 and not plan.is_current
-                and serialized.get("plan_type") == "multi_week"
+                and is_persistent_plan_type(serialized.get("plan_type"))
             )
             metadata = {}
             if is_replacement_candidate:
@@ -446,9 +481,57 @@ class CoachEngine:
                 metadata,
             )
 
+        if intent_name == "workout_plan_edit":
+            result = WorkoutService(self.db).apply_scoped_plan_edit(user_id=user_id, text=payload_text)
+            return (
+                result["message"],
+                {
+                    "plan_edit_status": result["status"],
+                    "plan_edit_type": result["edit_type"],
+                    "changed_exercises": result["changed_exercises"],
+                },
+            )
+
+        if intent_name == "workout_plan_change_summary":
+            return (
+                _workout_plan_change_summary_response(WorkoutService(self.db).current_plan(user_id=user_id)),
+                {"plan_change_summary": True},
+            )
+
+        if intent_name == "current_workout_plan_summary":
+            workout_service = WorkoutService(self.db)
+            return (
+                _current_workout_plan_summary_response(
+                    workout_service.current_plan(user_id=user_id),
+                    workout_service=workout_service,
+                ),
+                {"current_workout_plan_summary": True},
+            )
+
+        if intent_name == "next_workout_summary":
+            next_workout = WorkoutService(self.db).next_workout(user_id=user_id)
+            return (
+                _next_workout_summary_response(next_workout),
+                _next_workout_summary_metadata(next_workout),
+            )
+
         if intent_name == "workout_log":
-            log = WorkoutService(self.db).parse_log(user_id=user_id, request=WorkoutLogRequest(text=payload_text))
-            return f"רשמתי את האימון. {_workout_log_coach_response(log)}"
+            workout_service = WorkoutService(self.db)
+            next_workout = workout_service.next_workout(user_id=user_id)
+            workout_id = (
+                next_workout.get("id")
+                if next_workout and _text_log_targets_next_workout(raw_text or payload_text, next_workout)
+                else None
+            )
+            log = workout_service.log_workout(
+                user_id=user_id,
+                request=WorkoutLogRequest(text=payload_text, workout_id=workout_id),
+            )
+            gate = _progression_gate_from_next_workout(next_workout) if workout_id else None
+            return (
+                "רשמתי את האימון. "
+                f"{_workout_log_coach_response(log, progression_gate=gate, pain_status_known=_text_has_explicit_pain_status(payload_text))}"
+            )
 
         if intent_name == "meal_log":
             meal = MealService(self.db).log_manual_meal(user_id=user_id, request=MealTextRequest(text=payload_text))
@@ -468,6 +551,9 @@ class CoachEngine:
 
         if intent_name == "missed_workout_guidance":
             return _missed_workout_guidance_response()
+
+        if intent_name == "return_after_break_guidance":
+            return _return_after_break_guidance_response()
 
         if intent_name == "weekly_action_plan_guidance":
             return _weekly_action_plan_guidance_response()
@@ -517,45 +603,178 @@ def _append_secondary_intent_prompt(response_text: str, secondary_intent: str) -
 
 
 def _confirms_plan_replacement(text: str) -> bool:
-    normalized = text.lower().strip()
-    return any(
+    normalized = _normalize_plan_replacement_decision(text)
+    if _has_plan_replacement_question_framing(normalized):
+        return False
+    if normalized in {"כן", "מאשר", "מאשרת", "yes", "confirm"}:
+        return True
+    explicit_action = any(
         phrase in normalized
         for phrase in [
-            "כן",
-            "מאשר",
             "תחליף",
             "תמחק",
             "מחק",
             "החלף",
             "להחליף",
-            "החדשה",
-            "yes",
+            "הפעל את החדשה",
+            "תפעיל את החדשה",
+            "כן להחליף",
+            "yes replace",
             "replace",
             "delete old",
-            "save new",
             "activate",
+        ]
+    )
+    if explicit_action:
+        return True
+    tokens = set(normalized.split())
+    return bool({"כן", "yes"} & tokens) and any(
+        phrase in normalized for phrase in ["החדשה", "להחליף", "תמחק", "תחליף", "replace", "activate"]
+    )
+
+
+def _has_plan_replacement_question_framing(text: str) -> bool:
+    return "?" in text or any(
+        marker in text
+        for marker in [
+            "מה זה",
+            "מה אומר",
+            "מה המשמעות",
+            "מה ההבדל",
+            "איך",
+            "למה",
+            "האם",
+            "תסביר",
+            "הסבר",
+            "what",
+            "how",
+            "why",
+            "explain",
+            "difference",
         ]
     )
 
 
 def _declines_plan_replacement(text: str) -> bool:
-    normalized = text.lower().strip()
+    normalized = _normalize_plan_replacement_decision(text)
+    if _has_plan_replacement_question_framing(normalized):
+        return False
+    if normalized in {"לא", "no", "cancel", "עזוב", "עזבי"}:
+        return True
     return any(
         phrase in normalized
         for phrase in [
-            "לא",
             "אל תחליף",
+            "אל תחליפי",
             "אל תמחק",
-            "עזוב",
+            "אל תמחקי",
+            "לא להחליף",
+            "לא למחוק",
             "תשאיר",
+            "תשאירי",
             "השאר",
+            "השאירי",
             "תשאיר את הקיימת",
-            "no",
-            "cancel",
+            "להשאיר קיימת",
             "keep old",
             "keep current",
+            "keep existing",
         ]
     )
+
+
+def _normalize_plan_replacement_decision(text: str) -> str:
+    normalized = text.lower().strip()
+    normalized = re.sub(r"[\"'`.,!?;:(){}\[\]\-]+", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _workout_plan_change_summary_response(plan) -> str:
+    if plan is None:
+        return "אין כרגע תוכנית אימון פעילה שאפשר לסכם. הפעולה הבאה: לבנות תוכנית שבועית, לשבועיים או חודשית."
+    edit_history = list((plan.plan_json or {}).get("plan_edit_history") or [])
+    if not edit_history:
+        return (
+            "לא מצאתי עריכת תוכנית שמורה בתוכנית הפעילה. "
+            "הפעולה הבאה: לבצע את האימון הבא ולתעד RPE או מאמץ מילולי, כאב ומה הושלם."
+        )
+    latest = edit_history[-1]
+    edit_type = str(latest.get("edit_type") or "scoped_edit")
+    summary = _PLAN_EDIT_RESPONSE_SUMMARIES.get(edit_type, "עשיתי שינוי נקודתי בתוכנית הפעילה בלי לבנות תוכנית חדשה.")
+    changed = latest.get("changed_exercises")
+    changed_text = f" זה נגע ב-{changed} תרגילים/חלופות." if isinstance(changed, int) and changed > 0 else ""
+    return (
+        f"השינוי האחרון בתוכנית: {summary}{changed_text} "
+        "לא החלפתי את כל התוכנית. הפעולה הבאה: באימון הקרוב לבצע את הגרסה המעודכנת ולתעד RPE או מאמץ מילולי, כאב ומה הושלם."
+    )
+
+
+def _current_workout_plan_summary_response(plan, *, workout_service: WorkoutService) -> str:
+    if plan is None:
+        return "אין כרגע תוכנית אימון פעילה. הפעולה הבאה: לבקש תוכנית שבועית, לשבועיים או חודשית לפי הזמינות והציוד שלך."
+    serialized = workout_service.serialize_plan_with_rows(plan)
+    days = serialized.get("days") or []
+    plan_type = serialized.get("plan_type") or "monthly_plan"
+    days_per_week = serialized.get("days_per_week") or plan.days_per_week
+    duration_weeks = serialized.get("duration_weeks") or plan.duration_weeks
+    day_summaries = []
+    for day in days[:3]:
+        exercises = day.get("exercises") or []
+        first_exercise = (exercises[0] or {}).get("name") if exercises else None
+        if first_exercise:
+            day_summaries.append(f"{day.get('name')}: מתחיל ב-{first_exercise}")
+        elif day.get("name"):
+            day_summaries.append(str(day.get("name")))
+    days_text = "; ".join(day_summaries) if day_summaries else "אין פירוט ימים זמין כרגע."
+    more_text = f" ועוד {len(days) - 3} ימים." if len(days) > 3 else "."
+    return (
+        f"התוכנית הפעילה שלך: {serialized.get('name') or plan.name}. "
+        f"סוג: {plan_type}, משך {duration_weeks} שבועות, {days_per_week} ימים בשבוע. "
+        f"תקציר ימים: {days_text}{more_text} "
+        "אני לא מדביק כאן את כל התוכנית כדי לא להפוך את הצ׳אט לדאמפ ארוך; היא שמורה כתוכנית מובנית. "
+        "הפעולה הבאה: לפתוח את האימון הבא ולתעד RPE או מאמץ מילולי, כאב ומה הושלם."
+    )
+
+
+def _next_workout_summary_response(next_workout: dict[str, Any] | None) -> str:
+    if next_workout is None:
+        return "אין כרגע אימון הבא כי אין תוכנית פעילה. הפעולה הבאה: לבקש תוכנית שבועית, לשבועיים או חודשית לפי הזמינות והציוד שלך."
+    plan = next_workout.get("plan") or {}
+    execution_plan = next_workout.get("execution_plan") or {}
+    adaptation = next_workout.get("adaptation") or {}
+    exercises = execution_plan.get("adjusted_exercises") or next_workout.get("exercises") or []
+    exercise_lines = []
+    for exercise in exercises[:4]:
+        name = exercise.get("name") or "תרגיל"
+        sets = exercise.get("sets") or "-"
+        reps = exercise.get("reps_or_duration") or "-"
+        rest = exercise.get("rest") or "-"
+        exercise_lines.append(f"{name}: {sets} סטים, {reps}, מנוחה {rest}")
+    exercises_text = "; ".join(exercise_lines) if exercise_lines else "אין פירוט תרגילים זמין כרגע."
+    more_text = f" ועוד {len(exercises) - 4} תרגילים." if len(exercises) > 4 else "."
+    load_summary = execution_plan.get("summary") or adaptation.get("next_adjustment") or "לבצע לפי התוכנית הנוכחית."
+    gate = _progression_gate_from_next_workout(next_workout)
+    gate_text = f" שער התקדמות: {gate.get('execution_note')}" if gate else ""
+    plan_text = f" מתוך {plan.get('name')}" if plan.get("name") else ""
+    return (
+        f"האימון הבא שלך: {next_workout.get('name') or 'האימון הבא'}{plan_text}. "
+        f"הנחיית ביצוע: {load_summary} "
+        f"תרגילים ראשונים: {exercises_text}{more_text}{gate_text} "
+        "הפעולה הבאה: לבצע את האימון הזה ולתעד לכל הפחות מה הושלם, RPE או מאמץ מילולי, והאם היה כאב."
+    )
+
+
+def _next_workout_summary_metadata(next_workout: dict[str, Any] | None) -> dict[str, Any]:
+    if next_workout is None:
+        return {"next_workout_summary": True, "next_workout_id": None, "exercise_ids": []}
+    execution_plan = next_workout.get("execution_plan") or {}
+    exercises = execution_plan.get("adjusted_exercises") or next_workout.get("exercises") or []
+    return {
+        "next_workout_summary": True,
+        "next_workout_id": next_workout.get("id"),
+        "exercise_ids": [exercise.get("exercise_id") for exercise in exercises if exercise.get("exercise_id")],
+    }
+
 
 
 def _workout_plan_saved_response(
@@ -565,38 +784,199 @@ def _workout_plan_saved_response(
     replacement_candidate: bool = False,
 ) -> str:
     name = _natural_plan_name(str(serialized.get("name") or "תוכנית אימון"))
-    if serialized.get("plan_type") == "single_session":
-        body = f"אימון יחיד מוכן: {name}. זה אימון חד-פעמי ולא מחליף את התוכנית הפעילה."
+    assumptions_text = _plan_assumptions_text(serialized)
+    weekly_spacing_text = _plan_weekly_spacing_text(serialized)
+    horizon_text = _plan_horizon_text(serialized)
+    if is_single_workout_plan(serialized.get("plan_type")):
+        body = (
+            f"אימון יחיד מוכן: {name}. {assumptions_text}"
+            "זה אימון חד-פעמי ולא מחליף את התוכנית הפעילה. "
+            f"{_first_workout_next_action(serialized, single_workout=True)}"
+        )
     else:
         days_per_week = serialized.get("days_per_week")
         days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
         if replacement_candidate:
             body = (
-                f"בניתי תוכנית חדשה: {name}, {days_text}. "
+                f"בניתי תוכנית חדשה: {name}, {days_text}. {assumptions_text}{weekly_spacing_text}{horizon_text}"
+                f"{_first_workout_preview(serialized)}"
                 "היא לא מחליפה עדיין את התוכנית הפעילה. "
-                "רוצה למחוק את הישנה ולהפוך את החדשה לתוכנית הפעילה?"
+                "רוצה למחוק את הישנה ולהפוך את החדשה לתוכנית הפעילה? "
+                "הפעולה הבאה: לענות 'כן להחליף' כדי להפעיל אותה, או 'להשאיר קיימת' כדי למחוק את המועמדת."
             )
         else:
-            body = f"תוכנית אימון מוכנה: {name} עם {days_text}. הפעולה הבאה: לעבור על היום הראשון ולוודא שהעומס מתאים."
+            body = (
+                f"תוכנית אימון מוכנה: {name} עם {days_text}. {assumptions_text}{weekly_spacing_text}{horizon_text}"
+                f"{_first_workout_next_action(serialized)}"
+            )
 
     if pain_area:
         ack = (
-            f"שמתי לב שציינת כאב ב{pain_area}. בניתי את התוכנית סביב זה, עם תרגילים שמכבדים את הטווח. "
-            "אם הכאב חוזר, מחמיר או חד — לעצור, ולא לדחוף דרך כאב. אם יש סימן רציני, לפנות לאיש מקצוע מוסמך."
+            f"שמתי לב שציינת כאב ב{pain_area}. זו לא אבחנה; התאמתי את התוכנית שמרנית לטווח ללא כאב. "
+            "אם הכאב חוזר, מחמיר או חד - לעצור, ולא לדחוף דרך כאב. אם יש סימן רציני, לפנות לאיש מקצוע מוסמך."
         )
         return f"{ack} {body}"
 
     return body
 
 
+def _first_workout_next_action(serialized: dict, *, single_workout: bool = False) -> str:
+    days = serialized.get("days") or []
+    first_day = days[0] if days else {}
+    day_name = str(first_day.get("name") or "היום הראשון")
+    exercises = first_day.get("exercises") or []
+    first_exercise = str((exercises[0] or {}).get("name") or "התרגיל הראשון") if exercises else "התרגיל הראשון"
+    if single_workout:
+        return f"הפעולה הבאה: להתחיל ב{first_exercise}, לבצע את שאר האימון לפי הסדר, ולתעד RPE או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+    return f"הפעולה הבאה: להתחיל מ{day_name}, תרגיל ראשון {first_exercise}, ואז לתעד RPE או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+
+
+def _first_workout_preview(serialized: dict) -> str:
+    days = serialized.get("days") or []
+    first_day = days[0] if days else {}
+    exercises = first_day.get("exercises") or []
+    if not exercises:
+        return ""
+    first_exercise = str((exercises[0] or {}).get("name") or "").strip()
+    if not first_exercise:
+        return ""
+    return f"האימון הראשון בתוכנית החדשה מתחיל ב{first_exercise}. "
+
+
+def _plan_assumptions_text(serialized: dict) -> str:
+    assumptions = (serialized.get("decision_inputs") or {}).get("assumptions") or []
+    if not assumptions:
+        return ""
+    visible = _visible_plan_assumptions(assumptions)
+    if not visible:
+        return ""
+    return f"הנחות: {'; '.join(visible)}. "
+
+
+def _visible_plan_assumptions(assumptions: list[str]) -> list[str]:
+    cleaned = [str(assumption).strip().rstrip(".") for assumption in assumptions if str(assumption).strip()]
+    if not cleaned:
+        return []
+    priorities = [
+        ("ימי אימון", "אימונים בשבוע"),
+        ("משך אימון", "דקות"),
+        ("ציוד", "משקל גוף"),
+        ("אופק תוכנית", "תוכנית חודשית"),
+        ("מטרה", "שיפור כושר"),
+        ("רמת ניסיון", "מתחיל/ה"),
+    ]
+    selected: list[str] = []
+    for terms in priorities:
+        match = next((item for item in cleaned if item not in selected and any(term in item for term in terms)), None)
+        if match:
+            selected.append(match)
+        if len(selected) >= 3:
+            return selected
+    for item in cleaned:
+        if item not in selected:
+            selected.append(item)
+        if len(selected) >= 3:
+            break
+    return selected
+
+
+def _plan_weekly_spacing_text(serialized: dict) -> str:
+    days_per_week = serialized.get("days_per_week") or 0
+    if days_per_week < 4:
+        return ""
+    guidance = (serialized.get("decision_inputs") or {}).get("weekly_spacing_guidance")
+    if not guidance:
+        return ""
+    first_sentence = str(guidance).strip().split(".")[0].strip()
+    if not first_sentence:
+        return ""
+    return f"{first_sentence}. "
+
+
+def _plan_horizon_text(serialized: dict) -> str:
+    plan_type = str(serialized.get("plan_type") or "")
+    keyword_sets = {
+        "weekly_plan": ("בסוף השבוע",),
+        "two_week_plan": ("שבוע 1", "שבוע 2"),
+        "monthly_plan": ("בסוף כל שבוע",),
+    }
+    keywords = keyword_sets.get(plan_type)
+    if not keywords:
+        return ""
+    label = _natural_plan_name(plan_type)
+    for item in serialized.get("tracking_guidance") or []:
+        text = str(item).strip().rstrip(".")
+        if text and all(keyword in text for keyword in keywords):
+            return f"{label}: {text}. "
+    return f"{label}: לתעד RPE או מאמץ מילולי, כאב והשלמות לפני שינוי עומס או נפח. "
+
+
 def _activated_plan_response(serialized: dict) -> str:
     name = _natural_plan_name(str(serialized.get("name") or "תוכנית אימון"))
     days_per_week = serialized.get("days_per_week")
     days_text = "יום אחד בשבוע" if days_per_week == 1 else f"{days_per_week} ימים בשבוע"
-    return f"התוכנית החדשה פעילה עכשיו: {name}, {days_text}. הפעולה הבאה: להתחיל מהאימון הראשון ולתעד איך הוא הרגיש."
+    horizon_text = _plan_horizon_text(serialized)
+    return (
+        f"התוכנית החדשה פעילה עכשיו: {name}, {days_text}. {horizon_text}"
+        "הפעולה הבאה: להתחיל מהאימון הראשון ולתעד RPE או מאמץ מילולי, כאב ומה הושלם - לא לנחש."
+    )
 
 
-def _workout_log_coach_response(log) -> str:
+def _text_log_targets_next_workout(text: str, next_workout: dict[str, Any]) -> bool:
+    normalized = text.lower()
+    explicit_current_workout = [
+        "עשיתי את האימון",
+        "סיימתי את האימון",
+        "סיימתי אימון של היום",
+        "האימון של היום",
+        "האימון הבא",
+        "האימון בתוכנית",
+        "תעד אימון",
+        "לתעד אימון",
+        "רשום אימון",
+        "רשמתי אימון",
+        "סיימתי אימון",
+        "עשיתי אימון",
+        "finished the workout",
+        "did the workout",
+        "today's workout",
+        "next workout",
+        "current workout",
+    ]
+    if any(phrase in normalized for phrase in explicit_current_workout):
+        return True
+
+    execution_plan = next_workout.get("execution_plan") or {}
+    for exercise in execution_plan.get("adjusted_exercises") or []:
+        name = str(exercise.get("name") or "").strip().lower()
+        if len(name) >= 4 and name in normalized:
+            return True
+    return False
+
+
+def _progression_gate_from_next_workout(next_workout: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not next_workout:
+        return None
+    execution_plan = next_workout.get("execution_plan") or {}
+    for exercise in execution_plan.get("adjusted_exercises") or []:
+        notes = str(exercise.get("notes") or "")
+        if exercise.get("adjustment") == "substitution_progression_gate" or any(
+            marker in notes for marker in ["הוחלף", "קשות מדי", "לא זמינה", "לא זמין"]
+        ):
+            return exercise
+    return None
+
+
+def _text_has_explicit_pain_status(text: str) -> bool:
+    return has_explicit_pain_status(text)
+
+
+def _workout_log_coach_response(
+    log,
+    *,
+    progression_gate: dict[str, Any] | None = None,
+    pain_status_known: bool = True,
+) -> str:
     if log.pain_flag:
         return (
             "הכאב הוא הסימן החשוב כאן. לעצור תנועות שמכאיבות, להוריד עומס או טווח באימון הבא, "
@@ -606,11 +986,60 @@ def _workout_log_coach_response(log) -> str:
         return "לא משלימים אימון שפוספס בכוח. הפעולה הבאה: לחזור בגרסה קצרה של 20-30 דקות או לבצע את האימון הבא כרגיל."
     if log.status in {"partial", "modified"}:
         return "אימון חלקי עדיין נותן מידע טוב לתכנון. הפעולה הבאה: באימון הבא לשמור על אותו עומס או להוריד סט אחד אם העייפות נשארת."
+    if progression_gate and log.status == "completed" and (log.rpe is None or not pain_status_known):
+        exercise_name = str(progression_gate.get("name") or "התרגיל שהוחלף")
+        missing = []
+        if log.rpe is None:
+            missing.append("RPE 1-10")
+        if not pain_status_known:
+            missing.append("האם הופיע כאב")
+        return (
+            f"זה נשמר, אבל חסר {' ו'.join(missing)} כדי להחליט על שער ההתקדמות של {exercise_name}. "
+            "הפעולה הבאה: שלח את החסר במשפט אחד; בלי זה נשמור את הגרסה הנוכחית ולא ננחש."
+        )
+    if progression_gate and log.status == "completed" and log.rpe is not None and pain_status_known:
+        exercise_name = str(progression_gate.get("name") or "התרגיל שהוחלף")
+        if log.rpe >= 9:
+            return (
+                f"RPE {log.rpe} גבוה מדי לשער התקדמות של {exercise_name}. "
+                "הפעולה הבאה: לשמור את הגרסה הנוכחית או להוריד מעט נפח, בלי להעלות שלב."
+            )
+        if not log.exercise_results:
+            return (
+                f"RPE {log.rpe} ובלי כאב פותחים שער זהיר של שלב אחד ל{exercise_name}. "
+                "זה לוג כללי, אז באימון הבא לתעד גם חזרות/RPE לתרגיל הזה - לא לנחש; אם זה עובר RPE 8 או מופיע כאב - לשמור."
+            )
+        next_step = str(progression_gate.get("progression_next_step") or "").strip()
+        if next_step:
+            return (
+                f"הלוג של {exercise_name} נקי: RPE {log.rpe} ובלי כאב. "
+                f"הפעולה הבאה: להתקדם שלב אחד בלבד, רק ל{next_step}; לתעד בפועל ולא לנחש. אם זה עובר RPE 8 או מופיע כאב - לחזור לגרסה הנוכחית."
+            )
+        return (
+            f"RPE {log.rpe} ובלי כאב מספיקים לשער ההתקדמות של {exercise_name}. "
+            "הפעולה הבאה: להתקדם שלב אחד בלבד, לתעד בפועל ולא לנחש; אם זה עובר RPE 8 או מופיע כאב - לשמור את הגרסה הנוכחית."
+        )
     if log.rpe is not None:
         if log.rpe >= 9:
             return f"RPE {log.rpe} אומר שהאימון היה קשה מאוד. הפעולה הבאה: באימון הבא לשמור עומס או להוריד מעט נפח, לא להוסיף עוד סטים."
-        return f"RPE {log.rpe} נראה מאמץ בשליטה. הפעולה הבאה: לחזור על אותו מבנה, ואם הטכניקה נשארת נקייה להוסיף חזרה אחת בתרגיל המרכזי."
+        if log.exercise_results:
+            return f"RPE {log.rpe} נראה מאמץ בשליטה. הפעולה הבאה: לחזור על אותו מבנה, ואם הטכניקה נשארת נקייה להוסיף חזרה אחת בתרגיל המרכזי ולתעד בפועל."
+        return f"RPE {log.rpe} נראה מאמץ בשליטה, אבל חסר תרגיל מרכזי עם חזרות. הפעולה הבאה: לחזור על אותו מבנה ולתעד תרגיל מרכזי, חזרות, RPE וכאב - לא להוסיף חזרה מתוך ניחוש."
     if log.exercise_results:
+        rir = _first_logged_rir(log)
+        if rir is not None:
+            if rir <= 0:
+                return f"RIR {rir} אומר שהסט היה קרוב לכשל. הפעולה הבאה: באימון הבא לשמור עומס או להוריד מעט, ולא להוסיף חזרות עד שיש סט נקי יותר."
+            if rir <= 3:
+                return f"RIR {rir} עם תיעוד חזרות נותן בסיס להתקדמות זהירה. הפעולה הבאה: באימון הבא להוסיף חזרה אחת או עומס קטן אחד בלבד, ולתעד שוב RPE/RIR וכאב."
+            return f"RIR {rir} אומר שנשאר הרבה מרווח. הפעולה הבאה: להעלות עומס קטן או להאט קצב כדי לכוון ל-RIR 1-3, בלי קפיצה גדולה."
+        effort_signal = _first_logged_effort_signal(log)
+        if effort_signal == "too_hard":
+            return "כתבת שהסט היה קשה או כבד מדי. הפעולה הבאה: באימון הבא לשמור עומס או להוריד מעט, ולתעד אם נשארו 1-3 חזרות נקיות."
+        if effort_signal == "underloaded":
+            return "כתבת שזה היה קל מדי או שנשאר הרבה כוח. הפעולה הבאה: להעלות עומס קטן או להאט קצב, ולכוון ל-1-3 חזרות נקיות ברזרבה."
+        if effort_signal == "controlled":
+            return "נשמע שהמאמץ היה בשליטה. הפעולה הבאה: לחזור על אותו מבנה ולתעד RPE 1-10 או RIR וכאב לפני שמעלים עומס."
         return "האימון נראה ברור מספיק לתכנון הבא. הפעולה הבאה: באימון הבא לתעד גם RPE כללי כדי לדעת אם להעלות או לשמור עומס."
     return "הכיוון ברור. הפעולה הבאה: באימון הבא להוסיף תרגיל מרכזי, חזרות או RPE כדי שאפשר יהיה להתאים עומס בצורה מדויקת יותר."
 
@@ -624,6 +1053,28 @@ def _meal_log_coach_response(meal) -> str:
     )
 
 
+def _first_logged_rir(log) -> int | None:
+    for result in getattr(log, "exercise_results", None) or []:
+        if not isinstance(result, dict):
+            continue
+        value = result.get("rir")
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int | float):
+            return int(value)
+    return None
+
+
+def _first_logged_effort_signal(log) -> str | None:
+    for result in getattr(log, "exercise_results", None) or []:
+        if not isinstance(result, dict):
+            continue
+        value = result.get("effort_signal")
+        if value in {"too_hard", "underloaded", "controlled"}:
+            return str(value)
+    return None
+
+
 def _range_text(low: int | None, high: int | None, unit: str) -> str:
     if low is None or high is None:
         return f"טווח {unit} לא ברור"
@@ -635,7 +1086,11 @@ def _natural_plan_name(name: str) -> str:
         "full_body": "גוף מלא",
         "upper_lower": "עליון/תחתון",
         "push_pull_legs": "דחיפה/משיכה/רגליים",
+        "single_workout": "אימון יחיד",
         "single_session": "אימון יחיד",
+        "weekly_plan": "תוכנית שבועית",
+        "two_week_plan": "תוכנית לשבועיים",
+        "monthly_plan": "תוכנית חודשית",
     }
     for raw, natural in replacements.items():
         name = name.replace(raw, natural)
@@ -802,8 +1257,19 @@ def _equipment_substitution_guidance_response(text: str) -> str:
 
 def _missed_workout_guidance_response() -> str:
     return (
-        "לא מתחילים מאפס אחרי פספוס. השבוע חוזרים עם גרסה קצרה: אימון אחד מלא או שני אימונים קצרים יותר, בלי להחזיר את כל הנפח בבת אחת. "
-        "הפעולה הבאה: בחר יום אחד קרוב, עשה 20-30 דקות, ותעד שסיימת."
+        "לא מתחילים מאפס אחרי פספוס, ולא מחזירים את כל הנפח בבת אחת. "
+        "אם זה היה בגלל זמן: לחזור לאימון הבא בתור או לבצע את האימון שפספסת בגרסה קצרה. "
+        "אם זה היה בגלל עייפות, כאב או שינה גרועה: גרסת מינימום של 20-30 דקות, פחות סטים ובלי להעלות עומס. "
+        "הפעולה הבאה: לבחור חלון אחד קרוב, לסיים גרסה קצרה, ולתעד מה הפריע."
+    )
+
+
+def _return_after_break_guidance_response() -> str:
+    return (
+        "אחרי הפסקה ארוכה לא חוזרים ביום הראשון למספרים הישנים, וגם לא עושים אימון פיצוי. "
+        "שבוע החזרה צריך להיות קל-בינוני: בערך 60-80% מהנפח או העומס שהיית רגיל אליו, RPE 5-7, ולהשאיר 2-4 חזרות ברזרבה. "
+        "אם ההפסקה הייתה בגלל מחלה, כאב או שינה גרועה, התחל אפילו נמוך יותר ואל תעלה עומס עד שהתגובה ברורה. "
+        "הפעולה הבאה: לעשות אימון בסיסי קצר, לתעד RPE או מאמץ מילולי, כאב/עייפות, ולהעלות רק אחרי 2-3 אימונים נקיים."
     )
 
 
@@ -937,6 +1403,7 @@ _KNOWLEDGE_INTENT_FALLBACKS = {
     "nutrition_guidance": _nutrition_guidance_response,
     "equipment_substitution_guidance": _equipment_substitution_guidance_response,
     "missed_workout_guidance": lambda _payload_text: _missed_workout_guidance_response(),
+    "return_after_break_guidance": lambda _payload_text: _return_after_break_guidance_response(),
     "weekly_action_plan_guidance": lambda _payload_text: _weekly_action_plan_guidance_response(),
     "supplement_safety_guidance": _supplement_safety_guidance_response,
     "low_energy_action_guidance": lambda _payload_text: _low_energy_action_guidance_response(),
@@ -952,6 +1419,7 @@ _PROVIDER_CONTEXT_INTENT_FOR = {
     "equipment_substitution_guidance": "workout_plan",
     "weekly_action_plan_guidance": "workout_plan",
     "missed_workout_guidance": "workout_log",
+    "return_after_break_guidance": "workout_log",
     "fitness_term_guidance": "general_chat",
     # Motivation and progress answers are grounded in the user's recent training history.
     "motivation_recovery": "workout_log",

@@ -1,0 +1,1171 @@
+{
+  "artifacts": {
+    "grounding": [
+      {
+        "keyless_backend": "ddg",
+        "label": "keyless",
+        "resultCount": 5,
+        "webSearchQueries": [
+          "RPE RIR beginner strength training programming sets reps"
+        ]
+      }
+    ],
+    "hiring_signals_mode": false,
+    "plan_source": "external",
+    "pre_research_flags_present": true,
+    "resolved": {
+      "context": "",
+      "entity": "workout plan programming RPE RIR sets reps rest beginner hypertrophy strength coach",
+      "github_repos": [],
+      "github_user": "",
+      "subreddits": [
+        "Fitness",
+        "naturalbodybuilding",
+        "weightroom",
+        "bodyweightfitness"
+      ],
+      "x_handle": ""
+    }
+  },
+  "clusters": [
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone"
+      ],
+      "cluster_id": "cluster-1",
+      "representative_ids": [
+        "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?"
+    },
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest"
+      ],
+      "cluster_id": "cluster-2",
+      "representative_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "RECAP - First Natural Contest"
+    },
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique"
+      ],
+      "cluster_id": "cluster-3",
+      "representative_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "We did it boys! OCB Pro Card - Classic Physique"
+    },
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique"
+      ],
+      "cluster_id": "cluster-4",
+      "representative_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs"
+    },
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen"
+      ],
+      "cluster_id": "cluster-5",
+      "representative_ids": [
+        "https://reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "My first show as a teen"
+    },
+    {
+      "candidate_ids": [
+        "https://reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders"
+      ],
+      "cluster_id": "cluster-6",
+      "representative_ids": [
+        "https://reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders"
+      ],
+      "score": 0.0,
+      "sources": [
+        "reddit"
+      ],
+      "title": "Did training Manna really make your shoulders bulletproof?"
+    }
+  ],
+  "errors_by_source": {},
+  "generated_at": "2026-06-24T19:44:47.649234+00:00",
+  "items_by_source": {
+    "grounding": [],
+    "reddit": [
+      {
+        "body": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?\nMy dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you stopped losing in games",
+        "container": "bodyweightfitness",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 506,
+          "score": 2010
+        },
+        "engagement_score": 100,
+        "freshness": 97,
+        "item_id": "R1",
+        "local_rank_score": 0.3425,
+        "local_relevance": 0.0,
+        "metadata": {
+          "comment_insights": [
+            "My dad has been doing 120 push-ups per day for over 40 years.",
+            "I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger.",
+            "I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I w...",
+            "When my ex asked for a separation and I was stuck in my brother's house, I didn't have anything to do so I told myself I'm just going to do a daily ro...",
+            "Wow. Give that ol\u2019 badass a high-five for me.",
+            "See there\u2019s your mistake, you weren\u2019t supposed to do those \u201cpushups\u201d with the missus underneath you.",
+            "I did it for a few months and saw results, I did 2 sets of 50 and occasionally did it to failure."
+          ],
+          "top_comments": [
+            {
+              "author": "Squat_bar_27413",
+              "date": "2026-06-09",
+              "excerpt": "My dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H",
+              "score": 1996,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqn9ny/"
+            },
+            {
+              "author": "Tdawg_1409",
+              "date": "2026-06-09",
+              "excerpt": "I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in",
+              "score": 1738,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqk3p2/"
+            },
+            {
+              "author": "adavidmiller",
+              "date": "2026-06-09",
+              "excerpt": "I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you stopped losing in games ",
+              "score": 1398,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqndr0/"
+            },
+            {
+              "author": "InvaderKota",
+              "date": "2026-06-10",
+              "excerpt": "When my ex asked for a separation and I was stuck in my brother's house, I didn't have anything to do so I told myself I'm just going to do a daily routine of waking up and doing some push-ups, crunch",
+              "score": 373,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqw5gw/"
+            },
+            {
+              "author": "VaginalConductor",
+              "date": "2026-06-10",
+              "excerpt": "Wholesome.",
+              "score": 260,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqt5cq/"
+            },
+            {
+              "author": "MuzackAndLyrics",
+              "date": "2026-06-10",
+              "excerpt": "Wow. Give that ol\u2019 badass a high-five for me.",
+              "score": 257,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqrbyik/"
+            },
+            {
+              "author": "frustratedpolarbear",
+              "date": "2026-06-10",
+              "excerpt": "See there\u2019s your mistake, you weren\u2019t supposed to do those \u201cpushups\u201d with the missus underneath you.",
+              "score": 220,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqr00c1/"
+            },
+            {
+              "author": "gerber68",
+              "date": "2026-06-09",
+              "excerpt": "I did it for a few months and saw results, I did 2 sets of 50 and occasionally did it to failure. Some days I did none, some days I did 400 if I missed a bunch of days.",
+              "score": 210,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqiixy/"
+            },
+            {
+              "author": "BegrudginglyAwake",
+              "date": "2026-06-10",
+              "excerpt": "In college my friends and I decided to challenge ourselves to do 15,000 pushups in a month/ 500 per day. While they did become a lot easier, I had the same experience where there was basically zero ph",
+              "score": 202,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqzckp/"
+            },
+            {
+              "author": "Squat_bar_27413",
+              "date": "2026-06-10",
+              "excerpt": "I convinced him to go on one last white water canoe trip with me last summer for what was likely be our last father / daughter canoe trip. Trust me, he's an absolute inspiration to me.",
+              "score": 179,
+              "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqrd1oh/"
+            }
+          ]
+        },
+        "published_at": "2026-06-09",
+        "relevance_hint": 0.0,
+        "snippet": "My dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you...",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?",
+        "url": "https://www.reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone/",
+        "why_relevant": "Reddit listing"
+      },
+      {
+        "body": "Did training Manna really make your shoulders bulletproof?",
+        "container": "bodyweightfitness",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 35,
+          "score": 122
+        },
+        "engagement_score": 37,
+        "freshness": 95,
+        "item_id": "R36",
+        "local_rank_score": 0.31999999999999995,
+        "local_relevance": 0.07,
+        "metadata": {
+          "comment_insights": [],
+          "top_comments": []
+        },
+        "published_at": "2026-05-31",
+        "relevance_hint": 0.0,
+        "snippet": "Did training Manna really make your shoulders bulletproof?",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "Did training Manna really make your shoulders bulletproof?",
+        "url": "https://www.reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders/",
+        "why_relevant": "Reddit listing"
+      },
+      {
+        "body": "RECAP - First Natural Contest\nWhen I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb Sick arms bro Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+        "container": "naturalbodybuilding",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 92,
+          "score": 642
+        },
+        "engagement_score": 70,
+        "freshness": 94,
+        "item_id": "R2",
+        "local_rank_score": 0.305,
+        "local_relevance": 0.0,
+        "metadata": {
+          "comment_insights": [
+            "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb",
+            "Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+            "You look fantastic man. If you don't win the contest I will be shocked. How tall are you and how much do you weigh in that video?"
+          ],
+          "top_comments": [
+            {
+              "author": "Kirkybeefjerky",
+              "date": "2026-05-25",
+              "excerpt": "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb",
+              "score": 105,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuu5w3/"
+            },
+            {
+              "author": "RetreatHell94",
+              "date": "2026-05-25",
+              "excerpt": "Sick arms bro",
+              "score": 68,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuzi36/"
+            },
+            {
+              "author": "JustJoshinJapan",
+              "date": "2026-05-25",
+              "excerpt": "Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+              "score": 58,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvdcs2/"
+            },
+            {
+              "author": "Entire-Bicycle1878",
+              "date": "2026-05-25",
+              "excerpt": "We know it\u2019s you cbum",
+              "score": 53,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvbc1u/"
+            },
+            {
+              "author": "redditorianizer",
+              "date": "2026-05-25",
+              "excerpt": "Haha yes I definitely rushed a bit! Will slow down and hold the poses longer at the next one in 12 days.",
+              "score": 18,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvdlab/"
+            },
+            {
+              "author": "Eyerishguy",
+              "date": "2026-05-25",
+              "excerpt": "You look fantastic man. If you don't win the contest I will be shocked. How tall are you and how much do you weigh in that video?",
+              "score": 18,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv0pw5/"
+            },
+            {
+              "author": "ussichan",
+              "date": "2026-05-25",
+              "excerpt": "I knew it, my man delivered \ud83d\ude4c",
+              "score": 16,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv4ye1/"
+            },
+            {
+              "author": "redditorianizer",
+              "date": "2026-05-25",
+              "excerpt": "Thank you so much!",
+              "score": 15,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv2udt/"
+            },
+            {
+              "author": "redditorianizer",
+              "date": "2026-05-26",
+              "excerpt": "Haha that\u2019s an amazing compliment. Thank you!",
+              "score": 11,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onwb2j0/"
+            },
+            {
+              "author": "TheAgedIron",
+              "date": "2026-05-25",
+              "excerpt": "Looked phenomenal bro",
+              "score": 11,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuv7wc/"
+            }
+          ]
+        },
+        "published_at": "2026-05-25",
+        "relevance_hint": 0.0,
+        "snippet": "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb Sick arms bro Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "RECAP - First Natural Contest",
+        "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest/",
+        "why_relevant": "Reddit listing"
+      },
+      {
+        "body": "We did it boys! OCB Pro Card - Classic Physique\nCongrats bro!!!! Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+        "container": "naturalbodybuilding",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 36,
+          "score": 484
+        },
+        "engagement_score": 57,
+        "freshness": 97,
+        "item_id": "R4",
+        "local_rank_score": 0.2995,
+        "local_relevance": 0.0,
+        "metadata": {
+          "comment_insights": [
+            "Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d",
+            "Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+            "Great job! Your VMOs are looking insane.",
+            "5 ft 10. Was in mid 180s on stage. Now back to low 190s within a week."
+          ],
+          "top_comments": [
+            {
+              "author": "Dense_Researcher_99",
+              "date": "2026-06-12",
+              "excerpt": "Congrats bro!!!!",
+              "score": 19,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orav5y6/"
+            },
+            {
+              "author": "archvize",
+              "date": "2026-06-12",
+              "excerpt": "Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d",
+              "score": 9,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orauri6/"
+            },
+            {
+              "author": "flatvinnie",
+              "date": "2026-06-12",
+              "excerpt": "Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+              "score": 5,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb4blp/"
+            },
+            {
+              "author": "Gumshoe42",
+              "date": "2026-06-12",
+              "excerpt": "Wowzers! Looking good, bro!",
+              "score": 4,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb8zxo/"
+            },
+            {
+              "author": "redditorianizer",
+              "date": "2026-06-12",
+              "excerpt": "Haha did a full week of depletion after the first contest. The suffering was worth it.",
+              "score": 3,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb70v9/"
+            },
+            {
+              "author": "Troutmaan",
+              "date": "2026-06-12",
+              "excerpt": "Let\u2019s gooooo",
+              "score": 3,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orawgc6/"
+            },
+            {
+              "author": "Bonkxd",
+              "date": "2026-06-12",
+              "excerpt": "Great job! Your VMOs are looking insane.",
+              "score": 3,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orawxfu/"
+            },
+            {
+              "author": "4u2nvinmtl",
+              "date": "2026-06-12",
+              "excerpt": "Congratulations",
+              "score": 3,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orba99l/"
+            },
+            {
+              "author": "redditorianizer",
+              "date": "2026-06-13",
+              "excerpt": "5 ft 10. Was in mid 180s on stage. Now back to low 190s within a week.",
+              "score": 3,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orbvqn6/"
+            },
+            {
+              "author": "Goldenflame89",
+              "date": "2026-06-12",
+              "excerpt": "hell yeah",
+              "score": 2,
+              "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb0fhh/"
+            }
+          ]
+        },
+        "published_at": "2026-06-12",
+        "relevance_hint": 0.0,
+        "snippet": "Congrats bro!!!! Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "We did it boys! OCB Pro Card - Classic Physique",
+        "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique/",
+        "why_relevant": "Reddit listing"
+      },
+      {
+        "body": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+        "container": "naturalbodybuilding",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 46,
+          "score": 369
+        },
+        "engagement_score": 50,
+        "freshness": 99,
+        "item_id": "R5",
+        "local_rank_score": 0.2975,
+        "local_relevance": 0.0,
+        "metadata": {
+          "comment_insights": [],
+          "top_comments": []
+        },
+        "published_at": "2026-06-21",
+        "relevance_hint": 0.0,
+        "snippet": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+        "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique/",
+        "why_relevant": "Reddit listing"
+      },
+      {
+        "body": "My first show as a teen",
+        "container": "naturalbodybuilding",
+        "date_confidence": "high",
+        "engagement": {
+          "num_comments": 38,
+          "score": 350
+        },
+        "engagement_score": 49,
+        "freshness": 98,
+        "item_id": "R6",
+        "local_rank_score": 0.294,
+        "local_relevance": 0.0,
+        "metadata": {
+          "comment_insights": [],
+          "top_comments": []
+        },
+        "published_at": "2026-06-16",
+        "relevance_hint": 0.0,
+        "snippet": "My first show as a teen",
+        "source": "reddit",
+        "source_quality": 0.6,
+        "title": "My first show as a teen",
+        "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen/",
+        "why_relevant": "Reddit listing"
+      }
+    ]
+  },
+  "provider_runtime": {
+    "planner_model": "deterministic",
+    "reasoning_provider": "local",
+    "rerank_model": "local-score"
+  },
+  "query_plan": {
+    "cluster_mode": "none",
+    "freshness_mode": "evergreen_ok",
+    "intent": "concept",
+    "notes": [],
+    "raw_topic": "workout plan programming RPE RIR sets reps rest beginner hypertrophy strength coach",
+    "source_weights": {
+      "grounding": 0.5,
+      "reddit": 0.5
+    },
+    "subqueries": [
+      {
+        "label": "rpe_rir_beginner",
+        "ranking_query": "practical coach and community advice about using RPE RIR for beginner strength training without overcomplicating programming",
+        "search_query": "RPE RIR beginner strength training programming sets reps",
+        "sources": [
+          "reddit",
+          "grounding"
+        ],
+        "weight": 1.0
+      }
+    ]
+  },
+  "range_from": "2025-06-24",
+  "range_to": "2026-06-24",
+  "ranked_candidates": [
+    {
+      "candidate_id": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone",
+      "cluster_id": "cluster-1",
+      "engagement": 100,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 97,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 49.996849123241134,
+      "item_id": "R1",
+      "local_relevance": 0.0,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R1",
+            "native_rank": 1,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 1
+      },
+      "rerank_score": 0.40000000000000213,
+      "rrf_score": 0.00819672131147541,
+      "snippet": "My dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you...",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?\nMy dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you stopped losing in games",
+          "container": "bodyweightfitness",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 506,
+            "score": 2010
+          },
+          "engagement_score": 100,
+          "freshness": 97,
+          "item_id": "R1",
+          "local_rank_score": 0.3425,
+          "local_relevance": 0.0,
+          "metadata": {
+            "comment_insights": [
+              "My dad has been doing 120 push-ups per day for over 40 years.",
+              "I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger.",
+              "I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I w...",
+              "When my ex asked for a separation and I was stuck in my brother's house, I didn't have anything to do so I told myself I'm just going to do a daily ro...",
+              "Wow. Give that ol\u2019 badass a high-five for me.",
+              "See there\u2019s your mistake, you weren\u2019t supposed to do those \u201cpushups\u201d with the missus underneath you.",
+              "I did it for a few months and saw results, I did 2 sets of 50 and occasionally did it to failure."
+            ],
+            "top_comments": [
+              {
+                "author": "Squat_bar_27413",
+                "date": "2026-06-09",
+                "excerpt": "My dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H",
+                "score": 1996,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqn9ny/"
+              },
+              {
+                "author": "Tdawg_1409",
+                "date": "2026-06-09",
+                "excerpt": "I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in",
+                "score": 1738,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqk3p2/"
+              },
+              {
+                "author": "adavidmiller",
+                "date": "2026-06-09",
+                "excerpt": "I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you stopped losing in games ",
+                "score": 1398,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqndr0/"
+              },
+              {
+                "author": "InvaderKota",
+                "date": "2026-06-10",
+                "excerpt": "When my ex asked for a separation and I was stuck in my brother's house, I didn't have anything to do so I told myself I'm just going to do a daily routine of waking up and doing some push-ups, crunch",
+                "score": 373,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqw5gw/"
+              },
+              {
+                "author": "VaginalConductor",
+                "date": "2026-06-10",
+                "excerpt": "Wholesome.",
+                "score": 260,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqt5cq/"
+              },
+              {
+                "author": "MuzackAndLyrics",
+                "date": "2026-06-10",
+                "excerpt": "Wow. Give that ol\u2019 badass a high-five for me.",
+                "score": 257,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqrbyik/"
+              },
+              {
+                "author": "frustratedpolarbear",
+                "date": "2026-06-10",
+                "excerpt": "See there\u2019s your mistake, you weren\u2019t supposed to do those \u201cpushups\u201d with the missus underneath you.",
+                "score": 220,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqr00c1/"
+              },
+              {
+                "author": "gerber68",
+                "date": "2026-06-09",
+                "excerpt": "I did it for a few months and saw results, I did 2 sets of 50 and occasionally did it to failure. Some days I did none, some days I did 400 if I missed a bunch of days.",
+                "score": 210,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqiixy/"
+              },
+              {
+                "author": "BegrudginglyAwake",
+                "date": "2026-06-10",
+                "excerpt": "In college my friends and I decided to challenge ourselves to do 15,000 pushups in a month/ 500 per day. While they did become a lot easier, I had the same experience where there was basically zero ph",
+                "score": 202,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqqzckp/"
+              },
+              {
+                "author": "Squat_bar_27413",
+                "date": "2026-06-10",
+                "excerpt": "I convinced him to go on one last white water canoe trip with me last summer for what was likely be our last father / daughter canoe trip. Trust me, he's an absolute inspiration to me.",
+                "score": 179,
+                "url": "https://reddit.com/r/bodyweightfitness/comments/1u1l0gk/comment/oqrd1oh/"
+              }
+            ]
+          },
+          "published_at": "2026-06-09",
+          "relevance_hint": 0.0,
+          "snippet": "My dad has been doing 120 push-ups per day for over 40 years. He also does crunches and a few other things. He had a stroke 2 years ago and 3 month afterwards was upset he could only do 60 push-ups. H I started doing pushups after every time I lost in a game as a way to release the energy as something different than anger. I was doing around 1-2 hundered a day for the summer. I noticed it became in I stopped doing this for no bad reason at all, in all honestly I just forgot why I began in the first place and it slowly faded out of my life lol I will choose to believe you...",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?",
+          "url": "https://www.reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "One week into 100 pushups daily. Has anyone actually stuck with this long-term?",
+      "url": "https://www.reddit.com/r/bodyweightfitness/comments/1u1l0gk/one_week_into_100_pushups_daily_has_anyone/"
+    },
+    {
+      "candidate_id": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest",
+      "cluster_id": "cluster-2",
+      "engagement": 70,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 94,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 34.54441628480035,
+      "item_id": "R2",
+      "local_relevance": 0.0,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R2",
+            "native_rank": 3,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 3
+      },
+      "rerank_score": 0.0,
+      "rrf_score": 0.007936507936507936,
+      "snippet": "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb Sick arms bro Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "RECAP - First Natural Contest\nWhen I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb Sick arms bro Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+          "container": "naturalbodybuilding",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 92,
+            "score": 642
+          },
+          "engagement_score": 70,
+          "freshness": 94,
+          "item_id": "R2",
+          "local_rank_score": 0.305,
+          "local_relevance": 0.0,
+          "metadata": {
+            "comment_insights": [
+              "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb",
+              "Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+              "You look fantastic man. If you don't win the contest I will be shocked. How tall are you and how much do you weigh in that video?"
+            ],
+            "top_comments": [
+              {
+                "author": "Kirkybeefjerky",
+                "date": "2026-05-25",
+                "excerpt": "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb",
+                "score": 105,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuu5w3/"
+              },
+              {
+                "author": "RetreatHell94",
+                "date": "2026-05-25",
+                "excerpt": "Sick arms bro",
+                "score": 68,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuzi36/"
+              },
+              {
+                "author": "JustJoshinJapan",
+                "date": "2026-05-25",
+                "excerpt": "Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+                "score": 58,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvdcs2/"
+              },
+              {
+                "author": "Entire-Bicycle1878",
+                "date": "2026-05-25",
+                "excerpt": "We know it\u2019s you cbum",
+                "score": 53,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvbc1u/"
+              },
+              {
+                "author": "redditorianizer",
+                "date": "2026-05-25",
+                "excerpt": "Haha yes I definitely rushed a bit! Will slow down and hold the poses longer at the next one in 12 days.",
+                "score": 18,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onvdlab/"
+              },
+              {
+                "author": "Eyerishguy",
+                "date": "2026-05-25",
+                "excerpt": "You look fantastic man. If you don't win the contest I will be shocked. How tall are you and how much do you weigh in that video?",
+                "score": 18,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv0pw5/"
+              },
+              {
+                "author": "ussichan",
+                "date": "2026-05-25",
+                "excerpt": "I knew it, my man delivered \ud83d\ude4c",
+                "score": 16,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv4ye1/"
+              },
+              {
+                "author": "redditorianizer",
+                "date": "2026-05-25",
+                "excerpt": "Thank you so much!",
+                "score": 15,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onv2udt/"
+              },
+              {
+                "author": "redditorianizer",
+                "date": "2026-05-26",
+                "excerpt": "Haha that\u2019s an amazing compliment. Thank you!",
+                "score": 11,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onwb2j0/"
+              },
+              {
+                "author": "TheAgedIron",
+                "date": "2026-05-25",
+                "excerpt": "Looked phenomenal bro",
+                "score": 11,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1tnlohy/comment/onuv7wc/"
+              }
+            ]
+          },
+          "published_at": "2026-05-25",
+          "relevance_hint": 0.0,
+          "snippet": "When I think classic, this is the quality and type of physique I think about. You killed it bro \ud83d\udcaa\ud83c\udffb Sick arms bro Looks amazing, only thing I\u2019d like is for you to hold the poses longer so we can admire a bit more \ud83d\ude02 great job dude!",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "RECAP - First Natural Contest",
+          "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "RECAP - First Natural Contest",
+      "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1tnlohy/recap_first_natural_contest/"
+    },
+    {
+      "candidate_id": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique",
+      "cluster_id": "cluster-3",
+      "engagement": 57,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 97,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 25.767011966073635,
+      "item_id": "R4",
+      "local_relevance": 0.0,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R4",
+            "native_rank": 4,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 4
+      },
+      "rerank_score": 0.40000000000000213,
+      "rrf_score": 0.0078125,
+      "snippet": "Congrats bro!!!! Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "We did it boys! OCB Pro Card - Classic Physique\nCongrats bro!!!! Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+          "container": "naturalbodybuilding",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 36,
+            "score": 484
+          },
+          "engagement_score": 57,
+          "freshness": 97,
+          "item_id": "R4",
+          "local_rank_score": 0.2995,
+          "local_relevance": 0.0,
+          "metadata": {
+            "comment_insights": [
+              "Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d",
+              "Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+              "Great job! Your VMOs are looking insane.",
+              "5 ft 10. Was in mid 180s on stage. Now back to low 190s within a week."
+            ],
+            "top_comments": [
+              {
+                "author": "Dense_Researcher_99",
+                "date": "2026-06-12",
+                "excerpt": "Congrats bro!!!!",
+                "score": 19,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orav5y6/"
+              },
+              {
+                "author": "archvize",
+                "date": "2026-06-12",
+                "excerpt": "Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d",
+                "score": 9,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orauri6/"
+              },
+              {
+                "author": "flatvinnie",
+                "date": "2026-06-12",
+                "excerpt": "Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+                "score": 5,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb4blp/"
+              },
+              {
+                "author": "Gumshoe42",
+                "date": "2026-06-12",
+                "excerpt": "Wowzers! Looking good, bro!",
+                "score": 4,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb8zxo/"
+              },
+              {
+                "author": "redditorianizer",
+                "date": "2026-06-12",
+                "excerpt": "Haha did a full week of depletion after the first contest. The suffering was worth it.",
+                "score": 3,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb70v9/"
+              },
+              {
+                "author": "Troutmaan",
+                "date": "2026-06-12",
+                "excerpt": "Let\u2019s gooooo",
+                "score": 3,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orawgc6/"
+              },
+              {
+                "author": "Bonkxd",
+                "date": "2026-06-12",
+                "excerpt": "Great job! Your VMOs are looking insane.",
+                "score": 3,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orawxfu/"
+              },
+              {
+                "author": "4u2nvinmtl",
+                "date": "2026-06-12",
+                "excerpt": "Congratulations",
+                "score": 3,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orba99l/"
+              },
+              {
+                "author": "redditorianizer",
+                "date": "2026-06-13",
+                "excerpt": "5 ft 10. Was in mid 180s on stage. Now back to low 190s within a week.",
+                "score": 3,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orbvqn6/"
+              },
+              {
+                "author": "Goldenflame89",
+                "date": "2026-06-12",
+                "excerpt": "hell yeah",
+                "score": 2,
+                "url": "https://reddit.com/r/naturalbodybuilding/comments/1u3vosv/comment/orb0fhh/"
+              }
+            ]
+          },
+          "published_at": "2026-06-12",
+          "relevance_hint": 0.0,
+          "snippet": "Congrats bro!!!! Wow \ud83d\udcaf well done \ud83d\ude42\ud83d\ude42\ud83d\ude42 looking great \ud83d\udc4d Well done mate, congrats!!Jeeze you really tighten the screws on that conditioning\u2026 \ud83d\ude2e\u200d\ud83d\udca8",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "We did it boys! OCB Pro Card - Classic Physique",
+          "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "We did it boys! OCB Pro Card - Classic Physique",
+      "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u3vosv/we_did_it_boys_ocb_pro_card_classic_physique/"
+    },
+    {
+      "candidate_id": "https://reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique",
+      "cluster_id": "cluster-4",
+      "engagement": 50,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 99,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 9.15,
+      "item_id": "R5",
+      "local_relevance": 0.0,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R5",
+            "native_rank": 5,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 5
+      },
+      "rerank_score": 0.8000000000000007,
+      "rrf_score": 0.007692307692307693,
+      "snippet": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+          "container": "naturalbodybuilding",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 46,
+            "score": 369
+          },
+          "engagement_score": 50,
+          "freshness": 99,
+          "item_id": "R5",
+          "local_rank_score": 0.2975,
+          "local_relevance": 0.0,
+          "metadata": {
+            "comment_insights": [],
+            "top_comments": []
+          },
+          "published_at": "2026-06-21",
+          "relevance_hint": 0.0,
+          "snippet": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+          "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "~9 weeks out from my first show. Men\u2019s physique Oklahoma. 6\u20192\u201d 185lbs",
+      "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1ubw1ab/9_weeks_out_from_my_first_show_mens_physique/"
+    },
+    {
+      "candidate_id": "https://reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen",
+      "cluster_id": "cluster-5",
+      "engagement": 49,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 98,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 22.95,
+      "item_id": "R6",
+      "local_relevance": 0.0,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R6",
+            "native_rank": 6,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 6
+      },
+      "rerank_score": 0.6000000000000014,
+      "rrf_score": 0.007575757575757576,
+      "snippet": "My first show as a teen",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "My first show as a teen",
+          "container": "naturalbodybuilding",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 38,
+            "score": 350
+          },
+          "engagement_score": 49,
+          "freshness": 98,
+          "item_id": "R6",
+          "local_rank_score": 0.294,
+          "local_relevance": 0.0,
+          "metadata": {
+            "comment_insights": [],
+            "top_comments": []
+          },
+          "published_at": "2026-06-16",
+          "relevance_hint": 0.0,
+          "snippet": "My first show as a teen",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "My first show as a teen",
+          "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "My first show as a teen",
+      "url": "https://www.reddit.com/r/naturalbodybuilding/comments/1u7r39w/my_first_show_as_a_teen/"
+    },
+    {
+      "candidate_id": "https://reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders",
+      "cluster_id": "cluster-6",
+      "engagement": 37,
+      "explanation": "fallback-local-score (entity-miss demotion)",
+      "final_score": 0.0,
+      "freshness": 95,
+      "fun_explanation": "heuristic-fallback",
+      "fun_score": 12.45,
+      "item_id": "R36",
+      "local_relevance": 0.07,
+      "metadata": {
+        "provenance": [
+          {
+            "item_id": "R36",
+            "native_rank": 2,
+            "source": "reddit",
+            "subquery_label": "rpe_rir_beginner"
+          }
+        ]
+      },
+      "native_ranks": {
+        "rpe_rir_beginner:reddit": 2
+      },
+      "rerank_score": 4.899999999999999,
+      "rrf_score": 0.008064516129032258,
+      "snippet": "Did training Manna really make your shoulders bulletproof?",
+      "source": "reddit",
+      "source_items": [
+        {
+          "body": "Did training Manna really make your shoulders bulletproof?",
+          "container": "bodyweightfitness",
+          "date_confidence": "high",
+          "engagement": {
+            "num_comments": 35,
+            "score": 122
+          },
+          "engagement_score": 37,
+          "freshness": 95,
+          "item_id": "R36",
+          "local_rank_score": 0.31999999999999995,
+          "local_relevance": 0.07,
+          "metadata": {
+            "comment_insights": [],
+            "top_comments": []
+          },
+          "published_at": "2026-05-31",
+          "relevance_hint": 0.0,
+          "snippet": "Did training Manna really make your shoulders bulletproof?",
+          "source": "reddit",
+          "source_quality": 0.6,
+          "title": "Did training Manna really make your shoulders bulletproof?",
+          "url": "https://www.reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders/",
+          "why_relevant": "Reddit listing"
+        }
+      ],
+      "source_quality": 0.6,
+      "sources": [
+        "reddit"
+      ],
+      "subquery_labels": [
+        "rpe_rir_beginner"
+      ],
+      "title": "Did training Manna really make your shoulders bulletproof?",
+      "url": "https://www.reddit.com/r/bodyweightfitness/comments/1tst9iu/did_training_manna_really_make_your_shoulders/"
+    }
+  ],
+  "topic": "workout plan programming RPE RIR sets reps rest beginner hypertrophy strength coach",
+  "warnings": [
+    "Top evidence is highly concentrated in one source."
+  ]
+}

@@ -162,6 +162,12 @@ def test_supabase_migration_defines_user_owned_rls_policies():
         "body_metrics",
     ):
         assert f"alter table public.{table} enable row level security;" in sql
+    memory_sql = Path("supabase/migrations/202606240001_memory_facts.sql").read_text(encoding="utf-8")
+    assert "grant select, insert, update, delete on public.memory_facts to authenticated;" in memory_sql
+    assert "grant usage, select on all sequences in schema public to authenticated;" in memory_sql
+    assert "alter table public.memory_facts enable row level security;" in memory_sql
+    assert "create policy memory_facts_own_rows" in memory_sql
+    assert "(select auth.uid())" in memory_sql
     assert "to authenticated" in sql
     assert "(select auth.uid())" in sql
     assert "with check" in sql
@@ -185,6 +191,7 @@ def test_supabase_manual_verification_sql_checks_schema_rls_and_storage():
     assert "body_metrics" in sql
     assert "body_fat_percent" in sql
     assert "storage.buckets" in sql
+    assert "memory_facts" in sql
 
 
 def test_supabase_migrations_are_non_destructive():

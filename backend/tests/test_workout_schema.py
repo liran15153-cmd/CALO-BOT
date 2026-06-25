@@ -32,10 +32,12 @@ def test_structured_workout_plan_keeps_planning_decision_metadata():
     payload = valid_plan()
     payload.update(
         {
-            "plan_type": "multi_week",
+            "plan_type": "monthly_plan",
             "training_split": "full_body",
             "experience_level": "beginner",
             "session_length_minutes": 45,
+            "progression_schedule": ["Week 1: calibrate.", "Week 2: add reps."],
+            "tracking_guidance": ["Log RPE, pain, completed work, and notes."],
             "safety_notes": ["Stop for sharp pain or unusual dizziness."],
             "decision_inputs": {
                 "goal": "improve_strength",
@@ -60,7 +62,9 @@ def test_structured_workout_plan_keeps_planning_decision_metadata():
 
     plan = StructuredWorkoutPlan(**payload)
 
-    assert plan.plan_type == "multi_week"
+    assert plan.plan_type == "monthly_plan"
+    assert len(plan.progression_schedule) == 2
+    assert plan.tracking_guidance == ["Log RPE, pain, completed work, and notes."]
     assert plan.training_split == "full_body"
     assert plan.days[0].focus == "full_body"
     assert plan.days[0].exercises[0].movement_pattern == "squat"

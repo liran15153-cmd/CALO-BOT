@@ -1,7 +1,7 @@
--- Step 1 of the memory-system rebuild: drop the legacy keyword-based memory engine
--- (coaching_memories, memory_summaries) and the separate weekly/daily summaries
--- analytics feature (weekly_summaries). These are intentionally removed to start from a
--- clean infrastructure before building the new typed fact store (memory_facts).
+-- Compatibility cleanup for older deployments: remove legacy keyword-based memory
+-- tables (coaching_memories, memory_summaries) and the separate weekly/daily
+-- summaries table (weekly_summaries). This migration does not create the next memory
+-- system; it only prevents old deployments from keeping duplicate memory sources.
 --
 -- Dropping each table with CASCADE also removes its indexes and RLS policies.
 

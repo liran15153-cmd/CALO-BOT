@@ -29,6 +29,7 @@ def test_init_db_creates_core_tables(tmp_path):
         "safety_events",
         "usage_events",
         "pending_actions",
+        "memory_facts",
     }.issubset(tables)
 
 
