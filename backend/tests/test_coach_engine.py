@@ -2737,6 +2737,28 @@ def test_intent_llm_fallback_unknown_result_continues_general_chat(tmp_path, mon
     assert db.scalar(select(WorkoutPlan)) is None
 
 
+def test_intent_llm_fallback_rechecks_budget_before_general_chat(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    monkeypatch.setenv("DAILY_AI_TOKEN_LIMIT", "10")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "unknown", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "׳‘׳ ׳׳™ ׳׳¡׳’׳¨׳× ׳׳¡׳•׳“׳¨׳× ׳׳—׳•׳“׳© ׳”׳§׳¨׳•׳‘ ׳›׳“׳™ ׳׳—׳–׳•׳¨ ׳׳›׳•׳©׳¨"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "budget_exceeded"
+    assert provider.extract_calls == 1
+    assert provider.chat_calls == 0
+    assert db.scalar(select(UsageEvent).where(UsageEvent.provider == "configured")) is not None
+    assert db.scalar(select(UsageEvent).where(UsageEvent.provider == "budget_exceeded")) is not None
+
+
 def test_intent_llm_fallback_does_not_override_deterministic_workout_log(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
