@@ -49,6 +49,31 @@ def test_readiness_rejects_auth_required_with_sqlite(monkeypatch):
     get_settings.cache_clear()
 
 
+def test_readiness_reports_ready_for_complete_supabase_config(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://db.example.com/app")
+    monkeypatch.setenv("SUPABASE_URL", "https://nexmxwvivewvgmrritqa.supabase.co")
+    monkeypatch.setenv("SUPABASE_JWKS_URL", "https://nexmxwvivewvgmrritqa.supabase.co/auth/v1/.well-known/jwks.json")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "publishable-test-key")
+    monkeypatch.setenv("SUPABASE_STORAGE_BUCKET", "meal-images")
+    monkeypatch.setenv("SUPABASE_AUTH_REQUIRED", "true")
+    get_settings.cache_clear()
+    client = TestClient(app)
+
+    response = client.get("/api/readiness")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["production_ready"] is True
+    assert body["issues"] == []
+    assert body["checks"]["database"]["status"] == "configured"
+    assert body["checks"]["supabase_auth"]["status"] == "configured"
+    assert body["checks"]["jwks"]["status"] == "configured"
+    assert body["checks"]["storage"]["status"] == "configured"
+    get_settings.cache_clear()
+
+
 def test_readiness_does_not_expose_config_values(monkeypatch):
     database_url = "postgresql://app_user:" + "secret-db-pass" + "@db.example.com:5432/app"
     publishable_key = "sb_publishable_abcdefghijklmnopqrstuvwxyz1234567890"
