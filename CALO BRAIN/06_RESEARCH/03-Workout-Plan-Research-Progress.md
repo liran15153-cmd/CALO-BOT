@@ -11021,3 +11021,24 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Focused service/API suite: `154 passed`.
 - No `User not found` matches remain in backend app/tests.
+
+## Final Auth Profile Hebrew Default Cleanup - 2026-06-26
+
+### Verification target
+
+- Remove the remaining English fallback name for Supabase-authenticated users without an email.
+
+### Changes
+
+- Changed the auth-user default display name from `Supabase user` to `משתמש Supabase`.
+- Added a ProfileService regression test for this no-email auth-user path.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_profile_service.py --basetemp .pytest-tmp-profile-auth-name`
+- `rg -n "Supabase user" backend/app backend/tests -S`
+
+### Result
+
+- Profile service tests: `5 passed`.
+- No `Supabase user` matches remain in backend app/tests.

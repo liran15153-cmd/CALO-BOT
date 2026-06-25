@@ -33,7 +33,7 @@ class ProfileService:
         user = User(
             auth_user_id=auth_user_id,
             email=email,
-            name=email.split("@", 1)[0] if email else "Supabase user",
+            name=email.split("@", 1)[0] if email else "משתמש Supabase",
         )
         self.db.add(user)
         self.db.commit()

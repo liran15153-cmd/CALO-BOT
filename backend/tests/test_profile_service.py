@@ -74,6 +74,15 @@ def test_profile_service_updates_existing_local_profile(tmp_path):
     assert second.main_goal == "improve_strength"
 
 
+def test_profile_service_uses_hebrew_default_name_for_auth_user_without_email(tmp_path):
+    db = make_session(tmp_path)
+    service = ProfileService(db)
+
+    user = service.get_or_create_auth_user(auth_user_id="auth-user-1")
+
+    assert user.name == "משתמש Supabase"
+
+
 def test_profile_service_missing_user_error_is_hebrew(tmp_path):
     db = make_session(tmp_path)
     service = ProfileService(db)
