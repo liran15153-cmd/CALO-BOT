@@ -44,7 +44,7 @@ class WorkoutService:
         equipment = request.equipment or inferred_equipment or profile_equipment or ["bodyweight"]
         inferred_goal = self._infer_goal(request.prompt)
         profile_goal = profile.main_goal if profile else None
-        goal = inferred_goal or request.goal or profile_goal or "improve_fitness"
+        goal = request.goal or inferred_goal or profile_goal or "improve_fitness"
         inferred_experience = infer_experience(request.prompt)
         profile_experience = profile.experience_level if profile else None
         experience_level = request.experience_level or inferred_experience or profile_experience or "beginner"

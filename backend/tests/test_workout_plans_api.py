@@ -471,7 +471,7 @@ def test_workout_plan_hebrew_prompt_goal_overrides_saved_profile_goal(tmp_path):
     assert "ריצה" not in body["days"][0]["exercises"][0]["notes"]
 
 
-def test_workout_plan_hebrew_prompt_goal_beats_conflicting_request_goal(tmp_path):
+def test_workout_plan_request_goal_beats_conflicting_hebrew_prompt_goal(tmp_path):
     client, _db = make_client_and_db(tmp_path)
     client.post("/api/onboarding", json=valid_payload())
 
@@ -486,9 +486,8 @@ def test_workout_plan_hebrew_prompt_goal_beats_conflicting_request_goal(tmp_path
     assert response.status_code == 200
     body = response.json()
     assumptions = body["decision_inputs"]["assumptions"]
-    assert body["goal"] == "improve_endurance"
+    assert body["goal"] == "build_muscle"
     assert body["plan_type"] == "two_week_plan"
-    assert body["days"][0]["exercises"][0]["name"] == "אירובי בסיסי בקצב שיחה"
     assert any("שדה goal" in assumption and "מתוך הבקשה" in assumption for assumption in assumptions)
 
 
