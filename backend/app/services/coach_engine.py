@@ -49,7 +49,7 @@ class CoachEngine:
         profile_service = ProfileService(self.db)
         user = self.db.get(User, user_id) if user_id is not None else profile_service.get_default_user()
         if user is None:
-            raise ValueError("User not found")
+            raise ValueError("משתמש לא נמצא")
         chat_service = ChatService(self.db)
         session = chat_service.get_or_create_session(user_id=user.id, session_id=payload.session_id)
 

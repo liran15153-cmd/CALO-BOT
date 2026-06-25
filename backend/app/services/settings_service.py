@@ -55,7 +55,7 @@ class SettingsService:
     def export_local_data(self, user_id: int | None = None) -> dict[str, Any]:
         user = ProfileService(self.db).get_default_user() if user_id is None else self.db.get(User, user_id)
         if user is None:
-            raise ValueError("User not found")
+            raise ValueError("משתמש לא נמצא")
         profile = ProfileService(self.db).get_profile_for_user(user.id)
         plans = self.db.scalars(select(WorkoutPlan).where(WorkoutPlan.user_id == user.id)).all()
         workouts = self.db.scalars(select(Workout).where(Workout.user_id == user.id)).all()

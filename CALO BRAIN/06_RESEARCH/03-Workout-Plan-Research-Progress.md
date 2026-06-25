@@ -11000,3 +11000,24 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused schema/body-metric/workout-log suite: `44 passed`.
+
+## Final Hebrew User Error Cleanup - 2026-06-26
+
+### Verification target
+
+- Remove the remaining direct `User not found` service errors from the Hebrew-first backend surface.
+
+### Changes
+
+- Translated missing-user service errors in coach engine, dashboard, settings export, and onboarding profile save.
+- Added a ProfileService regression test for the Hebrew missing-user error.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_profile_service.py backend/tests/test_dashboard_api.py backend/tests/test_settings_api.py backend/tests/test_coach_engine.py --basetemp .pytest-tmp-hebrew-user-errors`
+- `rg -n "User not found" backend/app backend/tests -S`
+
+### Result
+
+- Focused service/API suite: `154 passed`.
+- No `User not found` matches remain in backend app/tests.

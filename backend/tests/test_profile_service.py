@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
@@ -71,3 +72,11 @@ def test_profile_service_updates_existing_local_profile(tmp_path):
     assert first.id == second.id
     assert second.user.name == "Lee"
     assert second.main_goal == "improve_strength"
+
+
+def test_profile_service_missing_user_error_is_hebrew(tmp_path):
+    db = make_session(tmp_path)
+    service = ProfileService(db)
+
+    with pytest.raises(ValueError, match="משתמש לא נמצא"):
+        service.upsert_onboarding(valid_payload(), user_id=999)

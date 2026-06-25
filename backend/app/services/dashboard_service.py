@@ -18,7 +18,7 @@ class DashboardService:
         workout_service = WorkoutService(self.db)
         user = profile_service.get_default_user() if user_id is None else self.db.get(User, user_id)
         if user is None:
-            raise ValueError("User not found")
+            raise ValueError("משתמש לא נמצא")
         profile = profile_service.get_profile_for_user(user.id)
         week_start, week_end = self._current_week_range()
         workouts = self._workouts_for_week(user.id, week_start, week_end)

@@ -52,7 +52,7 @@ class ProfileService:
     def upsert_onboarding(self, payload: OnboardingPayload, user_id: int | None = None) -> UserProfile:
         user = self.db.get(User, user_id) if user_id is not None else self.get_default_user()
         if user is None:
-            raise ValueError("User not found")
+            raise ValueError("משתמש לא נמצא")
         user.name = payload.name
         profile = self.db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
         if profile is None:
