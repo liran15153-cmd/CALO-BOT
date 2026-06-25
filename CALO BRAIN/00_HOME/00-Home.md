@@ -81,4 +81,4 @@ Supabase live verification is separate from local tests:
 npm run verify:supabase
 ```
 
-It requires real Supabase Auth test users in `.env.local`.
+It requires real Supabase Auth test users in `.env.local`. With a trusted server-side `SUPABASE_SECRET_KEY`, the verifier can create or repair those test users before running the isolation checks.

@@ -53,6 +53,8 @@ Automated user-isolation and Storage check:
 ```powershell
 $env:SUPABASE_URL="https://<project-ref>.supabase.co"
 $env:SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
+# Optional server-side admin key: creates or repairs the two verifier Auth users before sign-in.
+$env:SUPABASE_SECRET_KEY="<server-side-service-role-key>"
 $env:SUPABASE_TEST_USER_A_EMAIL="a@example.com"
 $env:SUPABASE_TEST_USER_A_PASSWORD="..."
 $env:SUPABASE_TEST_USER_B_EMAIL="b@example.com"
@@ -60,7 +62,7 @@ $env:SUPABASE_TEST_USER_B_PASSWORD="..."
 npm run verify:supabase
 ```
 
-`npm run verify:supabase` signs in two real Supabase Auth users, uses an existing user A `public.users` row or inserts a verifier-owned row, verifies user B cannot read it, checks user B update/delete isolation only for a row the verifier created, uploads one private `meal-images` object under user A's auth id, verifies user B cannot read or delete it, and cleans up only verifier-created data. If required env vars are missing, it reports `skipped`; that is not live proof.
+`npm run verify:supabase` signs in two real Supabase Auth users, uses an existing user A `public.users` row or inserts a verifier-owned row, verifies user B cannot read it, checks user B update/delete isolation only for a row the verifier created, uploads one private `meal-images` object under user A's auth id, verifies user B cannot read or delete it, and cleans up only verifier-created data. If `SUPABASE_SECRET_KEY` is set, the verifier first creates missing Auth users or resets their passwords and confirms their emails through Supabase Auth Admin. If required env vars are missing, it reports `skipped`; that is not live proof.
 
 Manual API user-isolation check:
 

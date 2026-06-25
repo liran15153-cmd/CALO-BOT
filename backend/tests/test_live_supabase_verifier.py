@@ -1,3 +1,6 @@
+import httpx
+
+import scripts.verify_supabase_live as verifier
 from scripts.verify_supabase_live import env_with_dotenv_files, missing_live_verification_env, run_live_verification
 
 
@@ -140,6 +143,124 @@ def test_live_verifier_checks_mutations_and_cleans_created_user_row(monkeypatch)
     assert result["rls_mutation_checks"] == "passed"
     assert delete_user_tokens == ["token-b", "token-a"]
     assert storage_delete_tokens == ["token-b", "token-a"]
+
+
+def test_live_verifier_bootstraps_auth_test_users_when_service_key_is_present(monkeypatch):
+    env = {**live_env(), "SUPABASE_SECRET_KEY": "service-role-test-key"}
+    bootstrapped = []
+
+    def fake_bootstrap(_base_url, _secret_key, email, password):
+        bootstrapped.append((email, password))
+
+    def fake_sign_in(_base_url, _publishable_key, email, _password):
+        if email == "a@example.com":
+            return {"access_token": "token-a", "user_id": "auth-user-a", "email": email}
+        return {"access_token": "token-b", "user_id": "auth-user-b", "email": email}
+
+    def fake_select(_base_url, _publishable_key, access_token, auth_user_id):
+        if access_token == "token-a":
+            return [{"id": 42, "auth_user_id": auth_user_id, "name": "Existing user"}]
+        return []
+
+    monkeypatch.setattr("scripts.verify_supabase_live._ensure_auth_user", fake_bootstrap, raising=False)
+    monkeypatch.setattr("scripts.verify_supabase_live._sign_in", fake_sign_in)
+    monkeypatch.setattr("scripts.verify_supabase_live._select_user_rows", fake_select)
+    monkeypatch.setattr("scripts.verify_supabase_live._upload_storage_object", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "scripts.verify_supabase_live._get_storage_object_status",
+        lambda _base_url, _publishable_key, _bucket, access_token, _object_path: 200
+        if access_token == "token-a"
+        else 404,
+    )
+    monkeypatch.setattr("scripts.verify_supabase_live._delete_storage_object_status", lambda *_args, **_kwargs: 404)
+    monkeypatch.setattr("scripts.verify_supabase_live._delete_storage_object", lambda *_args, **_kwargs: None)
+
+    result = run_live_verification(env)
+
+    assert result["status"] == "passed"
+    assert bootstrapped == [
+        ("a@example.com", "password-a"),
+        ("b@example.com", "password-b"),
+    ]
+
+
+def test_live_verifier_sign_in_failure_without_service_key_explains_repair_path(monkeypatch):
+    env = live_env()
+
+    def fake_sign_in(*_args, **_kwargs):
+        raise RuntimeError("Supabase Auth sign-in failed: 400 invalid_credentials")
+
+    monkeypatch.setattr("scripts.verify_supabase_live._sign_in", fake_sign_in)
+
+    try:
+        run_live_verification(env)
+    except RuntimeError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("run_live_verification must fail on invalid Supabase Auth credentials")
+
+    assert "SUPABASE_SECRET_KEY" in message
+    assert "SUPABASE_TEST_USER" in message
+
+
+def test_ensure_auth_user_creates_confirmed_user_when_missing(monkeypatch):
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append(("GET", url, headers, None, timeout))
+        return httpx.Response(200, json={"users": []})
+
+    def fake_post(url, headers, json, timeout):
+        calls.append(("POST", url, headers, json, timeout))
+        return httpx.Response(200, json={"user": {"id": "new-auth-user"}})
+
+    monkeypatch.setattr(verifier.httpx, "get", fake_get)
+    monkeypatch.setattr(verifier.httpx, "post", fake_post)
+
+    verifier._ensure_auth_user("https://example.supabase.co", "service-role", "a@example.com", "password-a")
+
+    assert calls[0][0] == "GET"
+    assert calls[0][2]["Authorization"] == "Bearer service-role"
+    assert calls[1] == (
+        "POST",
+        "https://example.supabase.co/auth/v1/admin/users",
+        {
+            "apikey": "service-role",
+            "Authorization": "Bearer service-role",
+            "Content-Type": "application/json",
+        },
+        {"email": "a@example.com", "password": "password-a", "email_confirm": True},
+        20,
+    )
+
+
+def test_ensure_auth_user_repairs_existing_user_password_and_confirmation(monkeypatch):
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append(("GET", url, headers, None, timeout))
+        return httpx.Response(200, json={"users": [{"id": "existing-auth-user", "email": "A@EXAMPLE.COM"}]})
+
+    def fake_patch(url, headers, json, timeout):
+        calls.append(("PATCH", url, headers, json, timeout))
+        return httpx.Response(200, json={"user": {"id": "existing-auth-user"}})
+
+    monkeypatch.setattr(verifier.httpx, "get", fake_get)
+    monkeypatch.setattr(verifier.httpx, "patch", fake_patch)
+
+    verifier._ensure_auth_user("https://example.supabase.co", "service-role", "a@example.com", "password-a")
+
+    assert calls[-1] == (
+        "PATCH",
+        "https://example.supabase.co/auth/v1/admin/users/existing-auth-user",
+        {
+            "apikey": "service-role",
+            "Authorization": "Bearer service-role",
+            "Content-Type": "application/json",
+        },
+        {"password": "password-a", "email_confirm": True},
+        20,
+    )
 
 
 def live_env() -> dict[str, str]:

@@ -59,10 +59,43 @@ def run_live_verification(env: Mapping[str, str]) -> dict:
 
     base_url = env["SUPABASE_URL"].rstrip("/")
     publishable_key = env["SUPABASE_PUBLISHABLE_KEY"]
+    secret_key = env.get("SUPABASE_SECRET_KEY")
     bucket = env.get("SUPABASE_STORAGE_BUCKET") or "meal-images"
 
-    user_a = _sign_in(base_url, publishable_key, env["SUPABASE_TEST_USER_A_EMAIL"], env["SUPABASE_TEST_USER_A_PASSWORD"])
-    user_b = _sign_in(base_url, publishable_key, env["SUPABASE_TEST_USER_B_EMAIL"], env["SUPABASE_TEST_USER_B_PASSWORD"])
+    if secret_key:
+        _ensure_auth_user(
+            base_url,
+            secret_key,
+            env["SUPABASE_TEST_USER_A_EMAIL"],
+            env["SUPABASE_TEST_USER_A_PASSWORD"],
+        )
+        _ensure_auth_user(
+            base_url,
+            secret_key,
+            env["SUPABASE_TEST_USER_B_EMAIL"],
+            env["SUPABASE_TEST_USER_B_PASSWORD"],
+        )
+
+    try:
+        user_a = _sign_in(
+            base_url,
+            publishable_key,
+            env["SUPABASE_TEST_USER_A_EMAIL"],
+            env["SUPABASE_TEST_USER_A_PASSWORD"],
+        )
+        user_b = _sign_in(
+            base_url,
+            publishable_key,
+            env["SUPABASE_TEST_USER_B_EMAIL"],
+            env["SUPABASE_TEST_USER_B_PASSWORD"],
+        )
+    except RuntimeError as exc:
+        if not secret_key and "Supabase Auth sign-in failed" in str(exc):
+            raise RuntimeError(
+                f"{exc}. Set valid SUPABASE_TEST_USER_* credentials, or set SUPABASE_SECRET_KEY "
+                "in the trusted server-side environment so the verifier can create or repair the Auth test users."
+            ) from exc
+        raise
     if user_a["user_id"] == user_b["user_id"]:
         raise RuntimeError("test users must be two different Supabase Auth users")
 
@@ -173,6 +206,45 @@ def _sign_in(base_url: str, publishable_key: str, email: str, password: str) -> 
     if not access_token or not user_id:
         raise RuntimeError("Supabase Auth sign-in did not return access_token and user.id")
     return {"access_token": access_token, "user_id": user_id, "email": email}
+
+
+def _ensure_auth_user(base_url: str, secret_key: str, email: str, password: str) -> None:
+    user_id = _find_auth_user_id_by_email(base_url, secret_key, email)
+    if user_id:
+        response = httpx.patch(
+            f"{base_url}/auth/v1/admin/users/{quote(user_id, safe='')}",
+            headers=_auth_admin_headers(secret_key),
+            json={"password": password, "email_confirm": True},
+            timeout=20,
+        )
+        _raise_for_status(response, f"Supabase Auth admin update failed for {email}")
+        return
+
+    response = httpx.post(
+        f"{base_url}/auth/v1/admin/users",
+        headers=_auth_admin_headers(secret_key),
+        json={"email": email, "password": password, "email_confirm": True},
+        timeout=20,
+    )
+    _raise_for_status(response, f"Supabase Auth admin create failed for {email}")
+
+
+def _find_auth_user_id_by_email(base_url: str, secret_key: str, email: str) -> str | None:
+    target = email.casefold()
+    for page in range(1, 11):
+        response = httpx.get(
+            f"{base_url}/auth/v1/admin/users?page={page}&per_page=100",
+            headers=_auth_admin_headers(secret_key),
+            timeout=20,
+        )
+        _raise_for_status(response, f"Supabase Auth admin list failed while checking {email}")
+        users = response.json().get("users") or []
+        for user in users:
+            if str(user.get("email") or "").casefold() == target:
+                return str(user.get("id") or "")
+        if len(users) < 100:
+            return None
+    return None
 
 
 def _insert_public_user(base_url: str, publishable_key: str, user: dict[str, str]) -> int:
@@ -306,6 +378,14 @@ def _data_headers(publishable_key: str, access_token: str) -> dict[str, str]:
     return {
         "apikey": publishable_key,
         "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+
+def _auth_admin_headers(secret_key: str) -> dict[str, str]:
+    return {
+        "apikey": secret_key,
+        "Authorization": f"Bearer {secret_key}",
         "Content-Type": "application/json",
     }
 
