@@ -828,7 +828,14 @@ function formatConfidence(confidence: string): string {
 }
 
 function formatDifficulty(difficulty: string): string {
-  return { easy: 'קל', moderate: 'בינוני', hard: 'קשה' }[difficulty] ?? difficulty;
+  return {
+    easy: 'קל',
+    moderate: 'בינוני',
+    hard: 'קשה',
+    beginner: 'מתחיל',
+    intermediate: 'בינוני',
+    advanced: 'מתקדם'
+  }[difficulty] ?? 'קושי לא מוכר';
 }
 
 function formatLogDate(value: string): string {

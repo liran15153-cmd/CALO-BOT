@@ -404,6 +404,38 @@ describe('Workout plan UI', () => {
     expect(screen.getByText(/חתירה עם גומייה/i)).toBeInTheDocument();
   });
 
+  it('renders legacy next workout difficulty in Hebrew', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/health')) {
+          return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+        }
+        if (url.endsWith('/api/workout-plans/current')) {
+          return jsonResponse(currentPlanFixture());
+        }
+        if (url.endsWith('/api/workouts/next')) {
+          return jsonResponse({ ...nextWorkoutFixture(), difficulty: 'beginner' });
+        }
+        if (url.endsWith('/api/workout-logs/recent')) {
+          return jsonResponse([]);
+        }
+        if (url.includes('/api/pending-actions/current')) {
+          return jsonResponse({}, 404);
+        }
+        return jsonResponse({});
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /אימונים/i }));
+
+    expect(await screen.findByText(/מתחיל/i)).toBeInTheDocument();
+    expect(screen.queryByText(/beginner/i)).not.toBeInTheDocument();
+  });
+
   it('still displays the current plan when the next workout request fails', async () => {
     vi.stubGlobal(
       'fetch',

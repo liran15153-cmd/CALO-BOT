@@ -24,7 +24,7 @@ describe('Meals UI', () => {
               calories_max: 380,
               protein_min: 35,
               protein_max: 55,
-              confidence: 'medium',
+              confidence: 'legacy_score',
               items: [
                 { id: 10, name: 'יוגורט יווני', quantity: 'מנה משוערת' },
                 { id: 11, name: 'שייק חלבון', quantity: 'מנה משוערת' }
@@ -101,6 +101,8 @@ describe('Meals UI', () => {
     expect(await screen.findByText(/ארוחות אחרונות/i)).toBeInTheDocument();
     expect(screen.getByText(/210-380 קלוריות/i)).toBeInTheDocument();
     expect(screen.getByText(/35-55 גרם חלבון/i)).toBeInTheDocument();
+    expect(screen.getByText(/לא ידוע/i)).toBeInTheDocument();
+    expect(screen.queryByText(/legacy_score/i)).not.toBeInTheDocument();
     expect(screen.getByText(/יוגורט יווני/i)).toBeInTheDocument();
     expect(screen.getByText(/שייק חלבון/i)).toBeInTheDocument();
   });

@@ -251,6 +251,6 @@ function formatConfidence(confidence: string | null | undefined): string {
       low: 'ביטחון נמוך',
       medium: 'ביטחון בינוני',
       high: 'ביטחון גבוה'
-    }[confidence ?? ''] ?? confidence ?? 'לא ידוע'
+    }[confidence ?? ''] ?? 'לא ידוע'
   );
 }
