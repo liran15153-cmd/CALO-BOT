@@ -11042,3 +11042,19 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Profile service tests: `5 passed`.
 - No `Supabase user` matches remain in backend app/tests.
+
+## Final Supabase Live Verifier Attempt - 2026-06-26
+
+### Verification target
+
+- Re-check the repo's only external smoke script after the final local gates.
+
+### Checks run
+
+- `npm run verify:supabase`
+
+### Result
+
+- Failed before live proof with `invalid_credentials` from Supabase Auth sign-in.
+- No local code change was made for this because the blocker is missing/invalid live test credentials, not a failing local invariant.
+- Merge-readiness boundary remains: local tests/build/lint/merge-tree are proven; live Supabase user-isolation/storage proof still requires valid `SUPABASE_TEST_USER_*` credentials or a trusted `SUPABASE_SECRET_KEY`.
