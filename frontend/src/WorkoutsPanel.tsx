@@ -790,7 +790,24 @@ function formatSetCount(sets: string): string {
 function formatEquipment(equipment: string[]): string {
   if (equipment.length === 0) return 'משקל גוף';
   return equipment
-    .map((item) => ({ dumbbells: 'משקולות יד', 'resistance bands': 'גומיות התנגדות', bodyweight: 'משקל גוף' })[item] ?? item)
+    .map(
+      (item) =>
+        ({
+          dumbbells: 'משקולות יד',
+          'resistance bands': 'גומיות התנגדות',
+          bodyweight: 'משקל גוף',
+          gym: 'חדר כושר',
+          machines: 'מכונות',
+          machine: 'מכונה',
+          cables: 'כבלים',
+          cable: 'כבל',
+          cable_machine: 'כבל',
+          bench: 'ספסל',
+          barbell: 'מוט',
+          kettlebell: 'קטלבל',
+          pull_up_bar: 'מתח'
+        })[item] ?? item
+    )
     .join(', ');
 }
 

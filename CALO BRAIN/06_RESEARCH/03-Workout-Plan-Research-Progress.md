@@ -11149,3 +11149,22 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused App shell suite: `2 passed`.
+
+## Final Frontend Equipment Copy Cleanup - 2026-06-26
+
+### Verification target
+
+- Prevent raw equipment keys from leaking into Hebrew workout-plan UI.
+
+### Changes
+
+- Extended the workout-plan equipment formatter for common gym/home equipment keys such as `barbell`, `bench`, `cables`, `gym`, `machines`, `kettlebell`, and `pull_up_bar`.
+- Added WorkoutsPanel coverage proving stored gym equipment renders as Hebrew labels.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run WorkoutsPanel.test.tsx`
+
+### Result
+
+- Focused WorkoutsPanel suite: `23 passed`.

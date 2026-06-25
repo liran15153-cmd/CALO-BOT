@@ -363,7 +363,7 @@ describe('Workout plan UI', () => {
             duration_weeks: 4,
             days_per_week: 2,
             session_length_minutes: 45,
-            equipment_needed: ['resistance bands'],
+            equipment_needed: ['resistance bands', 'barbell', 'bench', 'cables', 'gym'],
             days: [
               {
                 name: 'יום שלישי גוף מלא',
@@ -395,6 +395,7 @@ describe('Workout plan UI', () => {
     expect(await screen.findByText(/תוכנית כוח שמורה/i)).toBeInTheDocument();
     expect(screen.getByText('תוכנית חודשית')).toBeInTheDocument();
     expect(screen.getByText('4 שבועות, 45 דקות לאימון')).toBeInTheDocument();
+    expect(screen.getByText('גומיות התנגדות, מוט, ספסל, כבלים, חדר כושר')).toBeInTheDocument();
     expect(screen.getByText('התקדמות לפי שבוע')).toBeInTheDocument();
     expect(screen.getByText(/שבוע 4: שבוע בדיקה\/שימור לפני החודש הבא/i)).toBeInTheDocument();
     expect(screen.getByText('מה לתעד')).toBeInTheDocument();
