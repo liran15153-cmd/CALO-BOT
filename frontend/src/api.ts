@@ -426,27 +426,6 @@ export async function generateWorkoutPlan(prompt: string): Promise<WorkoutPlan> 
   return response.json();
 }
 
-export async function activateWorkoutPlan(planId: number): Promise<WorkoutPlan> {
-  const response = await apiFetch(`${API_BASE}/api/workout-plans/${planId}/activate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ delete_previous: true })
-  });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-export async function discardWorkoutPlan(planId: number): Promise<void> {
-  const response = await apiFetch(`${API_BASE}/api/workout-plans/${planId}`, {
-    method: 'DELETE'
-  });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
-}
-
 export async function fetchCurrentPendingAction(actionType = 'activate_workout_plan'): Promise<PendingAction | null> {
   const response = await apiFetch(`${API_BASE}/api/pending-actions/current?action_type=${encodeURIComponent(actionType)}`);
   if (response.status === 404) {
