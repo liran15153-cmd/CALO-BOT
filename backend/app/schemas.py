@@ -206,7 +206,7 @@ class WorkoutLogRequest(BaseModel):
     def has_log_content(self) -> "WorkoutLogRequest":
         if self.text or self.notes or self.exercises or self.status in {"skipped", "partial", "modified", "completed"}:
             return self
-        raise ValueError("Workout log requires text, structured exercises, notes, or status")
+        raise ValueError("תיעוד אימון דורש טקסט, תרגילים מובנים, הערות או סטטוס")
 
 
 class MealTextRequest(BaseModel):
@@ -239,10 +239,10 @@ class BodyMetricRequest(BaseModel):
         for key, raw_measurement in value.items():
             clean_key = key.strip()
             if not clean_key or len(clean_key) > 60:
-                raise ValueError("measurement names must be 1-60 characters")
+                raise ValueError("שם מדידה חייב להיות באורך 1-60 תווים")
             measurement = float(raw_measurement)
             if measurement < 0 or measurement > 500:
-                raise ValueError("measurement values must be between 0 and 500")
+                raise ValueError("ערך מדידה חייב להיות בין 0 ל-500")
             normalized[clean_key] = measurement
         return normalized
 
@@ -250,7 +250,7 @@ class BodyMetricRequest(BaseModel):
     def has_metric_content(self) -> "BodyMetricRequest":
         if self.weight_kg is not None or self.body_fat_percent is not None or self.measurements:
             return self
-        raise ValueError("body metric requires weight, body fat, or at least one measurement")
+        raise ValueError("מדד גוף דורש משקל, אחוז שומן או לפחות מדידה אחת")
 
 
 class BodyMetricResponse(BaseModel):

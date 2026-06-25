@@ -163,9 +163,9 @@ class WorkoutService:
     def activate_plan(self, user_id: int, plan_id: int, *, delete_previous: bool = True) -> WorkoutPlan:
         plan = self.db.get(WorkoutPlan, plan_id)
         if plan is None or plan.user_id != user_id:
-            raise WorkoutPlanNotFoundError("Workout plan not found")
+            raise WorkoutPlanNotFoundError("תוכנית האימון לא נמצאה")
         if is_single_workout_plan((plan.plan_json or {}).get("plan_type")):
-            raise SingleWorkoutActivationError("Cannot activate a single workout as the current plan")
+            raise SingleWorkoutActivationError("אי אפשר להפוך אימון יחיד לתוכנית הפעילה")
 
         current_plans = list(
             self.db.scalars(
@@ -197,9 +197,9 @@ class WorkoutService:
     def delete_plan(self, user_id: int, plan_id: int, *, allow_current: bool = False) -> None:
         plan = self.db.get(WorkoutPlan, plan_id)
         if plan is None or plan.user_id != user_id:
-            raise WorkoutPlanNotFoundError("Workout plan not found")
+            raise WorkoutPlanNotFoundError("תוכנית האימון לא נמצאה")
         if plan.is_current and not allow_current:
-            raise ActiveWorkoutPlanDeletionError("Cannot delete the active workout plan")
+            raise ActiveWorkoutPlanDeletionError("אי אפשר למחוק את תוכנית האימון הפעילה")
         self._delete_plan_record(plan)
         self.db.commit()
 
@@ -886,23 +886,23 @@ class WorkoutService:
     def _validate_workout_log_references(self, user_id: int, request: WorkoutLogRequest) -> None:
         if request.workout_id is None:
             if any(exercise.exercise_id is not None for exercise in request.exercises):
-                raise ValueError("exercise_id requires workout_id")
+                raise ValueError("exercise_id דורש workout_id")
             return
 
         workout = self.db.get(Workout, request.workout_id)
         if workout is None or workout.user_id != user_id:
-            raise ValueError("Unknown workout_id")
+            raise ValueError("workout_id לא נמצא")
 
         for exercise in request.exercises:
             if exercise.exercise_id is None:
                 continue
             workout_exercise = self.db.get(WorkoutExercise, exercise.exercise_id)
             if workout_exercise is None or workout_exercise.workout_id != request.workout_id:
-                raise ValueError("exercise_id does not belong to workout_id")
+                raise ValueError("exercise_id לא שייך ל-workout_id")
 
     def parse_log(self, user_id: int, request: WorkoutLogRequest) -> WorkoutLog:
         if request.text is None:
-            raise ValueError("Text workout log requires text")
+            raise ValueError("תיעוד אימון טקסטואלי דורש טקסט")
         text = request.text.lower()
         pain_flag = has_pain_or_injury_signal(text)
         status = (

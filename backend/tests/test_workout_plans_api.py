@@ -414,7 +414,7 @@ def test_activate_workout_plan_rejects_single_workout_and_keeps_current_plan(tmp
     response = client.post(f"/api/workout-plans/{one_off_id}/activate")
 
     assert response.status_code == 400
-    assert "single workout" in response.json()["detail"]
+    assert "אימון יחיד" in response.json()["detail"]
     assert db.get(WorkoutPlan, current_id).is_current is True
     assert db.get(WorkoutPlan, one_off_id).is_current is False
 

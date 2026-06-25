@@ -22,7 +22,7 @@ def get_current_pending_action(
     service = PendingActionService(db)
     action = service.current(user_id=user.id, action_type=action_type)
     if action is None:
-        raise HTTPException(status_code=404, detail="No pending action")
+        raise HTTPException(status_code=404, detail="אין פעולה ממתינה")
     return service.serialize(action, include_candidate_plan=True)
 
 

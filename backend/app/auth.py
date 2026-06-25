@@ -39,7 +39,7 @@ def get_auth_context(request: Request, db: Session = Depends(get_db)) -> AuthCon
 
     token = _bearer_token(request)
     if token is None:
-        raise HTTPException(status_code=401, detail="Missing Supabase access token")
+        raise HTTPException(status_code=401, detail="חסר טוקן גישה של Supabase")
 
     supabase_user = verify_supabase_access_token(token, settings=settings)
     user = ProfileService(db).get_or_create_auth_user(
@@ -74,28 +74,28 @@ def verify_supabase_access_token(token: str, *, settings: Settings | None = None
             options={"require": ["exp", "iss", "sub", "aud", "role"]},
         )
     except (jwt.PyJWTError, ValueError, TypeError, httpx.HTTPError) as exc:
-        raise HTTPException(status_code=401, detail="Invalid Supabase access token") from exc
+        raise HTTPException(status_code=401, detail="טוקן הגישה של Supabase לא תקין") from exc
 
     if payload.get("role") != "authenticated":
-        raise HTTPException(status_code=401, detail="Invalid Supabase access token")
+        raise HTTPException(status_code=401, detail="טוקן הגישה של Supabase לא תקין")
     auth_user_id = str(payload.get("sub") or "").strip()
     if not auth_user_id:
-        raise HTTPException(status_code=401, detail="Invalid Supabase access token")
+        raise HTTPException(status_code=401, detail="טוקן הגישה של Supabase לא תקין")
     email = payload.get("email")
     return SupabaseUser(auth_user_id=auth_user_id, email=str(email) if email else None)
 
 
 def _validate_supabase_auth_config(settings: Settings) -> None:
     if not settings.supabase_url or not settings.supabase_publishable_key or not settings.supabase_jwks_url:
-        raise HTTPException(status_code=503, detail="Supabase Auth is not configured")
+        raise HTTPException(status_code=503, detail="אימות Supabase לא מוגדר")
     project = _project_ref(settings.supabase_url)
     if project is None:
-        raise HTTPException(status_code=503, detail="Supabase URL is invalid")
+        raise HTTPException(status_code=503, detail="כתובת Supabase לא תקינה")
     jwks_project = _jwks_project_ref(settings.supabase_jwks_url)
     if jwks_project is None:
-        raise HTTPException(status_code=503, detail="Supabase JWKS URL is invalid")
+        raise HTTPException(status_code=503, detail="כתובת JWKS של Supabase לא תקינה")
     if jwks_project != project:
-        raise HTTPException(status_code=503, detail="Supabase JWKS URL does not match SUPABASE_URL")
+        raise HTTPException(status_code=503, detail="כתובת JWKS של Supabase לא תואמת ל-SUPABASE_URL")
 
 
 def _jwks_key(settings: Settings, kid: str) -> PyJWK:

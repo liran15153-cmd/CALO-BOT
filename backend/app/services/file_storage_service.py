@@ -16,7 +16,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": ".webp",
 }
 MAX_MEAL_IMAGE_BYTES = 5 * 1024 * 1024
-_SUPABASE_STORAGE_REQUIRED_MESSAGE = "Supabase Storage is required for meal images when Supabase Auth or production mode is enabled"
+_SUPABASE_STORAGE_REQUIRED_MESSAGE = "אחסון Supabase נדרש לתמונות ארוחה כאשר אימות Supabase או מצב production פעילים"
 
 
 class FileStorageService:

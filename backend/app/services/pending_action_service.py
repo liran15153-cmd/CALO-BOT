@@ -56,11 +56,11 @@ class PendingActionService:
     def resolve(self, *, user_id: int, action_id: int, decision: PendingDecision, resolved_by_message_id: int | None = None) -> dict[str, Any]:
         action = self.db.get(PendingAction, action_id)
         if action is None or action.user_id != user_id:
-            raise ValueError("Pending action not found")
+            raise ValueError("הפעולה הממתינה לא נמצאה")
         if action.status != "pending":
-            raise RuntimeError("Pending action is not open")
+            raise RuntimeError("הפעולה הממתינה כבר לא פתוחה")
         if action.action_type != WORKOUT_PLAN_REPLACEMENT_ACTION or action.subject_type != WORKOUT_PLAN_SUBJECT:
-            raise RuntimeError("Unsupported pending action")
+            raise RuntimeError("סוג הפעולה הממתינה אינו נתמך")
 
         candidate = self.db.get(WorkoutPlan, action.subject_id)
         if candidate is None or candidate.user_id != user_id:

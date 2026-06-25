@@ -38,5 +38,5 @@ def latest_body_metric(
 ) -> dict:
     metric = BodyMetricService(db).latest(user_id=user.id)
     if metric is None:
-        raise HTTPException(status_code=404, detail="Body metric not found")
+        raise HTTPException(status_code=404, detail="מדד גוף לא נמצא")
     return BodyMetricService.serialize(metric)

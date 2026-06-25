@@ -49,7 +49,7 @@ def test_meal_upload_rejects_local_file_fallback_in_production(tmp_path, monkeyp
     )
 
     assert response.status_code == 400
-    assert "Supabase Storage is required" in response.json()["detail"]
+    assert "אחסון Supabase נדרש" in response.json()["detail"]
     assert db.scalar(select(Meal)) is None
     get_settings.cache_clear()
 
@@ -68,7 +68,7 @@ def test_meal_upload_rejects_local_file_fallback_when_supabase_auth_required(tmp
     try:
         store_test_image(service, user_id=7, owner_key="auth-user-abc")
     except ValueError as exc:
-        assert "Supabase Storage is required" in str(exc)
+        assert "אחסון Supabase נדרש" in str(exc)
     else:
         raise AssertionError("local fallback should be rejected when Supabase Auth is required")
     assert not (tmp_path / "meals").exists()
@@ -83,7 +83,7 @@ def test_meal_image_download_rejects_local_file_fallback_in_production(tmp_path)
     try:
         service.download_meal_image("meals/7/image.jpg")
     except ValueError as exc:
-        assert "Supabase Storage is required" in str(exc)
+        assert "אחסון Supabase נדרש" in str(exc)
     else:
         raise AssertionError("local download fallback should be rejected in production")
 

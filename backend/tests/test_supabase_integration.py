@@ -37,7 +37,7 @@ def test_supabase_auth_required_rejects_missing_bearer_token(tmp_path, monkeypat
     response = client.get("/api/onboarding")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Missing Supabase access token"
+    assert response.json()["detail"] == "חסר טוקן גישה של Supabase"
 
 
 def test_supabase_access_token_is_verified_locally_with_jwks(monkeypatch):
@@ -85,7 +85,7 @@ def test_supabase_url_cannot_be_used_as_jwks_url(monkeypatch):
     settings = supabase_settings(supabase_jwks_url="https://nexmxwvivewvgmrritqa.supabase.co")
     monkeypatch.setattr("backend.app.auth.httpx.get", jwks_response({"keys": [key.jwk()]}))
 
-    with pytest_auth_error(503, "Supabase JWKS URL is invalid"):
+    with pytest_auth_error(503, "כתובת JWKS של Supabase לא תקינה"):
         verify_supabase_access_token(key.token(settings=supabase_settings()), settings=settings)
 
 
@@ -96,7 +96,7 @@ def test_supabase_jwks_url_must_match_project_ref(monkeypatch):
     )
     monkeypatch.setattr("backend.app.auth.httpx.get", jwks_response({"keys": [key.jwk()]}))
 
-    with pytest_auth_error(503, "Supabase JWKS URL does not match SUPABASE_URL"):
+    with pytest_auth_error(503, "כתובת JWKS של Supabase לא תואמת ל-SUPABASE_URL"):
         verify_supabase_access_token(key.token(settings=supabase_settings()), settings=settings)
 
 
@@ -105,7 +105,7 @@ def test_supabase_project_url_cannot_be_auth_path(monkeypatch):
     settings = supabase_settings(supabase_url="https://nexmxwvivewvgmrritqa.supabase.co/auth/v1/.well-known/jwks.json")
     monkeypatch.setattr("backend.app.auth.httpx.get", jwks_response({"keys": [key.jwk()]}))
 
-    with pytest_auth_error(503, "Supabase URL is invalid"):
+    with pytest_auth_error(503, "כתובת Supabase לא תקינה"):
         verify_supabase_access_token(key.token(settings=supabase_settings()), settings=settings)
 
 
@@ -120,7 +120,7 @@ def test_malformed_authorization_header_is_rejected(tmp_path, monkeypatch):
     response = client.get("/api/onboarding", headers={"Authorization": "Token abc"})
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Missing Supabase access token"
+    assert response.json()["detail"] == "חסר טוקן גישה של Supabase"
 
 
 @pytest.mark.parametrize(
@@ -142,7 +142,7 @@ def test_invalid_supabase_tokens_are_rejected(name, token_factory, monkeypatch):
     settings = supabase_settings()
     monkeypatch.setattr("backend.app.auth.httpx.get", jwks_response({"keys": [key.jwk()]}))
 
-    with pytest_auth_error(401, "Invalid Supabase access token"):
+    with pytest_auth_error(401, "טוקן הגישה של Supabase לא תקין"):
         verify_supabase_access_token(token_factory(key, settings), settings=settings)
 
 
