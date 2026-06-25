@@ -11158,7 +11158,7 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 ### Changes
 
-- Extended the workout-plan equipment formatter for common gym/home equipment keys such as `barbell`, `bench`, `cables`, `gym`, `machines`, `kettlebell`, and `pull_up_bar`.
+- Extended the workout-plan equipment formatter for common gym/home equipment keys such as `barbell`, `bench`, `cables`, `gym`, `home`, `body weight`, `bands`, `machines`, `kettlebell`, and `pull_up_bar`.
 - Normalized label lookup case for profile/free-text equipment values.
 - Added WorkoutsPanel coverage proving stored gym equipment renders as Hebrew labels even when the backend returns capitalized keys.
 

@@ -795,8 +795,15 @@ function formatEquipment(equipment: string[]): string {
       return (
         {
           dumbbells: 'משקולות יד',
+          dumbbell: 'משקולת יד',
           'resistance bands': 'גומיות התנגדות',
+          resistance_bands: 'גומיות התנגדות',
+          bands: 'גומיות התנגדות',
+          band: 'גומייה',
           bodyweight: 'משקל גוף',
+          'body weight': 'משקל גוף',
+          'body-weight': 'משקל גוף',
+          home: 'בית',
           gym: 'חדר כושר',
           machines: 'מכונות',
           machine: 'מכונה',
