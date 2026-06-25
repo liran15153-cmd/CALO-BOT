@@ -1,6 +1,20 @@
 from backend.app.services.coach_intent_service import CoachIntentService
 
 
+def test_classify_with_trace_reports_rule_and_confidence():
+    service = CoachIntentService()
+
+    intent, rule, confidence = service.classify_with_trace("Build me a beginner workout")
+    assert intent.name == "workout_plan"
+    assert rule == "workout_plan"
+    assert confidence == "high"
+
+    intent, rule, confidence = service.classify_with_trace("tell me something nice")
+    assert intent.name == "general_chat"
+    assert rule == "general_chat"
+    assert confidence == "low"
+
+
 def test_intent_service_detects_hebrew_workout_plan_requests():
     intent = CoachIntentService().classify("תבנה לי תוכנית אימון של 2 ימים עם משקולות")
 

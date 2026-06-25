@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import IntEnum
 
 from backend.app.services.text_normalization import normalize_user_text
 
@@ -7,6 +8,40 @@ from backend.app.services.text_normalization import normalize_user_text
 class CoachIntent:
     name: str
     payload_text: str
+
+
+class IntentPriority(IntEnum):
+    WORKOUT_LOG = 100
+    MEAL_LOG = 99
+    MISSED_WORKOUT_GUIDANCE = 98
+    SUPPLEMENT_SAFETY_GUIDANCE = 97
+    WEEKLY_ACTION_PLAN_GUIDANCE = 96
+    LOW_ENERGY_ACTION_GUIDANCE = 95
+    MEAL_IMAGE_GUIDANCE = 94
+    NUTRITION_GUIDANCE = 93
+    FULL_WORKOUT_PLAN_REPLACEMENT = 92
+    WORKOUT_PLAN_CHANGE_SUMMARY = 91
+    NEXT_WORKOUT_SUMMARY = 90
+    CURRENT_WORKOUT_PLAN_SUMMARY = 89
+    WORKOUT_PLAN_EDIT = 88
+    WORKOUT_PLAN = 87
+    RETURN_AFTER_BREAK_GUIDANCE = 86
+    KNEE_SQUAT_SUBSTITUTION = 85
+    CREATINE_GUIDANCE = 84
+    EQUIPMENT_SUBSTITUTION_GUIDANCE = 83
+    PROGRESS_METRIC = 82
+    MOTIVATION_RECOVERY = 81
+    FITNESS_TERM_GUIDANCE = 80
+    NON_FITNESS = 79
+    GENERAL_CHAT = 0
+
+
+@dataclass(frozen=True)
+class IntentRule:
+    name: str
+    predicate_name: str
+    priority: IntentPriority
+    intent_name: str | None = None
 
 
 def _has_workout_plan_question_framing(text: str) -> bool:
@@ -33,57 +68,69 @@ def _has_workout_plan_question_framing(text: str) -> bool:
 
 
 class CoachIntentService:
+    _INTENT_RULES = (
+        IntentRule("workout_log", "_is_workout_log", IntentPriority.WORKOUT_LOG),
+        IntentRule("meal_log", "_is_meal_log", IntentPriority.MEAL_LOG),
+        IntentRule("missed_workout_guidance", "_is_missed_workout_guidance", IntentPriority.MISSED_WORKOUT_GUIDANCE),
+        IntentRule(
+            "supplement_safety_guidance",
+            "_is_supplement_safety_guidance",
+            IntentPriority.SUPPLEMENT_SAFETY_GUIDANCE,
+        ),
+        IntentRule(
+            "weekly_action_plan_guidance",
+            "_is_weekly_action_plan_guidance",
+            IntentPriority.WEEKLY_ACTION_PLAN_GUIDANCE,
+        ),
+        IntentRule("low_energy_action_guidance", "_is_low_energy_action_guidance", IntentPriority.LOW_ENERGY_ACTION_GUIDANCE),
+        IntentRule("meal_image_guidance", "_is_meal_image_guidance", IntentPriority.MEAL_IMAGE_GUIDANCE),
+        IntentRule("nutrition_guidance", "_is_nutrition_guidance", IntentPriority.NUTRITION_GUIDANCE),
+        IntentRule(
+            "full_workout_plan_replacement",
+            "_is_full_workout_plan_replacement",
+            IntentPriority.FULL_WORKOUT_PLAN_REPLACEMENT,
+            intent_name="workout_plan",
+        ),
+        IntentRule(
+            "workout_plan_change_summary",
+            "_is_workout_plan_change_summary",
+            IntentPriority.WORKOUT_PLAN_CHANGE_SUMMARY,
+        ),
+        IntentRule("next_workout_summary", "_is_next_workout_summary", IntentPriority.NEXT_WORKOUT_SUMMARY),
+        IntentRule(
+            "current_workout_plan_summary",
+            "_is_current_workout_plan_summary",
+            IntentPriority.CURRENT_WORKOUT_PLAN_SUMMARY,
+        ),
+        IntentRule("workout_plan_edit", "_is_workout_plan_edit", IntentPriority.WORKOUT_PLAN_EDIT),
+        IntentRule("workout_plan", "_is_workout_plan", IntentPriority.WORKOUT_PLAN),
+        IntentRule("return_after_break_guidance", "_is_return_after_break_guidance", IntentPriority.RETURN_AFTER_BREAK_GUIDANCE),
+        IntentRule("knee_squat_substitution", "_is_knee_squat_substitution", IntentPriority.KNEE_SQUAT_SUBSTITUTION),
+        IntentRule("creatine_guidance", "_is_creatine_guidance", IntentPriority.CREATINE_GUIDANCE),
+        IntentRule(
+            "equipment_substitution_guidance",
+            "_is_equipment_substitution_guidance",
+            IntentPriority.EQUIPMENT_SUBSTITUTION_GUIDANCE,
+        ),
+        IntentRule("progress_metric", "_is_progress_metric", IntentPriority.PROGRESS_METRIC),
+        IntentRule("motivation_recovery", "_is_motivation_recovery", IntentPriority.MOTIVATION_RECOVERY),
+        IntentRule("fitness_term_guidance", "_is_fitness_term_guidance", IntentPriority.FITNESS_TERM_GUIDANCE),
+        IntentRule("non_fitness", "_is_non_fitness_request", IntentPriority.NON_FITNESS),
+    )
+
     def classify(self, text: str) -> CoachIntent:
+        intent, _, _ = self.classify_with_trace(text)
+        return intent
+
+    def classify_with_trace(self, text: str) -> tuple[CoachIntent, str, str]:
         normalized = normalize_user_text(text)
         payload_text = self._strip_command_prefix(normalized)
 
-        # Logging actions outrank guidance/summary: a message that records something
-        # the user did should always be treated as a log, not as a question about it.
-        if self._is_workout_log(normalized):
-            return CoachIntent(name="workout_log", payload_text=payload_text)
-        if self._is_meal_log(normalized):
-            return CoachIntent(name="meal_log", payload_text=payload_text)
-        if self._is_missed_workout_guidance(normalized):
-            return CoachIntent(name="missed_workout_guidance", payload_text=payload_text)
-        if self._is_supplement_safety_guidance(normalized):
-            return CoachIntent(name="supplement_safety_guidance", payload_text=payload_text)
-        if self._is_weekly_action_plan_guidance(normalized):
-            return CoachIntent(name="weekly_action_plan_guidance", payload_text=payload_text)
-        if self._is_low_energy_action_guidance(normalized):
-            return CoachIntent(name="low_energy_action_guidance", payload_text=payload_text)
-        if self._is_meal_image_guidance(normalized):
-            return CoachIntent(name="meal_image_guidance", payload_text=payload_text)
-        if self._is_nutrition_guidance(normalized):
-            return CoachIntent(name="nutrition_guidance", payload_text=payload_text)
-        if self._is_full_workout_plan_replacement(normalized):
-            return CoachIntent(name="workout_plan", payload_text=payload_text)
-        if self._is_workout_plan_change_summary(normalized):
-            return CoachIntent(name="workout_plan_change_summary", payload_text=payload_text)
-        if self._is_next_workout_summary(normalized):
-            return CoachIntent(name="next_workout_summary", payload_text=payload_text)
-        if self._is_current_workout_plan_summary(normalized):
-            return CoachIntent(name="current_workout_plan_summary", payload_text=payload_text)
-        if self._is_workout_plan_edit(normalized):
-            return CoachIntent(name="workout_plan_edit", payload_text=payload_text)
-        if self._is_workout_plan(normalized):
-            return CoachIntent(name="workout_plan", payload_text=payload_text)
-        if self._is_return_after_break_guidance(normalized):
-            return CoachIntent(name="return_after_break_guidance", payload_text=payload_text)
-        if self._is_knee_squat_substitution(normalized):
-            return CoachIntent(name="knee_squat_substitution", payload_text=payload_text)
-        if self._is_creatine_guidance(normalized):
-            return CoachIntent(name="creatine_guidance", payload_text=payload_text)
-        if self._is_equipment_substitution_guidance(normalized):
-            return CoachIntent(name="equipment_substitution_guidance", payload_text=payload_text)
-        if self._is_progress_metric(normalized):
-            return CoachIntent(name="progress_metric", payload_text=payload_text)
-        if self._is_motivation_recovery(normalized):
-            return CoachIntent(name="motivation_recovery", payload_text=payload_text)
-        if self._is_fitness_term_guidance(normalized):
-            return CoachIntent(name="fitness_term_guidance", payload_text=payload_text)
-        if self._is_non_fitness_request(normalized):
-            return CoachIntent(name="non_fitness", payload_text=payload_text)
-        return CoachIntent(name="general_chat", payload_text=text)
+        for rule in self._INTENT_RULES:
+            if getattr(self, rule.predicate_name)(normalized):
+                intent_name = rule.intent_name or rule.name
+                return CoachIntent(name=intent_name, payload_text=payload_text), rule.name, "high"
+        return CoachIntent(name="general_chat", payload_text=text), "general_chat", "low"
 
     # Common Israeli foods used to gate eating-slang and food-judgment questions, so a
     # bare slang verb ("טרפתי אימון", "חיסלתי סטים") is never mistaken for a meal log.
