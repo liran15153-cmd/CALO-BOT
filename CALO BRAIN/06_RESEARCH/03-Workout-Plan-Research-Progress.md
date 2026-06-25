@@ -11081,3 +11081,22 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 
 - Focused storage/settings suite: `19 passed`.
 - Reset now uses the shared storage service; no duplicate `_delete_meal_image_files` helper remains.
+
+## Final Storage Transition Cleanup - 2026-06-26
+
+### Verification target
+
+- Cover the edge case where meal images were created in local fallback mode before Supabase Storage was configured.
+
+### Changes
+
+- `FileStorageService.delete_meal_image()` now attempts local cleanup after a successful or already-missing Supabase object delete.
+- Added a regression test proving a legacy local image file is removed even when the Supabase object returns `404`.
+
+### Checks run
+
+- `python -m pytest backend/tests/test_meal_upload_api.py backend/tests/test_settings_api.py --basetemp .pytest-tmp-storage-transition`
+
+### Result
+
+- Focused storage/settings suite: `20 passed`.

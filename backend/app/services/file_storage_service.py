@@ -93,11 +93,15 @@ class FileStorageService:
             )
             if response.status_code not in {200, 204, 404}:
                 raise ValueError("מחיקת תמונת הארוחה מ-Supabase נכשלה")
+            self._delete_local_meal_image(image_path)
             return
 
         if self.settings.app_env == "production" or self.settings.supabase_auth_required:
             raise ValueError(_SUPABASE_STORAGE_REQUIRED_MESSAGE)
 
+        self._delete_local_meal_image(image_path)
+
+    def _delete_local_meal_image(self, image_path: str) -> None:
         root = self.upload_root.resolve()
         path = Path(image_path)
         try:

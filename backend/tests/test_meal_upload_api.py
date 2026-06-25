@@ -152,6 +152,30 @@ def test_supabase_meal_image_delete_uses_auth_user_token(tmp_path, monkeypatch):
     assert requests[0][1]["Authorization"] == "Bearer user-jwt"
 
 
+def test_supabase_meal_image_delete_also_cleans_legacy_local_file(tmp_path, monkeypatch):
+    service = FileStorageService(
+        tmp_path / "uploads",
+        access_token="user-jwt",
+        settings=Settings(
+            _env_file=None,
+            supabase_url="https://nexmxwvivewvgmrritqa.supabase.co",
+            supabase_publishable_key="publishable-test-key",
+        ),
+    )
+    local_path = tmp_path / "uploads" / "meals" / "7" / "2026-06-26" / "old.jpg"
+    local_path.parent.mkdir(parents=True)
+    local_path.write_bytes(b"legacy-local-image")
+
+    monkeypatch.setattr(
+        "backend.app.services.file_storage_service.httpx.delete",
+        lambda *_args, **_kwargs: FakeStorageResponse(404),
+    )
+
+    service.delete_meal_image("meals/7/2026-06-26/old.jpg")
+
+    assert not local_path.exists()
+
+
 def test_meal_upload_rejects_jpeg_content_type_with_invalid_magic_bytes(tmp_path):
     client, db = make_client_and_db(tmp_path)
 
