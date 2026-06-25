@@ -266,6 +266,9 @@ export function WorkoutsPanel() {
     }));
   }
 
+  const planTypeLabel = plan ? formatPlanType(plan.plan_type) : null;
+  const planDurationLabel = plan ? formatWorkoutPlanDuration(plan) : null;
+
   return (
     <section className="panel workouts-panel">
       <div className="panel-heading">
@@ -487,8 +490,8 @@ export function WorkoutsPanel() {
         <div className="plan-view">
           <div className="plan-summary">
             <h4>{plan.name}</h4>
-            {formatPlanType(plan.plan_type) && <span>{formatPlanType(plan.plan_type)}</span>}
-            {formatWorkoutPlanDuration(plan) && <span>{formatWorkoutPlanDuration(plan)}</span>}
+            {planTypeLabel && <span>{planTypeLabel}</span>}
+            {planDurationLabel && <span>{planDurationLabel}</span>}
             <span>{formatDaysPerWeek(plan.days_per_week)}</span>
             <span>{formatEquipment(plan.equipment_needed)}</span>
           </div>
