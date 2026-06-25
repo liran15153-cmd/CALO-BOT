@@ -10774,3 +10774,40 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
   - `reset_deleted_records=32`
   - `readiness_production_ready=false`
 - Boundary: this proves local product flow only. `npm run verify:supabase` remains the required live Supabase/RLS/Storage proof.
+
+## Final Hebrew-First UI Cleanup - 2026-06-26
+
+### Verification target
+
+- Keep the visible local/no-key and settings status UI Hebrew-first before merging.
+- Keep test fixtures aligned with Hebrew-first product behavior so English mock copy does not hide regressions.
+
+### Changes
+
+- Translated the no-API-key provider alert in the app shell.
+- Translated visible Supabase auth/storage labels and formatted Supabase status values.
+- Updated frontend status fixtures for dashboard/settings smoke tests to Hebrew copy.
+- Added frontend assertions that the old English local-mode/status/disclaimer strings do not reach the rendered UI.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run App.test.tsx SettingsPanel.test.tsx`
+- `npm --prefix frontend test -- --run`
+- `npm --prefix frontend run lint`
+- `npm run lint`
+- `npm run build`
+- `npm test`
+- `git diff --check`
+- `python scripts/secret_scan.py`
+- `git merge-tree --write-tree origin/main HEAD`
+
+### Result
+
+- Latest pushed commits:
+  - `470757f Translate remaining settings status UI`
+  - `d7ae8b5 Keep frontend status fixtures Hebrew-first`
+- Frontend tests: `50 passed`.
+- Full local suite: backend `586 passed`, frontend `50 passed`.
+- Build, lint, diff check, and secret scan passed.
+- Merge-tree against `origin/main` returned a tree id without conflicts.
+- Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
