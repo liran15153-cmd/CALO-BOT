@@ -11100,3 +11100,23 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 ### Result
 
 - Focused storage/settings suite: `20 passed`.
+
+## Final Auth Session Storage Cleanup - 2026-06-26
+
+### Verification target
+
+- Prevent a corrupt or stale browser session from bypassing the login screen without a usable Supabase access token.
+
+### Changes
+
+- `getStoredAuthSession()` now returns a session only when `access_token` is a non-empty string.
+- Invalid or unparsable stored sessions are removed from `localStorage`.
+- Added auth storage unit tests.
+
+### Checks run
+
+- `npm --prefix frontend test -- --run auth.test.ts App.test.tsx api.test.ts`
+
+### Result
+
+- Focused frontend auth/API/app suite: `9 passed`.

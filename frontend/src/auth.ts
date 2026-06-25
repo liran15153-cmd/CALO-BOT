@@ -19,8 +19,15 @@ export function isSupabaseAuthConfigured(): boolean {
 export function getStoredAuthSession(): SupabaseAuthSession | null {
   try {
     const raw = window.localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as SupabaseAuthSession) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw) as Partial<SupabaseAuthSession>;
+    if (typeof session.access_token !== 'string' || !session.access_token.trim()) {
+      window.localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session as SupabaseAuthSession;
   } catch {
+    window.localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
