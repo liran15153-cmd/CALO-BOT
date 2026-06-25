@@ -10926,3 +10926,27 @@ Inspect the workout-log parser boundary. The safer Loop 64 response depends on d
 - Full local suite: backend `586 passed`, frontend `50 passed`.
 - Lint and diff check passed.
 - Boundary unchanged: live Supabase verification remains skipped/unproven until valid live credentials are available.
+
+## Final Local Live Hebrew Smoke - 2026-06-26
+
+### Verification target
+
+- Verify the already-running local backend/frontend still respond after the final Hebrew-first cleanup commits.
+- Confirm readiness/settings text is valid UTF-8 Hebrew, not only test-proven strings.
+
+### Checks run
+
+- `GET http://127.0.0.1:8000/api/readiness`
+- `GET http://127.0.0.1:8000/api/settings`
+- `GET http://127.0.0.1:5173`
+- `GET http://127.0.0.1:5174`
+- Explicit Python UTF-8 decode for readiness/settings response bodies.
+
+### Result
+
+- Backend health/readiness server responded.
+- Frontend dev servers on ports `5173` and `5174` returned HTTP 200.
+- Decoded readiness detail included: `SQLite למסד נתונים מקומי בפיתוח`.
+- Decoded readiness issue included: `אימות Supabase לא נדרש`.
+- Decoded settings disclaimer began with Hebrew medical-safety wording.
+- Existing dev-server processes were left running because they may belong to the local workspace session.
