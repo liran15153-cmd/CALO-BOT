@@ -2656,6 +2656,7 @@ def test_chat_endpoint_sends_coaching_knowledge_to_configured_provider(tmp_path,
 
 def test_chat_endpoint_uses_haiku_chat_model_by_default_for_configured_provider(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "false")
     monkeypatch.delenv("ANTHROPIC_CHAT_MODEL", raising=False)
     get_settings.cache_clear()
     client, _db = make_client_and_db(tmp_path)

@@ -261,7 +261,7 @@ class MealService:
     @staticmethod
     def _parse_analysis_json(text: str) -> dict:
         try:
-            loaded = json.loads(text)
+            loaded = json.loads(MealService._extract_json_object_text(text))
         except json.JSONDecodeError:
             loaded = None
         if isinstance(loaded, dict):
@@ -274,6 +274,15 @@ class MealService:
                 "confidence": "low",
             }
         )
+
+    @staticmethod
+    def _extract_json_object_text(text: str) -> str:
+        stripped = text.strip()
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start != -1 and end > start:
+            return stripped[start : end + 1]
+        return stripped
 
     @staticmethod
     def _ensure_hebrew_analysis_payload(payload: dict) -> dict:

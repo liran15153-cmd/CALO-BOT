@@ -273,6 +273,33 @@ def test_meal_image_analysis_updates_meal_ranges_and_items(tmp_path, monkeypatch
     assert usage.token_breakdown_json["total"] == 30
 
 
+def test_meal_image_analysis_parses_fenced_json_provider_text(tmp_path, monkeypatch):
+    client, db = make_client_and_db(tmp_path)
+    upload = client.post(
+        "/api/meals/upload",
+        data={"note": "Chicken bowl"},
+        files={"file": ("lunch.jpg", b"\xff\xd8\xff\xe0fake-jpeg", "image/jpeg")},
+    ).json()
+    monkeypatch.setattr(
+        "backend.app.services.meal_service.build_ai_provider",
+        lambda _api_key, _model: FencedJsonImageProvider(),
+    )
+
+    response = client.post(f"/api/meals/{upload['id']}/analyze")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "configured"
+    assert body["detected_items"][0]["name"] == "קערת עוף ואורז"
+    meal = db.get(Meal, upload["id"])
+    assert meal is not None
+    assert meal.calories_min == 520
+    assert meal.calories_max == 760
+    item = db.scalar(select(MealItem))
+    assert item is not None
+    assert item.name == "קערת עוף ואורז"
+
+
 def test_meal_image_analysis_replaces_non_hebrew_provider_text(tmp_path, monkeypatch):
     enable_language_guard(monkeypatch)
     get_settings.cache_clear()
@@ -449,6 +476,26 @@ class FakeImageProvider:
                 "total": 30,
                 "source": "fake_image_provider",
             },
+        )
+
+
+class FencedJsonImageProvider:
+    def analyze_image(self, _image_path, note=None):
+        return AIResult(
+            text=(
+                "```json\n"
+                '{"detected_items":[{"name":"קערת עוף ואורז","quantity":"קערה אחת",'
+                '"calories_range":[520,760],"protein_range":[35,52]}],'
+                '"calorie_range":[520,760],'
+                '"macro_ranges":{"protein":[35,52],"carbs":[55,90],"fat":[12,24]},'
+                '"message":"הערכה שמרנית לפי התמונה, עם טווחים ולא ערך מדויק.",'
+                '"confidence":"medium","follow_up_questions":["כמה אורז היה בקערה?"]}'
+                "\n```"
+            ),
+            provider_status="configured",
+            used_model="fake-vision",
+            estimated_tokens_in=10,
+            estimated_tokens_out=20,
         )
 
 

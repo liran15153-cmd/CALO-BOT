@@ -148,7 +148,18 @@ class AnthropicProvider:
         encoded_image = base64.b64encode(image_path.read_bytes()).decode("ascii")
         response = self._call_messages_api(
             model=self.model,
-            system="הערך תזונת ארוחה מתמונה. החזר JSON עם טווחים, אי-ודאות, וכל טקסט למשתמש בעברית בלבד.",
+            system=(
+                "Analyze the meal image for a Hebrew-first fitness coach. "
+                "Return only valid JSON, with no markdown fences and no extra text. "
+                "Use exactly these keys: message, detected_items, calorie_range, macro_ranges, "
+                "confidence, follow_up_questions. "
+                "detected_items must be an array of objects with: name, quantity, calories_range, protein_range. "
+                "calorie_range and macro range values must be two-number arrays. "
+                "macro_ranges must use protein, carbs, and fat. "
+                "confidence must be one of low, medium, high. "
+                "All user-visible string values must be natural Hebrew only. "
+                "Give ranges and uncertainty; do not claim exact nutrition accuracy."
+            ),
             messages=[
                 {
                     "role": "user",
