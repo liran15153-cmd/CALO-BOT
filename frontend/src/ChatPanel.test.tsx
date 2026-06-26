@@ -70,6 +70,27 @@ describe('Chat UI', () => {
     expect(screen.queryByText(/צ'אט חדש התחיל/i)).not.toBeInTheDocument();
   });
 
+  it('does not overpromise broad long-term memory on a new chat', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/health')) {
+        return jsonResponse({ status: 'ok', service: 'calo-coach', database: 'configured', ai_provider: 'not_configured' });
+      }
+      if (url.endsWith('/api/chat/sessions') && init?.method === 'POST') {
+        return jsonResponse({ id: 1, title: "צ'אט מאמן", is_active: true });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /צ'אט/i }));
+    fireEvent.click(screen.getByRole('button', { name: /צ'אט חדש/i }));
+
+    expect(await screen.findByText(/המידע הבטיחותי השמור/i)).toBeInTheDocument();
+    expect(screen.queryByText(/זיכרון לטווח ארוך/i)).not.toBeInTheDocument();
+  });
+
   it('sends a message and renders the coach response', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
