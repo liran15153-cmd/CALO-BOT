@@ -601,10 +601,6 @@ class CoachEngine:
         return None
 
 
-def _hebrew_confidence(value: str | None) -> str:
-    return {"low": "נמוכה", "medium": "בינונית", "high": "גבוהה"}.get(value or "", value or "לא ידועה")
-
-
 def _unpack_tool_result(result: ToolResult) -> tuple[str, dict[str, Any]]:
     if isinstance(result, tuple):
         return result
