@@ -2762,6 +2762,29 @@ def test_intent_llm_fallback_unknown_result_continues_general_chat(tmp_path, mon
     assert db.scalar(select(WorkoutPlan)) is None
 
 
+def test_intent_llm_fallback_does_not_turn_general_chat_into_local_guidance(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")
+    get_settings.cache_clear()
+    client, db = make_client_and_db(tmp_path)
+    provider = IntentFallbackProvider({"intent": "weekly_action_plan_guidance", "confidence": "high"})
+    monkeypatch.setattr("backend.app.services.coach_engine.build_ai_provider", lambda _api_key, _model: provider)
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "מה כדאי לי לעשות השבוע כדי להיות עקבי יותר? אל תיצור תוכנית אימון, רק עצה קצרה"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "configured"
+    assert provider.extract_calls == 1
+    assert provider.chat_calls == 1
+    coach_message = db.scalar(select(ChatMessage).where(ChatMessage.role == "coach").order_by(ChatMessage.id.desc()))
+    assert coach_message is not None
+    assert coach_message.metadata_json["intent"] == "general_chat"
+    assert db.scalar(select(WorkoutPlan)) is None
+
+
 def test_intent_llm_fallback_rechecks_budget_before_general_chat(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("INTENT_LLM_FALLBACK_ENABLED", "true")

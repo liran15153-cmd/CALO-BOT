@@ -1,9 +1,7 @@
-import { Activity, Dumbbell, LayoutDashboard, LogOut, MessageSquare, Settings, UserRound, Utensils } from 'lucide-react';
+import { Activity, Dumbbell, LayoutDashboard, MessageSquare, Settings, UserRound, Utensils } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { clearApiAccessToken, fetchHealth, setApiAccessToken, type HealthStatus } from './api';
-import { AuthPanel } from './AuthPanel';
-import { clearStoredAuthSession, getStoredAuthSession, isSupabaseAuthConfigured, type SupabaseAuthSession } from './auth';
+import { fetchHealth, type HealthStatus } from './api';
 import { ChatPanel } from './ChatPanel';
 import { DashboardPanel } from './DashboardPanel';
 import { MealsPanel } from './MealsPanel';
@@ -27,13 +25,7 @@ const navItems: Array<{ id: View; label: string; icon: typeof LayoutDashboard }>
 function App() {
   const [view, setView] = useState<View>('dashboard');
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [session, setSession] = useState<SupabaseAuthSession | null>(() => getStoredAuthSession());
-  const authConfigured = isSupabaseAuthConfigured();
   const isNoApiKeyMode = health?.no_api_key_mode ?? health?.ai_provider === 'not_configured';
-
-  useEffect(() => {
-    setApiAccessToken(session?.access_token ?? null);
-  }, [session]);
 
   useEffect(() => {
     fetchHealth()
@@ -49,23 +41,6 @@ function App() {
   }, []);
 
   const title = useMemo(() => navItems.find((item) => item.id === view)?.label ?? 'לוח בקרה', [view]);
-
-  function handleLogout() {
-    clearStoredAuthSession();
-    clearApiAccessToken();
-    setSession(null);
-    setView('dashboard');
-  }
-
-  if (authConfigured && !session) {
-    return (
-      <main className="app-shell auth-shell" dir="rtl" lang="he">
-        <section className="workspace auth-workspace">
-          <AuthPanel onAuthenticated={setSession} />
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main className="app-shell" dir="rtl" lang="he">
@@ -102,12 +77,6 @@ function App() {
             <p>בינה מלאכותית: {formatProviderStatus(health?.ai_provider)}</p>
           </div>
         </div>
-        {authConfigured ? (
-          <button className="ghost-button sidebar-action" type="button" onClick={handleLogout}>
-            <LogOut size={16} aria-hidden="true" />
-            יציאה
-          </button>
-        ) : null}
         {isNoApiKeyMode ? (
           <div className="provider-alert" role="status" aria-live="polite">
             <span>ספק הבינה המלאכותית לא מוגדר</span>

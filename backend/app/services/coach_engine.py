@@ -30,6 +30,7 @@ from backend.app.services.workout_service import WorkoutService
 
 COACH_CHAT_MAX_OUTPUT_TOKENS = 320
 ToolResult = str | tuple[str, dict[str, Any]]
+_INTENT_LLM_FALLBACK_ACTION_INTENTS = {"workout_plan"}
 _PLAN_EDIT_RESPONSE_SUMMARIES = {
     "remove_bench": "הסרתי שימוש בספסל והחלפתי תרגילים או חלופות שדרשו ספסל.",
     "remove_cable": "הסרתי שימוש בכבל/פולי והחלפתי תרגילים או חלופות שדרשו כבל.",
@@ -148,7 +149,7 @@ class CoachEngine:
                     request=fallback_classifier.last_request,
                     result=fallback_classifier.last_result,
                 )
-            if fallback_intent_name is not None:
+            if fallback_intent_name in _INTENT_LLM_FALLBACK_ACTION_INTENTS:
                 intent = CoachIntent(name=fallback_intent_name, payload_text=payload.message)
                 intent_fallback_metadata = {
                     "intent_llm_fallback": True,
