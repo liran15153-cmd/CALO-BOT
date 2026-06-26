@@ -6,10 +6,9 @@ from sqlalchemy.orm import Session
 from backend.app.auth import get_current_user
 from backend.app.db import get_db
 from backend.app.models import User
-from backend.app.schemas import ActivateWorkoutPlanRequest, WorkoutPlanRequest
+from backend.app.schemas import ActivateWorkoutPlanRequest, WorkoutLogRequest, WorkoutPlanRequest
 from backend.app.services.pending_action_service import PendingActionService
 from backend.app.services.pain_text import extract_pain_area, vague_pain_plan_clarification_response
-from backend.app.schemas import WorkoutLogRequest
 from backend.app.services.safety_service import SafetyService
 from backend.app.services.workout_plan_builder import is_persistent_plan_type, is_single_workout_plan
 from backend.app.services.workout_service import (
